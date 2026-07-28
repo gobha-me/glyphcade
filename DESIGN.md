@@ -180,7 +180,11 @@ Oregon Trail.
 ## Framework dependencies
 
 Filed against [gobha-me/termforge](https://github.com/gobha-me/termforge) from
-this design pass:
+this design pass.
+
+> **This table is point-in-time — it records what was true when the design was
+> written.** [STATUS.md](STATUS.md) is the live state; check it (or `gh`) before
+> assuming anything here still blocks. #58 has already been fixed upstream.
 
 | Issue | Gap | Blocks |
 |---|---|---|
