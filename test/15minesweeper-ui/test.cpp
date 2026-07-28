@@ -21,6 +21,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <chrono>
 #include <string>
 #include <vector>
 
@@ -438,8 +439,15 @@ TEST_CASE("Enter on a finished board ends the game via done()", "[minesweeper]")
   REQUIRE(g->board().state() == State::Lost);
   REQUIRE_FALSE(g->done());
 
+  // ⚠ `g` DANGLES from here on. Shell::handle_in_game_key calls
+  // apply_transitions() as soon as the game consumes a key, so done() is
+  // polled and the Game is destroyed before dispatch_event even returns —
+  // asserting g->done() afterwards is a use-after-free, which is how ASan
+  // found this line. Assert the Shell's reaction instead; that the game ended
+  // itself is exactly what the Shell leaving InGame means.
   app.dispatch_event(key(termforge::Key::Enter));
-  REQUIRE(g->done());
+  REQUIRE(app.state() == Shell::State::Selector);
+  REQUIRE(app.current_game() == nullptr);
   app.step();
   REQUIRE(app.state() == Shell::State::Selector);
 }
@@ -490,6 +498,26 @@ TEST_CASE("the HUD zero-pads and only counts time after a reveal",
   app.step();
   REQUIRE(screen_contains(app, "MINES 002"));
   REQUIRE(screen_contains(app, "TIME 000"));
+
+  // ...and after a reveal it DOES advance, and the new value reaches the HUD.
+  // Asserted here rather than in a pty capture: the renderer diffs, so a clock
+  // ticking from 000 to 001 rewrites one digit in place and the string
+  // "TIME 001" never appears in the byte stream at all.
+  //
+  // 3.5 seconds of ticks, not exactly 3: 180 additions of 1.0/60.0 accumulate
+  // to 2.9999999999999996 in double, and seconds() truncates. The clock flips a
+  // fraction of a microsecond late at each whole second, which no player can
+  // see — but a test sitting exactly on that boundary is pinning floating-point
+  // rounding rather than the behaviour it is named after.
+  g->board().reveal({.row = 1, .col = 1});
+  REQUIRE(g->board().timer_running());
+  for (int i = 0; i < 7 * Shell::kTickHz / 2; ++i) {
+    g->tick(std::chrono::duration<double>{1.0 / Shell::kTickHz});
+  }
+  app.step();
+  REQUIRE(g->board().seconds() == 3);
+  REQUIRE(screen_contains(app, "TIME 003"));
+  REQUIRE_FALSE(screen_contains(app, "TIME 000"));
 }
 
 TEST_CASE("the state word says how the game ended, without colour",
