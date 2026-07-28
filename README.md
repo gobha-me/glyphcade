@@ -8,9 +8,10 @@ arcade-of-small-games idea and the same roster to raid, but terminal-native and
 compiled instead of HTML/CSS/JS. One binary, a selector, and a set of
 self-contained games.
 
-> **Status: the arcade runs.** The shell and its selector work — pick a game,
-> play it, pause it, come back to the menu. The only game in the menu today is a
-> diagnostic stub; the first real one is Minesweeper. See [STATUS.md](STATUS.md)
+> **Status: the arcade runs, and there is a game in it.** Pick Minesweeper from
+> the selector and play it — mouse or keyboard, three difficulties, timer and
+> mine counter, pause and quit-to-menu. Playable on a bare 7-bit terminal with
+> no colour. Audio is next. See [STATUS.md](STATUS.md)
 > for live state, [DESIGN.md](DESIGN.md) for the architecture, and the issue
 > tracker for the epic breakdown.
 

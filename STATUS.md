@@ -2,31 +2,38 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-07-28** (Epic 1)
+**Last updated: 2026-07-28** (Epic 3)
 
 ---
 
 ## Where the project actually is
 
-**Epic 1 has landed. There is an arcade.** The binary opens a selector, you pick
-a game, play it, pause it, and come back to the menu. Green on GCC 14 and Clang
-20, with and without audio, under ASan and UBSan, with `-Werror` throughout, and
-`cmake --install` still produces a package an external `find_package(term-game
-CONFIG)` consumer can link.
+**Epic 3 has landed. There is a game.** The binary opens a selector, you pick
+Minesweeper, and you play it — mouse or keyboard, three difficulties, a timer
+and a mine counter, pause and quit-to-menu. Green on GCC 14 and Clang 20, with
+and without audio, under ASan and UBSan, with `-Werror` throughout.
 
 Verified in a pty at **both** tiers — the ASCII/no-colour tier (which is also
 the only tier the headless tests can reach, since `test_run_frames` installs the
 fallback driver) and, with `TERM=xterm-256color`, the colour tier with rounded
-borders and the emoji icon. Recipe in [AGENTS.md](AGENTS.md).
+borders, the 💣 icon and the Unicode tile set. Recipe in [AGENTS.md](AGENTS.md).
 
-`BootApp` is **gone** — the Shell replaced it, and `test/10render` now points at
-the Shell. What is still missing is games: the only entry in the registry is
-[`StubGame`](include/termgame/games/stub/stub_game.hpp), a diagnostic with a
-deletion condition.
+**`StubGame` is gone**, on its own deletion condition — Minesweeper proves the
+same four things the diagnostic existed to prove, while also being a game.
+`test/11selector`, `test/12registry` and `test/13tick` now point at it.
 
-**Next move: Epic 3 (Minesweeper)** — the first real game, and the thing that
-retires the stub. Epic 2 (audio) is equally unblocked if you would rather do
-that first; nothing blocks either.
+⚠ What is verified is *rendering and rules*, not **feel**. Click latency, cursor
+responsiveness and whether the board is pleasant to play still need a human, and
+there is no sound at all.
+
+**Next move: Epic 2 (audio, gitea [#3](https://git.gobha.me/xcaliber/term-game/issues/3))** —
+Minesweeper is the SFX consumer waiting for it, and `Board`'s verbs already
+return "did anything change", which is where reveal/flag/explode/win will bind.
+Epics 4 (2048) and 5 (Snake) are equally unblocked; nothing blocks any of them.
+There is also one small, well-defined piece of housekeeping now unblocked:
+**gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16) — delete
+`guarded_run`**, whose upstream fix (termforge #71) shipped in v0.1.10 during
+this epic.
 
 ---
 
@@ -37,7 +44,7 @@ that first; nothing blocks either.
 | 0 — Bootstrap | **done** | — |
 | 1 — Arcade shell | **done** | — |
 | 2 — Audio engine | **ready** | — |
-| 3 — Minesweeper | **ready** | — |
+| 3 — Minesweeper | **done** | — |
 | 4 — 2048 | **ready** | — |
 | 5 — Snake | **ready** | — |
 | 6 — Tetris | **ready** | termforge #60 (degradable — feel only) |
@@ -96,7 +103,7 @@ Epic 0's `BootApp` no longer exists — Epic 1 replaced it with the Shell.
   `termforge::App`. Selector ↔ InGame ↔ Paused, a two-pane selector over
   `ListWidget`+`Frame`+`TextBox`, pause as a `ConfirmDialog` overlay, and
   `set_tick_hz(60)` forwarding the framework's fixed timestep to the game.
-- **`StubGame`** — one diagnostic game, with a deletion condition.
+- **`StubGame`** — one diagnostic game, with a deletion condition. **Deleted by Epic 3.**
 - **Tests:** `10render` (repointed off `BootApp`; the selector paints at three
   sizes), `11selector` (the state machine, incl. the Escape regression and the
   use-after-free probe), `12registry` (incl. "the factory and the metadata
@@ -115,10 +122,74 @@ Every one of these is a decision with a condition attached, not an oversight.
 |---|---|
 | Audio in `GameContext` | Epic 2 — do not guess the handle before the engine exists (gitea [#3](https://git.gobha.me/xcaliber/term-game/issues/3)) |
 | High-score persistence | the *second* scoring game, not the first — gitea [#14](https://git.gobha.me/xcaliber/term-game/issues/14) |
-| One static library target per game | the second real game; today `src/lib/games/<slug>/` compiles into `term-game_lib` |
-| `StubGame` | delete when Epic 3 (Minesweeper) lands — it proves the same four things while also being a game |
-| `Shell::quit_requested()` | delete when termforge [#73](https://github.com/gobha-me/termforge/issues/73) lands; it is duplicated state that exists only because `App::m_running` is unreadable |
+| One static library target per game | the second real game; today `src/lib/games/<slug>/` compiles into `term-game_lib`. Minesweeper was the first, so this now triggers on the **next** one |
+| `StubGame` | **done** — deleted by Epic 3 |
+| `Shell::quit_requested()` | delete when termforge [#73](https://github.com/gobha-me/termforge/issues/73) lands; it is duplicated state that exists only because `App::m_running` is unreadable — **still open** |
 | The selector's gutter marker | delete when termforge [#72](https://github.com/gobha-me/termforge/issues/72) lands, and give the two columns back to the list |
+
+---
+
+## What Epic 3 built
+
+Minesweeper, in four pieces, three of which name no termforge type at all:
+
+- **[`board.hpp`](include/termgame/games/minesweeper/board.hpp)** — the rules.
+  Deferred mine placement, flood fill, marks, chording, win/loss, and a clock
+  driven only by `dt`. It includes **no termforge header**, which is what makes
+  `test/14minesweeper` unable to construct a `Screen` rather than merely not
+  doing so.
+- **[`layout.hpp`](include/termgame/games/minesweeper/layout.hpp)** — integer
+  geometry. One `Layout` per frame feeds both `draw()` and `on_event()`, so
+  drawing and hit-testing cannot drift apart; `cell_at()` is round-tripped over
+  every cell at every size.
+- **[`glyphs.hpp`](include/termgame/games/minesweeper/glyphs.hpp)** — the two
+  tile tiers, with three `static_assert`s (7-bit ASCII, one column each,
+  pairwise distinct).
+- **[`minesweeper.hpp`](include/termgame/games/minesweeper/minesweeper.hpp)** —
+  the `Game`. The only file that knows `Screen`, `Event` or `GameContext` exist.
+
+**Three divergences from the HTML-Games reference**, each pinned by a test:
+
+| Reference | Ours | Why |
+|---|---|---|
+| Rejection sampler for mine placement | partial Fisher–Yates over eligible cells | the reference's loop is unbounded once `mines > rows*cols - 9`. ⚠ **Restoring it makes `test/14minesweeper` HANG, not fail** — verified. If ctest ever times out there, that is what happened. |
+| First click on a flagged cell places mines and starts the clock | the flag guard runs *before* placement | a move that did nothing must not arm the game |
+| Chording bound to `auxclick` only | left-click on a revealed number also chords | most trackpads have no middle button, and chording is core to playing well |
+
+Plus a question-mark mark state, which the reference does not have.
+
+**Mutation-tested** — the five claims this epic rests on:
+
+1. Shrinking the safe zone to the clicked cell → 3 logic cases red.
+2. Deleting the flag check in `flood_reveal` → 1 red.
+3. Deleting the `pressed == true` guard in `handle_mouse` → 1 red.
+4. Hardcoding the Unicode tile table at the call site → 3 red, **including the
+   7-bit sweep** — which is how we know the `static_assert` and the runtime
+   sweep are not the same check.
+5. Replacing the bracket cursor with a `kFocusBg` highlight → 3 red.
+
+**Two traps that cost a debugging round**, both now in the test file headers:
+
+- **Never hold a `Screen&` across a `step()`.** `App::test_run_frames`
+  reassigns `m_screen` on every call, so a cached reference dangles — and it
+  surfaces as a segfault mid-suite, not a wrong value.
+- **Never read the `Game*` after dispatching a key that ends the game.**
+  `Shell::handle_in_game_key` calls `apply_transitions()` as soon as the game
+  consumes a key, so `done()` is polled and the game destroyed *before*
+  `dispatch_event` returns. ASan found this one.
+
+The hand-rolled splitmix64 in `board.hpp` exists because
+`std::uniform_int_distribution` is not specified bit-for-bit. **Verified**, not
+assumed: the same seeds produce byte-identical mine layouts from the GCC and
+Clang builds.
+
+### What Epic 3 deliberately did not build
+
+| Deferred | Condition to revisit |
+|---|---|
+| **SFX** (reveal, flag, explode, win) | Epic 2 does not exist yet — gitea [#3](https://git.gobha.me/xcaliber/term-game/issues/3). `Board::reveal/cycle_mark/chord` already return "did anything change", which is the binding point. Issue [#4](https://git.gobha.me/xcaliber/term-game/issues/4) scoped audio as optional, degrading to silence. |
+| **High-score persistence** | the *second* scoring game — gitea [#14](https://git.gobha.me/xcaliber/term-game/issues/14). `GameContext` has no persistence seam, and a fresh `Game` is built per entry, so an in-memory best time would die on quit-to-menu. The timer and mine counter ship; only the record does not. |
+| A minimum terminal size in `GameMeta` | Hard needs 63x20 and the Shell's floor is 20x8, so the selector will launch a board the terminal cannot show. Epic 3 ships the in-game too-small screen instead — gitea [#15](https://git.gobha.me/xcaliber/term-game/issues/15). |
 
 ---
 
@@ -131,10 +202,11 @@ Every one of these is a decision with a condition attached, not an oversight.
 | [#59](https://github.com/gobha-me/termforge/issues/59) | No `on_tick(dt)` hook | **closed — shipped in v0.1.8** |
 | [#60](https://github.com/gobha-me/termforge/issues/60) | No key release (Kitty keyboard protocol) | open |
 | [#61](https://github.com/gobha-me/termforge/issues/61) | `Key` enum stops at F4 | **closed — shipped in v0.1.9** |
-| [#62](https://github.com/gobha-me/termforge/issues/62) | `Cell` has no text attributes | open |
+| [#62](https://github.com/gobha-me/termforge/issues/62) | `Cell` has no text attributes | open — costs Minesweeper a column per cell (63 vs 33 for Hard); commented with that number |
 | [#63](https://github.com/gobha-me/termforge/issues/63) | `Image` has no blit/alpha compositing | open |
 | [#64](https://github.com/gobha-me/termforge/issues/64) | MapWidget (Epic 3.6) | open |
-| [#71](https://github.com/gobha-me/termforge/issues/71) | `App::run()` skips `teardown()` on a throw | open — `guarded_run` covers it |
+| [#75](https://github.com/gobha-me/termforge/issues/75) | Mouse tracking mode hardcoded to `?1002h`; no `?1003h`, no way to disable | open — filed from Epic 3; not a blocker |
+| [#71](https://github.com/gobha-me/termforge/issues/71) | `App::run()` skips `teardown()` on a throw | **closed — fixed in v0.1.10.** ⚠ We are pinned at v0.1.9, so `guarded_run` is still load-bearing *here* but its deletion condition is met — gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16) |
 | [#72](https://github.com/gobha-me/termforge/issues/72) | `ListWidget` selection invisible at the fallback tier | open — gutter marker covers it |
 | [#73](https://github.com/gobha-me/termforge/issues/73) | No way to observe `quit()`; `test_run_frames` re-arms `m_running` | open — `Shell::quit_requested()` covers it |
 
@@ -162,9 +234,14 @@ Our workaround is [`guarded_run`](include/termgame/arcade/run_guard.hpp), and it
 has a deletion date: when `run()` guards its own exception path, delete that file,
 its header, and the unwinding assertion in `test/21exception`.
 
-**Still open at v0.1.9** — re-checked while building Epic 1. `run()` has no
-try/catch and no scope guard. `guarded_run` stays, and `main()` still constructs
-the App *inside* it.
+⚠ **FIXED UPSTREAM in v0.1.10**, released partway through Epic 3 and found by
+re-checking rather than by trusting this table. We are still pinned at **v0.1.9**,
+so `guarded_run` is load-bearing in *this* tree today — but its deletion
+condition is met, and doing it is the small piece of work tracked as gitea
+[#16](https://git.gobha.me/xcaliber/term-game/issues/16). Deliberately not folded
+into Epic 3: it moves the process's exception boundary and touches
+`test/21exception`, which deserves its own verification pass rather than a
+footnote in a game release.
 
 ### `ListWidget` cannot show its selection at the bottom tier
 
