@@ -33,6 +33,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
     arcade/run_guard.cpp
     arcade/shell.cpp
     arcade/all_games.cpp
+    games/minesweeper/board.cpp
     games/stub/stub_game.cpp
   )
 
