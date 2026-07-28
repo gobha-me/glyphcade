@@ -1,77 +1,108 @@
-// The exception path: a throwing frame must exit 1 AND unwind the App.
+// The exception path, in two halves that belong to two different projects.
 //
-// The second half is the real assertion. termforge's App::run() has no
-// try/catch, so what restores the terminal after a thrown frame is ~App() —
-// which only runs if the App is destroyed by stack unwinding, which only
-// happens because guarded_run provides a handler. See src/lib/arcade/
-// run_guard.cpp for the full explanation.
+// termforge's half: App::run() restores the terminal before an exception
+// leaves it (termforge#71, v0.1.10). Asserted below via test_run_guarded.
 //
-// ⚠ Known limit, stated rather than papered over: test_run_frames never enters
-// the alternate screen (it skips the tty half of setup()), so teardown()'s
-// leave_screen() is a no-op here. This proves the *unwinding contract* — App
-// destroyed on the way out — not the escape bytes on a real terminal.
+// Ours: whatever it rethrows becomes a diagnostic and exit 1 rather than
+// std::terminate. Asserted below via run_or_report. See src/lib/arcade/
+// exception_boundary.cpp for why that is all our half is now.
 //
-// The escape bytes ARE checkable without a human, using script(1) to allocate a
-// pty (see AGENTS.md); that is how the normal ESC-quit path was verified. It is
-// not automated for the exception path only because no shipped binary throws on
-// purpose, so there would be nothing to point it at.
+// ⚠ Known limit, stated rather than papered over: nothing here enters the
+// alternate screen, so no test in this file can see the escape bytes. What
+// pins those is the pty-restore test — cmake/pty_restore.sh drives a
+// deliberately-throwing probe under script(1) and asserts the alt-screen
+// leave appears *before* the fatal message in the byte stream. That is the
+// half of this contract a headless test cannot reach; run both.
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <stdexcept>
-#include <string>
 
 #include <termforge/core/app.hpp>
-#include <termgame/arcade/run_guard.hpp>
+#include <termgame/arcade/exception_boundary.hpp>
 
 namespace {
 
-bool g_app_destroyed = false;
-
-struct Sentinel {
-  ~Sentinel() { g_app_destroyed = true; }
-};
-
-class ThrowingApp final : public termforge::App {
+// Reads termforge's teardown state from *inside* the frame that throws, so the
+// post-condition has a before to be measured against.
+class TeardownWitness final : public termforge::App {
  public:
   auto on_render(termforge::Screen&) -> void override {
+    // teardown() has NOT run yet at this point — this is the "before".
+    m_hooked_at_throw = test_winch_hooked();
+
+    // A hard frame cap, per test_run_guarded's own docstring: if upstream's
+    // guard ever regresses into swallowing the exception, this test must fail
+    // the suite rather than spin forever.
+    if (++m_frames > kFrameCap) {
+      quit();
+      return;
+    }
     throw std::runtime_error("boom");
   }
 
+  [[nodiscard]] auto hooked_at_throw() const -> bool {
+    return m_hooked_at_throw;
+  }
+
  private:
-  // Fires only if this App is destroyed. A std::terminate without unwinding
-  // leaves it untouched.
-  Sentinel m_sentinel;
+  static constexpr int kFrameCap = 8;
+
+  bool m_hooked_at_throw{false};
+  int  m_frames{0};
 };
 
 }  // namespace
 
-TEST_CASE("a throwing frame exits 1 and unwinds the App", "[exception]") {
-  g_app_destroyed = false;
+TEST_CASE("upstream tears the terminal down before the throw reaches us",
+          "[exception]") {
+  // This asserts termforge's guarantee, not ours, which is why it goes through
+  // no termgame code at all. It is the reason the pin is at v0.1.10: before
+  // that, App::run() had no try/catch and what restored the terminal was
+  // ~App() — reached only by unwinding, which a throw escaping main() does not
+  // do. Now run_loop() tears down and then rethrows.
+  //
+  // test_run_guarded is the level the guarantee can be pinned at: run() itself
+  // is untestable because setup() needs a tty, so upstream exposes the loop
+  // wrapper — byte for byte what run() calls, teardown and all.
+  TeardownWitness app;
+  app.set_frame_ms(0);
 
-  const int rc = termgame::guarded_run([] {
-    // Constructed inside the guard, exactly as src/bin/main.cpp does it.
-    ThrowingApp app;
+  // REQUIRE_THROWS_AS is half the assertion: upstream deliberately does NOT
+  // convert the exception to an exit code. If a future termforge started
+  // swallowing it, our boundary would silently stop being the thing that
+  // produces exit 1, and nothing else in this suite would notice.
+  REQUIRE_THROWS_AS(app.test_run_guarded(20, 3, nullptr), std::runtime_error);
+
+  REQUIRE(app.hooked_at_throw());          // armed when the frame threw...
+  REQUIRE_FALSE(app.test_winch_hooked());  // ...and disarmed on the way out
+}
+
+TEST_CASE("an escaping exception becomes exit 1", "[exception]") {
+  // The shape of src/bin/main.cpp, over the same loop main() actually runs.
+  // test_run_guarded, not test_run_frames: the latter drives one frame body and
+  // never enters run_loop(), so it would exercise a path main() never takes.
+  //
+  // What used to be here as well was a sentinel member on the App, asserting it
+  // had been destroyed by unwinding. That assertion pinned a *mechanism* — and
+  // the mechanism was retired with termforge#71, since teardown no longer
+  // depends on the App being destroyed at all. The guarantee it was standing in
+  // for is asserted directly by the case above, at the level it actually lives.
+  const int rc = termgame::run_or_report([] {
+    TeardownWitness app;
     app.set_frame_ms(0);
-    std::string sink;
-    app.test_run_frames(1, 20, 3, &sink);
-    return 0;  // unreachable — on_render throws on the first frame
+    return app.test_run_guarded(20, 3, nullptr);  // rethrows
   });
 
   REQUIRE(rc == 1);
-
-  // THE regression assertion. Hoist the App above the guarded_run call, delete
-  // guarded_run's try/catch, or make it rethrow, and this goes red — which is
-  // the class of change someone makes while "simplifying main.cpp".
-  REQUIRE(g_app_destroyed);
 }
 
 TEST_CASE("a clean return passes through untouched", "[exception]") {
-  REQUIRE(termgame::guarded_run([] { return 7; }) == 7);
+  REQUIRE(termgame::run_or_report([] { return 7; }) == 7);
 }
 
 TEST_CASE("a non-std exception is still caught", "[exception]") {
-  // The catch(...) arm. Without it this would escape guarded_run and terminate
-  // the test binary rather than failing an assertion.
-  REQUIRE(termgame::guarded_run([]() -> int { throw 42; }) == 1);
+  // The catch(...) arm. Without it this would escape the boundary and
+  // terminate the test binary rather than failing an assertion.
+  REQUIRE(termgame::run_or_report([]() -> int { throw 42; }) == 1);
 }
