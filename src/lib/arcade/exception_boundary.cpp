@@ -1,4 +1,4 @@
-#include <termgame/arcade/run_guard.hpp>
+#include <termgame/arcade/exception_boundary.hpp>
 
 #include <cstdio>
 #include <exception>
@@ -13,7 +13,7 @@ namespace termgame {
 //     try { if (auto r = setup(); !r) { teardown(); ...; return 1; } }
 //     catch (...) { teardown(); throw; }
 //     ...
-//     return run_loop();          // try { loop } catch (...) { teardown(); throw; }
+//     return run_loop();   // try { loop } catch (...) { teardown(); throw; }
 //
 // So the terminal is out of raw mode and off the alternate screen before an
 // exception ever reaches this file. That was this function's original and only
@@ -43,7 +43,7 @@ namespace termgame {
 // to being written into a dying alt screen and nothing here would say so. The
 // pty-restore test (cmake/pty_restore.sh) is what catches that, by asserting
 // the alt-screen leave appears in the byte stream *before* this message does.
-auto guarded_run(const std::function<int()>& body) noexcept -> int {
+auto run_or_report(const std::function<int()>& body) noexcept -> int {
   try {
     return body();
   } catch (const std::exception& e) {

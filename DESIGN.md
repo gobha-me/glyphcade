@@ -283,7 +283,7 @@ term-game/
 ├── DESIGN.md  AGENTS.md  README.md  STATUS.md         # ✓
 ├── include/termgame/
 │   ├── build_info.hpp        # ✓ version + build_has_audio()
-│   ├── arcade/   run_guard.hpp ✓                      (Epic 0)
+│   ├── arcade/   exception_boundary.hpp ✓                      (Epic 0)
 │   │              game.hpp ✓  game_meta.hpp ✓  context.hpp ✓
 │   │              registry.hpp ✓  shell.hpp ✓         (Epic 1)
 │   │              scores.hpp                   (deferred — see GameContext)

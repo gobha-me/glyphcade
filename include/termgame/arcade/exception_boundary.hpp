@@ -30,6 +30,7 @@ namespace termgame {
 
 // Runs `body` and returns its value. If `body` throws, reports the exception on
 // stderr as "term-game: fatal: <what>" and returns 1.
-[[nodiscard]] auto guarded_run(const std::function<int()>& body) noexcept -> int;
+[[nodiscard]] auto run_or_report(const std::function<int()>& body) noexcept
+    -> int;
 
 }  // namespace termgame
