@@ -44,7 +44,59 @@ class ThrowingApp final : public termforge::App {
   Sentinel m_sentinel;
 };
 
+// The probe for upstream's own guarantee, as distinct from ours. It reads
+// termforge's teardown state from *inside* the frame that throws, so the
+// post-condition below has a before to be measured against.
+class TeardownWitness final : public termforge::App {
+ public:
+  auto on_render(termforge::Screen&) -> void override {
+    // teardown() has NOT run yet at this point — this is the "before".
+    m_hooked_at_throw = test_winch_hooked();
+
+    // A hard frame cap, per test_run_guarded's own docstring: if upstream's
+    // guard ever regresses into swallowing the exception, this test must fail
+    // the suite rather than spin forever.
+    if (++m_frames > kFrameCap) {
+      quit();
+      return;
+    }
+    throw std::runtime_error("boom");
+  }
+
+  [[nodiscard]] auto hooked_at_throw() const -> bool { return m_hooked_at_throw; }
+
+ private:
+  static constexpr int kFrameCap = 8;
+
+  bool m_hooked_at_throw{false};
+  int  m_frames{0};
+};
+
 }  // namespace
+
+TEST_CASE("upstream tears the terminal down before the throw reaches us",
+          "[exception]") {
+  // This asserts termforge's guarantee, not ours, which is why it goes through
+  // no termgame code at all. It is the reason the pin is at v0.1.10: before
+  // that, App::run() had no try/catch and what restored the terminal was
+  // ~App() — reached only by unwinding, which a throw escaping main() does not
+  // do. Now run_loop() tears down and then rethrows.
+  //
+  // test_run_guarded is the level the guarantee can be pinned at: run() itself
+  // is untestable because setup() needs a tty, so upstream exposes the loop
+  // wrapper — byte for byte what run() calls, teardown and all.
+  TeardownWitness app;
+  app.set_frame_ms(0);
+
+  // REQUIRE_THROWS_AS is half the assertion: upstream deliberately does NOT
+  // convert the exception to an exit code. If a future termforge started
+  // swallowing it, our boundary would silently stop being the thing that
+  // produces exit 1, and nothing else in this suite would notice.
+  REQUIRE_THROWS_AS(app.test_run_guarded(20, 3, nullptr), std::runtime_error);
+
+  REQUIRE(app.hooked_at_throw());          // armed when the frame threw...
+  REQUIRE_FALSE(app.test_winch_hooked());  // ...and disarmed on the way out
+}
 
 TEST_CASE("a throwing frame exits 1 and unwinds the App", "[exception]") {
   g_app_destroyed = false;
