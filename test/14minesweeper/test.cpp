@@ -25,6 +25,7 @@
 #include <vector>
 
 #include <termgame/games/minesweeper/board.hpp>
+#include <termgame/games/minesweeper/layout.hpp>
 
 namespace {
 
@@ -524,4 +525,95 @@ TEST_CASE("the RNG is unbiased enough to reach every cell") {
   // Every cell outside the fixed safe zone around (4,4) must have held a mine
   // at least once across 400 layouts.
   REQUIRE(ever.size() == static_cast<std::size_t>(9 * 9 - 9));
+}
+
+// ─── Geometry ──────────────────────────────────────────────────────────────
+// Still no Screen: compute_layout takes two ints and returns coordinates.
+
+TEST_CASE("the required size matches what each level actually needs") {
+  REQUIRE(needed_cols(9) == 21);
+  REQUIRE(needed_rows(9) == 13);
+  REQUIRE(needed_cols(16) == 35);
+  REQUIRE(needed_rows(16) == 20);
+  // Hard is the level that does not fit an 80-column terminal comfortably, and
+  // 63 is the number quoted upstream in termforge #62 as the cost of having no
+  // reverse-video attribute to mark the cursor with.
+  REQUIRE(needed_cols(30) == 63);
+  REQUIRE(needed_rows(16) == 20);
+}
+
+TEST_CASE("fits is exact at the boundary") {
+  REQUIRE(compute_layout(63, 20, 16, 30).fits);
+  REQUIRE_FALSE(compute_layout(62, 20, 16, 30).fits);
+  REQUIRE_FALSE(compute_layout(63, 19, 16, 30).fits);
+  REQUIRE(compute_layout(21, 13, 9, 9).fits);
+  // The Shell's own floor is 20x8, one column short of even Easy.
+  REQUIRE_FALSE(compute_layout(20, 8, 9, 9).fits);
+}
+
+TEST_CASE("every cell round-trips between drawing and hit-testing") {
+  // The claim the whole file exists for. Both columns of every cell, at every
+  // size the game can be drawn at, must map back to that cell.
+  struct Size {
+    int cols;
+    int rows;
+  };
+  const Size sizes[]{{80, 24}, {100, 30}, {63, 20}, {35, 20}, {21, 13}, {120, 40}};
+  const Level levels[]{Level::Easy, Level::Medium, Level::Hard};
+
+  for (const Size s : sizes) {
+    for (const Level level : levels) {
+      const Preset p = preset(level);
+      const Layout l = compute_layout(s.cols, s.rows, p.rows, p.cols);
+      if (!l.fits) continue;
+      for (int r = 0; r < p.rows; ++r) {
+        for (int c = 0; c < p.cols; ++c) {
+          const Coord want{.row = r, .col = c};
+          REQUIRE(l.cell_at(l.glyph_x(c), l.row_y(r)) == want);
+          REQUIRE(l.cell_at(l.gutter_x(c), l.row_y(r)) == want);
+        }
+      }
+    }
+  }
+}
+
+TEST_CASE("the grid never draws onto the border or off the screen") {
+  const Preset p = preset(Level::Hard);
+  const Layout l = compute_layout(80, 24, p.rows, p.cols);
+  REQUIRE(l.fits);
+  REQUIRE(l.frame_x >= 0);
+  REQUIRE(l.frame_y >= 1);                      // below the status row
+  REQUIRE(l.frame_y + l.frame_h <= l.hint_y);   // above the hint row
+  REQUIRE(l.gutter_x(0) > l.frame_x);           // inside the left border
+  // The furthest write is the closing bracket of a cursor on the last column.
+  const int last = l.gutter_x(p.cols - 1) + kCellCols;
+  REQUIRE(last < l.frame_x + l.frame_w - 1);
+}
+
+TEST_CASE("clicks outside the grid map to nothing") {
+  const Preset p = preset(Level::Easy);
+  const Layout l = compute_layout(40, 20, p.rows, p.cols);
+  REQUIRE(l.fits);
+
+  REQUIRE_FALSE(l.cell_at(l.origin_x - 1, l.row_y(0)).has_value());   // border
+  REQUIRE_FALSE(l.cell_at(l.glyph_x(0), l.origin_y - 1).has_value());  // border
+  REQUIRE_FALSE(l.cell_at(l.glyph_x(0), l.row_y(p.rows)).has_value());
+  REQUIRE_FALSE(l.cell_at(l.glyph_x(0), l.status_y).has_value());
+  REQUIRE_FALSE(l.cell_at(l.glyph_x(0), l.hint_y).has_value());
+  REQUIRE_FALSE(l.cell_at(-5, -5).has_value());
+  REQUIRE_FALSE(l.cell_at(9999, 9999).has_value());
+  // The trailing bracket column belongs to no cell.
+  REQUIRE_FALSE(l.cell_at(l.gutter_x(p.cols), l.row_y(0)).has_value());
+}
+
+TEST_CASE("a board that does not fit maps every click to nothing") {
+  const Preset p = preset(Level::Hard);
+  const Layout l = compute_layout(60, 20, p.rows, p.cols);
+  REQUIRE_FALSE(l.fits);
+  for (int y = 0; y < 20; ++y) {
+    for (int x = 0; x < 60; ++x) REQUIRE_FALSE(l.cell_at(x, y).has_value());
+  }
+  // The status and hint rows still exist, because the player still needs them.
+  REQUIRE(l.status_y == 0);
+  REQUIRE(l.hint_y == 19);
 }
