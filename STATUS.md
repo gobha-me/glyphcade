@@ -2,7 +2,7 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-07-28** (Epic 3)
+**Last updated: 2026-07-28** (Epic 3, then gitea #16)
 
 ---
 
@@ -30,10 +30,11 @@ there is no sound at all.
 Minesweeper is the SFX consumer waiting for it, and `Board`'s verbs already
 return "did anything change", which is where reveal/flag/explode/win will bind.
 Epics 4 (2048) and 5 (Snake) are equally unblocked; nothing blocks any of them.
-There is also one small, well-defined piece of housekeeping now unblocked:
-**gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16) — delete
-`guarded_run`**, whose upstream fix (termforge #71) shipped in v0.1.10 during
-this epic.
+
+Since Epic 3, gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16) has
+landed: the pin moved to termforge **v0.1.10** and the `guarded_run` workaround
+was retired. See the exception-boundary section below for what survived it and
+why.
 
 ---
 
@@ -56,7 +57,9 @@ this epic.
 [#58](https://github.com/gobha-me/termforge/issues/58) (frame pacing),
 [#59](https://github.com/gobha-me/termforge/issues/59) (`on_tick`) and
 [#61](https://github.com/gobha-me/termforge/issues/61) (F5–F12) are all closed,
-and we pin **v0.1.9** to get them. cpp-template CT-15 was fixed upstream at
+and we pin **v0.1.10** to get them, plus
+[#71](https://github.com/gobha-me/termforge/issues/71) (terminal restore on the
+exception path). cpp-template CT-15 was fixed upstream at
 `8f62930`; the build-tree `export(EXPORT ...)` block no longer exists, so there
 was nothing for us to delete. See
 [docs/cpp-template-audit.md](docs/cpp-template-audit.md) for what those cost us.
@@ -69,15 +72,20 @@ was nothing for us to delete. See
   directory name, as does the gitea repo).
 - **termforge consumed** via [cmake/deps/termforge.cmake](cmake/deps/termforge.cmake)
   — `find_package(termforge ... CONFIG)` first, FetchContent as the fallback.
-  Epic 0 pinned v0.1.7; the pin is now **v0.1.9** — see below.
+  Epic 0 pinned v0.1.7; the pin is now **v0.1.10** — see below.
 - **`TERMGAME_WITH_AUDIO`** auto-detection in [cmake/audio.cmake](cmake/audio.cmake).
   Nothing links rtaudio yet; Epic 2 owns that, and it is an export question —
   see the note at the bottom of that file.
-- **`guarded_run`** — the process's exception boundary, because
-  `termforge::App::run()` does not have one. See below.
+- **`run_or_report`** — the process's exception boundary. Until v0.1.10 it was
+  also the terminal-restore workaround for termforge #71; that half is
+  upstream's now, and what is left converts an escaping exception into a
+  readable diagnostic and exit 1 instead of 134 via SIGABRT. Renamed from
+  `guarded_run` by gitea #16. See below.
 - **Tests:** `00bootstrap` (the audio option reached the compiler),
-  `10render` (headless render, no tty), `21exception` (a throwing frame exits 1
-  *and* unwinds the App).
+  `10render` (headless render, no tty), `21exception` (upstream tore the
+  terminal down before the throw reached us, and our boundary turned it into
+  exit 1), `pty-restore` (the same claim in a real pty, where the escape bytes
+  are visible — added by gitea #16).
 - **CI** at [.gitea/workflows/ci.yaml](.gitea/workflows/ci.yaml) — written, not
   yet proven green; the runner image's toolchain was not verifiable when it was
   written, which is why its first job asserts the floor rather than assuming it.
@@ -206,42 +214,72 @@ Clang builds.
 | [#63](https://github.com/gobha-me/termforge/issues/63) | `Image` has no blit/alpha compositing | open |
 | [#64](https://github.com/gobha-me/termforge/issues/64) | MapWidget (Epic 3.6) | open |
 | [#75](https://github.com/gobha-me/termforge/issues/75) | Mouse tracking mode hardcoded to `?1002h`; no `?1003h`, no way to disable | open — filed from Epic 3; not a blocker |
-| [#71](https://github.com/gobha-me/termforge/issues/71) | `App::run()` skips `teardown()` on a throw | **closed — fixed in v0.1.10.** ⚠ We are pinned at v0.1.9, so `guarded_run` is still load-bearing *here* but its deletion condition is met — gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16) |
+| [#71](https://github.com/gobha-me/termforge/issues/71) | `App::run()` skips `teardown()` on a throw | **closed — shipped in v0.1.10, and we are on it** (gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16)). The terminal-restore workaround is gone; our boundary survives as a diagnostic. `test/21exception` asserts the upstream guarantee via `test_winch_hooked()`, `pty-restore` asserts the escape bytes. |
 | [#72](https://github.com/gobha-me/termforge/issues/72) | `ListWidget` selection invisible at the fallback tier | open — gutter marker covers it |
 | [#73](https://github.com/gobha-me/termforge/issues/73) | No way to observe `quit()`; `test_run_frames` re-arms `m_running` | open — `Shell::quit_requested()` covers it |
 
 Check state with `gh` rather than trusting this table if it looks stale.
 
-### The pin is v0.1.9, and the version request is patch-level
+### The pin is v0.1.10, and the version request is patch-level
 
-`cmake/deps/termforge.cmake` asks `find_package(termforge 0.1.9 …)`, not `0.1`.
-termforge's package version file is `SameMinorVersion`, so `0.1` would silently
-accept an installed **0.1.7** — which has no `set_tick_hz` — and turn "your copy
-is too old, falling back to FetchContent" into a wall of compiler errors in
-`shell.cpp`, on whichever machine happens to have a stale system copy. This is
-the first time we depend on API introduced in a *patch* release; a floor has to
-be expressed at the granularity the dependency actually moves at.
+`cmake/deps/termforge.cmake` asks `find_package(termforge 0.1.10 …)`, not `0.1`.
+termforge's package version file is `SameMinorVersion`, so `0.1` accepts *any*
+installed 0.1.x, and that bites in two ways:
 
-### `App::run()` does not restore the terminal on the exception path
+- **0.1.7** has no `set_tick_hz`, so accepting it turns "your copy is too old,
+  falling back to FetchContent" into a wall of compiler errors in `shell.cpp`,
+  on whichever machine happens to have a stale system copy. Loud, at build time.
+- **0.1.9** compiles clean and links clean, and hands you an `App` whose `run()`
+  does not restore the terminal when a frame throws. Nothing fails. The only
+  symptom is a wedged terminal, on one developer's machine, on the day something
+  happens to throw.
 
-Found while building Epic 0, and filed upstream. `app.hpp` promises the terminal
-is "always restored on exit … even on exception", but `App::run()` has no
-try/catch — a throw from `on_render` skips `teardown()` entirely. What rescues it
-is `~App()`, which only runs if the App is destroyed by *unwinding*, which does
-not happen when the exception escapes `main()` with no handler.
+The second is why this matters more than it looks. It is the second time we
+depend on API introduced in a *patch* release and the first where missing it is
+**silent** — a floor at minor granularity would not have caught it in any way.
+(The same argument is in the comment at the top of `cmake/deps/termforge.cmake`;
+those two places should always say the same thing.)
 
-Our workaround is [`guarded_run`](include/termgame/arcade/run_guard.hpp), and it
-has a deletion date: when `run()` guards its own exception path, delete that file,
-its header, and the unwinding assertion in `test/21exception`.
+### `App::run()` used not to restore the terminal on the exception path
 
-⚠ **FIXED UPSTREAM in v0.1.10**, released partway through Epic 3 and found by
-re-checking rather than by trusting this table. We are still pinned at **v0.1.9**,
-so `guarded_run` is load-bearing in *this* tree today — but its deletion
-condition is met, and doing it is the small piece of work tracked as gitea
-[#16](https://git.gobha.me/xcaliber/term-game/issues/16). Deliberately not folded
-into Epic 3: it moves the process's exception boundary and touches
-`test/21exception`, which deserves its own verification pass rather than a
-footnote in a game release.
+Resolved history, kept because it is why the pin is patch-level and why there is
+still a boundary in `main()` at all.
+
+Found while building Epic 0 and filed as termforge #71. `app.hpp` promised the
+terminal was "always restored on exit … even on exception", but `App::run()` had
+no try/catch — a throw from `on_render` skipped `teardown()`. What rescued it was
+`~App()`, which only runs if the App is destroyed by *unwinding*, which does not
+happen when the exception escapes `main()` with no handler; `std::terminate` is
+called without unwinding, and the terminal was left to the SIGABRT backstop.
+Our workaround was `guarded_run`, and its whole mechanism was providing a
+handler at the bottom of the stack so that unwinding happened at all.
+
+**Fixed in v0.1.10**, and we are on it (gitea #16). `run()` now guards `setup()`
+and delegates the loop to `run_loop()`, both `catch (...) { teardown(); throw; }`.
+
+**What we kept, and why it diverges from #16's own instructions.** The issue said
+delete the file. Upstream *rethrows* rather than converting to an exit code — on
+the stated grounds that "an int has no room for it, and the library will not
+decide that your exception was meaningless" — and points the consumer at exactly
+this: "Catch it around `run()` if you want a diagnostic of your own." Deleting
+outright would move a thrown frame from `1` + `term-game: fatal: <what>` to `134`
++ SIGABRT + silence. So the file survives as
+[`run_or_report`](include/termgame/arcade/exception_boundary.hpp), stripped of
+every terminal claim, and it no longer has a deletion condition — it has an
+upstream dependency.
+
+**What proves it now**, since the old unwinding assertion was pinning a mechanism
+that is no longer load-bearing:
+
+- `test/21exception` drives `App::test_run_guarded` and asserts, via
+  `test_winch_hooked()`, that `teardown()` ran on the throw path — plus
+  `REQUIRE_THROWS_AS`, which pins that upstream still rethrows.
+- `pty-restore` ([cmake/pty_restore.sh](cmake/pty_restore.sh)) runs a
+  deliberately-throwing probe under `script(1)` and asserts the alt-screen leave
+  appears in the byte stream **before** the fatal message. ⚠ Its probe builds its
+  App *outside* the boundary on purpose: shaped like `main.cpp`, `~App()` still
+  restores the terminal and the test passes even with the upstream guard removed.
+  That was found by mutating it, not by reading it.
 
 ### `ListWidget` cannot show its selection at the bottom tier
 
