@@ -5,40 +5,44 @@
 
 namespace termgame {
 
-// Why this exists, in full, because the failure is subtle and the upstream
-// docstring says the opposite.
+// What this function is for, and — because it used to be for something else
+// entirely — what it is no longer for.
 //
-// termforge's App::run() is:
+// Since termforge v0.1.10, App::run() guards its own exception path:
 //
-//     if (auto r = setup(); !r) { ...; return 1; }
-//     m_running = true;
-//     while (m_running) frame_step();
-//     teardown();                       // <- no try/catch, no scope guard
-//     return 0;
+//     try { if (auto r = setup(); !r) { teardown(); ...; return 1; } }
+//     catch (...) { teardown(); throw; }
+//     ...
+//     return run_loop();          // try { loop } catch (...) { teardown(); throw; }
 //
-// An exception thrown from on_render propagates out of frame_step() and skips
-// teardown() entirely. What rescues the terminal is ~App(), which calls
-// teardown() itself, followed by ~Terminal() restoring termios — but a
-// destructor only runs if the object is destroyed, and an exception that
-// escapes main() with no handler anywhere calls std::terminate WITHOUT
-// unwinding the stack. GCC and Clang both do this; it is permitted and it is
-// what they choose. The App is never destroyed, teardown() never runs, and the
-// only thing left standing between the user and a wedged terminal is
-// termforge's fatal-signal handler catching the subsequent SIGABRT — which does
-// restore the terminal, at the cost of exiting 134.
+// So the terminal is out of raw mode and off the alternate screen before an
+// exception ever reaches this file. That was this function's original and only
+// job — v0.1.9's run() had no try/catch at all, and what rescued the terminal
+// was ~App(), reached only by unwinding, which a throw escaping main() with no
+// handler does not do (std::terminate is called WITHOUT unwinding). Providing a
+// handler at the bottom of the stack was the entire mechanism. It is not any
+// more, and the "construct the App inside body" rule that went with it is gone.
 //
-// A handler existing at the bottom of the stack is what makes the
-// implementation unwind rather than terminate outright. That is the whole job
-// of this function: it does not "handle" much, it just needs to be there.
+// What is left is the piece upstream will not do for us. run() restores the
+// terminal and then rethrows, on the stated grounds that an int has no room for
+// an exception and the library will not decide yours was meaningless — and it
+// points the consumer here: "Catch it around run() if you want a diagnostic of
+// your own — the terminal is already sane by then." This is that catch, and
+// that is now the whole of it: a readable line and exit 1, instead of exit 134
+// via SIGABRT with nothing printed.
 //
-// Order matters and is worth stating: unwinding destroys the App on the way
-// out, so leave_screen() and the termios restore both happen BEFORE the catch
-// block runs. The diagnostic below therefore lands on a restored terminal
-// rather than being painted into an alternate screen that is about to vanish.
+// The ordering claim in the old version of this comment survives, on a new
+// footing. The diagnostic below still lands on a restored terminal rather than
+// being painted into an alternate screen that is about to vanish — but because
+// run_loop() calls teardown() *before* it rethrows, not because unwinding
+// destroys the App on the way out.
 //
-// ⚠ Deletion date: filed upstream against termforge. When App::run() guards its
-// own exception path, delete this file, its header, and test/21exception's
-// unwinding assertion.
+// ⚠ This file no longer has a deletion condition; it has an upstream
+// dependency. If a future termforge stops tearing down before it rethrows, or
+// starts swallowing the exception into a return code, this diagnostic goes back
+// to being written into a dying alt screen and nothing here would say so. The
+// pty-restore test (cmake/pty_restore.sh) is what catches that, by asserting
+// the alt-screen leave appears in the byte stream *before* this message does.
 auto guarded_run(const std::function<int()>& body) noexcept -> int {
   try {
     return body();

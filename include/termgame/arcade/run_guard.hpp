@@ -1,30 +1,35 @@
 #pragma once
 
-// term-game — run_guard: the process's outermost exception boundary.
+// term-game — the process's outermost exception boundary.
 //
-// This exists because termforge::App::run() does not have one. See the long
-// comment in src/lib/arcade/run_guard.cpp for what actually goes wrong without
-// it; the short version is that a throw escaping main() with no handler calls
-// std::terminate *without unwinding the stack*, so the App is never destroyed,
-// so the terminal is never taken out of the alternate screen by the ordinary
-// path.
+// This is where an exception nothing else caught becomes a diagnostic and an
+// exit code, rather than std::terminate and a core dump. It wraps the whole of
+// main(), and it is the only catch (...) in the tree.
 //
-// ⚠ Workaround with a deletion date, in the sense DESIGN.md uses the phrase.
-// Filed upstream against termforge; delete this file when App::run() restores
-// the terminal on the exception path itself.
+// ⚠ What this is NOT — since it used to be exactly that: it does not restore
+// the terminal. termforge::App::run() does that itself as of v0.1.10
+// (termforge#71); it tears down and *then* rethrows, so by the time an
+// exception arrives here the terminal is already out of raw mode and off the
+// alternate screen. Until v0.1.10 restoring it was this file's whole job, and
+// the mechanism was unwinding: main() constructed the App inside `body` so that
+// entering the catch would destroy it, because ~App() was the only thing that
+// ran teardown(). That is history. Do not reintroduce a rule about where the
+// App is constructed — there is no longer one.
+//
+// What survives is the half upstream deliberately declines to do. From
+// App::run()'s own docstring, on the exception it rethrows: it "is deliberately
+// not converted to a return code: an int has no room for it, and the library
+// will not decide that your exception was meaningless. Catch it around run() if
+// you want a diagnostic of your own — the terminal is already sane by then."
+// This is that catch. Without it a thrown frame ends the process at 134 via
+// SIGABRT with nothing printed; with it the user gets a line they can read.
 
 #include <functional>
 
 namespace termgame {
 
 // Runs `body` and returns its value. If `body` throws, reports the exception on
-// stderr and returns 1.
-//
-// ⚠ Construct the App INSIDE `body`, not outside the call. That placement is
-// the entire mechanism — it is unwinding into this function's catch that
-// destroys the App, and ~App() is what leaves the alternate screen. An App
-// living in the caller's frame is not destroyed by this catch at all, and the
-// terminal stays wedged. test/21exception asserts exactly this.
+// stderr as "term-game: fatal: <what>" and returns 1.
 [[nodiscard]] auto guarded_run(const std::function<int()>& body) noexcept -> int;
 
 }  // namespace termgame
