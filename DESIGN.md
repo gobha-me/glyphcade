@@ -254,15 +254,17 @@ this design pass.
 | [#63](https://github.com/gobha-me/termforge/issues/63) | `Image` has no blit/alpha compositing | sprite games |
 | [#64](https://github.com/gobha-me/termforge/issues/64) | MapWidget (Epic 3.6) | Sokoban |
 
-Of these, #27, #58, #59 and #61 are all done, and term-game pins **v0.1.9** to
-get them. #62/#63 degrade rather than block.
+Of these, #27, #58, #59 and #61 are all done, and term-game pins **v0.1.10** to
+get them (plus #71 — see below). #62/#63 degrade rather than block.
 
 Two gaps this design pass had not predicted have since been added to the list,
 both found by building against the framework rather than reasoning about it —
 which is the feedback loop this repo exists for:
 
-- **`App::run()` does not restore the terminal when a frame throws** (Epic 0).
-  Our `guarded_run` covers it; deletion date in STATUS.md.
+- **`App::run()` did not restore the terminal when a frame throws** (Epic 0) —
+  filed as #71, **fixed in v0.1.10**. The workaround is retired; what remains is
+  an ordinary diagnostic boundary, because upstream rethrows rather than
+  converting to an exit code. See STATUS.md.
 - **`ListWidget`'s selection is invisible at the bottom tier** (Epic 1) — it has
   no colour setters, and the fallback driver discards the theme inversion that
   is its only selection affordance. The selector draws its own marker in a

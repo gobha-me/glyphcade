@@ -141,6 +141,11 @@ runs in enforce mode and must print `CLEAN`. If it reports Class-B failures righ
 after you add files, `git add` them first: it reads `git ls-files`, so untracked
 files look like missing ones.
 
+Check `ctest -N` lists **`pty-restore`**. It is gated on `find_program(script)`,
+so on a box without `script(1)` it silently is not there — and a green run
+without it has not checked the one thing only a pty can show. Absent means
+skipped, not passed; the configure log says which.
+
 ### Checking the terminal itself, without a human
 
 An agent has no terminal, but it can allocate a pty with `script(1)` and read
@@ -181,6 +186,18 @@ truecolor SGR in the raw capture, and **no** notice.
 expect to find `ticks: 42` in the capture — later frames only repaint the digits
 that changed. Look for a *sequence* of distinct `elapsed: N.NNs` values instead;
 that is the evidence the simulation is advancing.
+
+**The throw path is automated** — `ctest -R pty-restore -V`, or by hand
+`cmake/pty_restore.sh build/test/pty-restore-probe`. It drives a
+deliberately-throwing binary through the same harness and asserts one `?1049h`,
+one `?1049l`, and that the leave sequence appears *before* `term-game: fatal:` in
+the byte stream. The headless suite cannot reach any of that: nothing there
+enters the alternate screen, so there are no escape bytes to look at.
+
+⚠ Its probe constructs its App **outside** the exception boundary, unlike
+`src/bin/main.cpp`. That is deliberate — shaped like `main.cpp`, `~App()` also
+restores the terminal, and the test passes even with termforge's guard removed.
+Read `test/pty_restore_probe.cpp` before "fixing" it to match.
 
 This covers rendering and terminal restore. It does **not** cover *feel* — frame
 pacing, input latency, animation smoothness still need a human to play it, and
