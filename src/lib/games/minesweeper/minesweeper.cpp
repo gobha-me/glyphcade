@@ -22,7 +22,7 @@ constexpr termforge::Rgb kCursorFg{0x40, 0xE0, 0xFF};
 
 // Three columns, sign-aware. No <format> and no stringstream — this file is on
 // the render path and the repo has no formatting dependency (the same reason
-// StubGame hand-rolled fixed2()).
+// the retired StubGame hand-rolled fixed2()).
 auto pad3(int v) -> std::string {
   if (v < 0) {
     const int a = std::min(-v, 99);
