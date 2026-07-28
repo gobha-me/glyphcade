@@ -27,6 +27,44 @@ else ()
   )
 endif ()
 
+# The only test in the suite that looks at real escape bytes: it drives a
+# deliberately-throwing binary under a pty and asserts the terminal came back.
+# See cmake/pty_restore.sh for what it judges and why it does not judge the
+# exit status.
+#
+# Standalone, like the two above — it is a script driving a non-Catch2 binary,
+# so it must not go through the auto-discovery foreach, which would demand a
+# `<dir>-test` target. (The probe's .cpp sits loose in test/ next to main.cpp;
+# the foreach skips it, since a file has neither CMakeLists.txt nor test.cpp
+# inside it.)
+#
+# Gated on script(1) rather than depending on it. CI here is written but not yet
+# proven green and the runner image's tooling is not known, so a hard dependency
+# would be the wrong bet — but a silently-absent test is worse than a missing
+# one, hence the STATUS message and the note in AGENTS.md that `ctest -N` should
+# list pty-restore.
+find_program(SCRIPT_EXECUTABLE script)
+
+if (SCRIPT_EXECUTABLE AND TARGET ${PROJECT_NAME}::lib)
+  message(STATUS "Configuring test setup pty-restore")
+
+  add_executable(pty-restore-probe pty_restore_probe.cpp)
+  target_link_libraries(pty-restore-probe PRIVATE ${PROJECT_NAME}::lib)
+
+  add_test(
+    NAME pty-restore
+    COMMAND ${CMAKE_CURRENT_LIST_DIR}/../cmake/pty_restore.sh
+            $<TARGET_FILE:pty-restore-probe>
+  )
+  set_tests_properties(pty-restore PROPERTIES FIXTURES_REQUIRED runners)
+else ()
+  message(STATUS
+    "pty-restore not configured — "
+    "script(1) found: ${SCRIPT_EXECUTABLE}. The throw-path terminal-restore "
+    "check is skipped; test/21exception still covers the headless half."
+  )
+endif ()
+
 file(GLOB TEST_DIRS ${CMAKE_CURRENT_LIST_DIR}/*)
 
 # Say this once, at configure time, instead of letting it surface as a link error
