@@ -1,0 +1,58 @@
+# term-game
+
+A TUI arcade suite in **C++23**. [TermForge](https://github.com/gobha-me/termforge)
+renders it, [RtAudio](https://github.com/thestk/rtaudio) sounds it.
+
+Sibling to [HTML-Games](https://git.gobha.me/xcaliber/HTML-Games) — same
+arcade-of-small-games idea and the same roster to raid, but terminal-native and
+compiled instead of HTML/CSS/JS. One binary, a selector, and a set of
+self-contained games.
+
+> **Status: design phase.** Nothing is built yet. See [DESIGN.md](DESIGN.md) for
+> the architecture and the issue tracker for the epic breakdown.
+
+## The idea
+
+Small games, escalating deliberately. Each one dogfoods a different part of
+TermForge — mouse routing, animation, real-time ticks, tile maps, inline pixel
+graphics — so framework gaps are found by a real consumer rather than guessed at.
+The suite doubles as the honest test of TermForge's pitch: notcurses-class inline
+graphics from a stdlib-only C++23 API.
+
+| # | Game | Dogfoods |
+|---|------|----------|
+| 1 | Shell + selector | ListWidget, Frame, dialogs, theme |
+| 2 | Minesweeper | mouse routing, grid rendering |
+| 3 | 2048 | tween animation |
+| 4 | Snake | real-time tick |
+| 5 | Tetris | held-key feel |
+| 6 | Sokoban | tile maps |
+| 7 | Solitaire | Kitty sprites, mouse drag-and-drop |
+
+Every game is playable at the bottom tier. Pixel sprites are an enhancement over
+a glyph fallback that always exists — never a requirement.
+
+## Audio
+
+Sound effects are **synthesized, not sampled** — square/triangle/noise
+oscillators with ADSR envelopes. No WAV decoder, no asset pipeline, no binary
+blobs in git, and it is the right sound for an arcade.
+
+The device is abstracted behind an `AudioSink` with three implementations:
+`RtAudioSink` (real hardware), `NullSink` (no sound card present), and
+`WavFileSink` (renders to disk, which is what makes the audio path testable
+offline). `TERMGAME_WITH_AUDIO` auto-detects rtaudio and defaults OFF when it is
+absent, so the repo builds and tests anywhere.
+
+## Build
+
+```bash
+cmake -B build && cmake --build build && ctest --test-dir build --output-on-failure
+```
+
+Requires a C++23 compiler (GCC 13+ / Clang 19+). `librtaudio-dev` is optional —
+without it you get a silent but fully playable arcade.
+
+## License
+
+TBD.
