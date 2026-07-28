@@ -35,7 +35,6 @@ if (${PROJECT_NAME}_BUILD_LIB)
     arcade/all_games.cpp
     games/minesweeper/board.cpp
     games/minesweeper/minesweeper.cpp
-    games/stub/stub_game.cpp
   )
 
   # Compiled libs get the project's include dir PUBLIC so consumers (bin,

@@ -23,7 +23,7 @@
 
 #include <termgame/arcade/registry.hpp>
 #include <termgame/arcade/shell.hpp>
-#include <termgame/games/stub/stub_game.hpp>
+#include <termgame/games/minesweeper/minesweeper.hpp>
 
 namespace {
 
@@ -57,24 +57,24 @@ class Probe final : public Shell {
       .key = termforge::Key::Char, .ch = U'c', .ctrl = true}};
 }
 
-// The stub's index in the menu, looked up rather than hardcoded — the stub is
-// scheduled for deletion and the roster will grow before then.
-[[nodiscard]] auto stub_index() -> int {
+// Looked up rather than hardcoded — the roster will grow, and menu order is
+// registry order.
+[[nodiscard]] auto minesweeper_index() -> int {
   const auto games = termgame::all_games();
   for (std::size_t i = 0; i < games.size(); ++i) {
-    if (games[i].meta.slug == "stub") return static_cast<int>(i);
+    if (games[i].meta.slug == "minesweeper") return static_cast<int>(i);
   }
   return -1;
 }
 
-[[nodiscard]] auto stub_of(const Shell& shell) -> const termgame::StubGame* {
-  return dynamic_cast<const termgame::StubGame*>(shell.current_game());
+[[nodiscard]] auto game_of(const Shell& shell) -> const termgame::Minesweeper* {
+  return dynamic_cast<const termgame::Minesweeper*>(shell.current_game());
 }
 
-// Enter the stub game from a fresh selector.
-auto enter_stub(Probe& app) -> void {
+// Enter Minesweeper from a fresh selector.
+auto enter_game(Probe& app) -> void {
   app.step();  // give the list its geometry
-  const int index = stub_index();
+  const int index = minesweeper_index();
   REQUIRE(index >= 0);
   while (app.selector_index() < index) app.dispatch_event(key(termforge::Key::Down));
   app.dispatch_event(key(termforge::Key::Enter));
@@ -126,17 +126,17 @@ TEST_CASE("real escape sequences reach the list", "[selector]") {
 
 TEST_CASE("Enter enters the selected game", "[selector]") {
   Probe app;
-  enter_stub(app);
+  enter_game(app);
   REQUIRE(app.current_game() != nullptr);
-  REQUIRE(app.current_game()->meta().slug == "stub");
+  REQUIRE(app.current_game()->meta().slug == "minesweeper");
 }
 
 TEST_CASE("every entry gets a fresh game", "[selector][lifetime]") {
   Probe app;
-  enter_stub(app);
+  enter_game(app);
 
   // Advance the simulation so the first instance has visibly accumulated state.
-  const auto* first = stub_of(app);
+  const auto* first = game_of(app);
   REQUIRE(first != nullptr);
   app.on_tick(std::chrono::duration<double>{1.0 / Shell::kTickHz});
   REQUIRE(first->ticks() > 0);
@@ -152,7 +152,7 @@ TEST_CASE("every entry gets a fresh game", "[selector][lifetime]") {
   // Freshness asserted through observable state, not a pointer comparison: a
   // recycled allocation can hand back the same address and would make a
   // pointer test pass or fail for reasons that have nothing to do with this.
-  const auto* second = stub_of(app);
+  const auto* second = game_of(app);
   REQUIRE(second != nullptr);
   REQUIRE(second->ticks() == 0);
   REQUIRE(second->elapsed().count() == 0.0);
@@ -174,7 +174,7 @@ TEST_CASE("Escape quits in the selector but returns to the menu in a game",
   }
   {
     Probe app;
-    enter_stub(app);
+    enter_game(app);
     app.dispatch_event(key(termforge::Key::Escape));
     REQUIRE(app.state() == Shell::State::Selector);
     REQUIRE_FALSE(app.quit_requested());
@@ -192,7 +192,7 @@ TEST_CASE("Ctrl+C quits from every state", "[selector][escape]") {
   }
   {
     Probe app;
-    enter_stub(app);
+    enter_game(app);
     app.dispatch_event(ctrl_c());
     REQUIRE(app.quit_requested());
   }
@@ -202,7 +202,7 @@ TEST_CASE("Ctrl+C quits from every state", "[selector][escape]") {
     // inherited from App::on_event — the Shell handles it itself — so this is
     // the case that catches someone dropping that branch.
     Probe app;
-    enter_stub(app);
+    enter_game(app);
     app.dispatch_event(ch(U'p'));
     REQUIRE(app.state() == Shell::State::Paused);
     app.dispatch_event(ctrl_c());
@@ -213,24 +213,31 @@ TEST_CASE("Ctrl+C quits from every state", "[selector][escape]") {
 TEST_CASE("P pauses, and the overlay swallows the game's input",
           "[selector][pause]") {
   Probe app;
-  enter_stub(app);
+  enter_game(app);
 
   app.dispatch_event(ch(U'p'));
   REQUIRE(app.state() == Shell::State::Paused);
   REQUIRE(app.overlay_count() == 1);
   REQUIRE(app.modal());
 
-  // 'd' is the stub's finish key. While paused it must never reach the game —
+  // 'f' is Minesweeper's flag key. While paused it must never reach the game —
   // proof that the pause suspends input rather than merely suspending ticks.
-  app.dispatch_event(ch(U'd'));
+  // Asserting on the model rather than on "we are still paused" is what makes
+  // this stronger than the diagnostic it replaced: the flag either moved the
+  // mine counter or it did not, and nothing else could have moved it.
+  const auto* game = game_of(app);
+  REQUIRE(game != nullptr);
+  const int before = game->board().mines_remaining();
+  app.dispatch_event(ch(U'f'));
   app.step();
   REQUIRE(app.state() == Shell::State::Paused);
   REQUIRE(app.current_game() != nullptr);
+  REQUIRE(game->board().mines_remaining() == before);
 }
 
 TEST_CASE("Escape resumes from pause", "[selector][pause]") {
   Probe app;
-  enter_stub(app);
+  enter_game(app);
   app.dispatch_event(ch(U'p'));
   REQUIRE(app.state() == Shell::State::Paused);
 
@@ -244,7 +251,7 @@ TEST_CASE("Escape resumes from pause", "[selector][pause]") {
 TEST_CASE("the pause dialog's Menu answer returns to the selector",
           "[selector][pause]") {
   Probe app;
-  enter_stub(app);
+  enter_game(app);
   app.dispatch_event(ch(U'p'));
   REQUIRE(app.state() == Shell::State::Paused);
 
@@ -258,9 +265,19 @@ TEST_CASE("the pause dialog's Menu answer returns to the selector",
 }
 
 TEST_CASE("a game can end itself", "[selector][lifetime]") {
+  // Minesweeper's done() means "the player accepted a finished board", so the
+  // board has to actually be finished. load_mines installs an exact layout, and
+  // opening the single mine loses immediately — no dependence on the RNG.
   Probe app;
-  enter_stub(app);
-  app.dispatch_event(ch(U'd'));  // stub sets done()
+  enter_game(app);
+  auto* game = const_cast<termgame::Minesweeper*>(game_of(app));
+  REQUIRE(game != nullptr);
+  const termgame::minesweeper::Coord mines[]{{3, 3}};
+  game->board().load_mines(mines);
+  game->board().reveal({.row = 3, .col = 3});
+  REQUIRE(game->board().finished());
+
+  app.dispatch_event(key(termforge::Key::Enter));  // accept the result
   app.step();
   REQUIRE(app.state() == Shell::State::Selector);
   REQUIRE(app.current_game() == nullptr);
@@ -269,13 +286,13 @@ TEST_CASE("a game can end itself", "[selector][lifetime]") {
 TEST_CASE("a game can request the menu from inside its own event handler",
           "[selector][lifetime]") {
   // ⚠ This is a use-after-free probe, and it is only worth anything under the
-  // sanitizer toolchains — run it there. The stub calls
+  // sanitizer toolchains — run it there. Minesweeper's 'q' calls
   // GameContext::quit_to_menu() from inside on_event; a Shell that honoured
   // that synchronously would destroy the game while its handler's frame was
   // still live. The deferred flag in GameContext exists for exactly this.
   Probe app;
-  enter_stub(app);
-  app.dispatch_event(ch(U'm'));
+  enter_game(app);
+  app.dispatch_event(ch(U'q'));
   app.step();
   REQUIRE(app.state() == Shell::State::Selector);
   REQUIRE(app.current_game() == nullptr);
@@ -285,7 +302,7 @@ TEST_CASE("the selector survives entering and leaving repeatedly",
           "[selector][lifetime]") {
   Probe app;
   for (int i = 0; i < 5; ++i) {
-    enter_stub(app);
+    enter_game(app);
     app.dispatch_event(key(termforge::Key::Escape));
     app.step();
     REQUIRE(app.state() == Shell::State::Selector);

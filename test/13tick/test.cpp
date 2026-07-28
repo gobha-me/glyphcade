@@ -28,7 +28,7 @@
 
 #include <termgame/arcade/registry.hpp>
 #include <termgame/arcade/shell.hpp>
-#include <termgame/games/stub/stub_game.hpp>
+#include <termgame/games/minesweeper/minesweeper.hpp>
 
 namespace {
 
@@ -90,16 +90,16 @@ class TickProbe : public Shell {
       termforge::KeyEvent{.key = termforge::Key::Char, .ch = c}};
 }
 
-[[nodiscard]] auto stub_of(const Shell& shell) -> const termgame::StubGame* {
-  return dynamic_cast<const termgame::StubGame*>(shell.current_game());
+[[nodiscard]] auto game_of(const Shell& shell) -> const termgame::Minesweeper* {
+  return dynamic_cast<const termgame::Minesweeper*>(shell.current_game());
 }
 
-auto enter_stub(TickProbe& app) -> void {
+auto enter_game(TickProbe& app) -> void {
   app.step();
   int index = -1;
   const auto games = termgame::all_games();
   for (std::size_t i = 0; i < games.size(); ++i) {
-    if (games[i].meta.slug == "stub") index = static_cast<int>(i);
+    if (games[i].meta.slug == "minesweeper") index = static_cast<int>(i);
   }
   REQUIRE(index >= 0);
   while (app.selector_index() < index) app.dispatch_event(key(termforge::Key::Down));
@@ -134,16 +134,16 @@ TEST_CASE("the delta clamp is in force", "[tick]") {
 TEST_CASE("an N-period frame delivers N game ticks", "[tick]") {
   TickProbe app;
   app.set_frame_ms(kFrameMs);
-  enter_stub(app);
+  enter_game(app);
 
-  const auto* stub = stub_of(app);
-  REQUIRE(stub != nullptr);
-  REQUIRE(stub->ticks() == 0);
+  const auto* game = game_of(app);
+  REQUIRE(game != nullptr);
+  REQUIRE(game->ticks() == 0);
 
   app.step(3);
   // Asserted against the STUB's counter, i.e. through the routing, rather than
   // against App::on_tick — which would pass even if the Shell forwarded nothing.
-  REQUIRE(stub->ticks() == 3 * kTicksPerFrame);
+  REQUIRE(game->ticks() == 3 * kTicksPerFrame);
 }
 
 TEST_CASE("no game ever sees a zero delta", "[tick]") {
@@ -153,25 +153,25 @@ TEST_CASE("no game ever sees a zero delta", "[tick]") {
   // is pinned here rather than assumed.
   TickProbe app;
   app.set_frame_ms(kFrameMs);
-  enter_stub(app);
+  enter_game(app);
   app.step(5);
 
-  const auto* stub = stub_of(app);
-  REQUIRE(stub != nullptr);
-  REQUIRE(stub->ticks() > 0);
-  REQUIRE(stub->min_dt() > Seconds::zero());
+  const auto* game = game_of(app);
+  REQUIRE(game != nullptr);
+  REQUIRE(game->ticks() > 0);
+  REQUIRE(game->min_dt() > Seconds::zero());
   // And it is the constant, not a measured frame delta.
-  REQUIRE(stub->min_dt().count() ==
+  REQUIRE(game->min_dt().count() ==
           Seconds{1.0 / Shell::kTickHz}.count());
 }
 
 TEST_CASE("a pathological delta cannot deliver an unbounded burst", "[tick]") {
   TickProbe app;
   app.set_frame_ms(kFrameMs);
-  enter_stub(app);
+  enter_game(app);
 
-  const auto* stub = stub_of(app);
-  REQUIRE(stub != nullptr);
+  const auto* game = game_of(app);
+  REQUIRE(game != nullptr);
 
   app.stall(30s);  // frozen between frames
   app.step();
@@ -181,9 +181,9 @@ TEST_CASE("a pathological delta cannot deliver an unbounded burst", "[tick]") {
   // collide with. With it, the bound is ceil(max_tick_dt * tick_hz).
   const int bound = static_cast<int>(
       std::ceil(app.max_tick_dt().count() * Shell::kTickHz));
-  INFO("delivered " << stub->ticks() << ", bound " << bound);
-  REQUIRE(stub->ticks() <= bound);
-  REQUIRE(stub->ticks() > 0);  // the frame is throttled, not dropped
+  INFO("delivered " << game->ticks() << ", bound " << bound);
+  REQUIRE(game->ticks() <= bound);
+  REQUIRE(game->ticks() > 0);  // the frame is throttled, not dropped
 }
 
 TEST_CASE("the selector does not tick a game", "[tick]") {
@@ -198,13 +198,13 @@ TEST_CASE("the selector does not tick a game", "[tick]") {
 TEST_CASE("pause stops the simulation and resume restarts it", "[tick]") {
   TickProbe app;
   app.set_frame_ms(kFrameMs);
-  enter_stub(app);
+  enter_game(app);
 
-  const auto* stub = stub_of(app);
-  REQUIRE(stub != nullptr);
+  const auto* game = game_of(app);
+  REQUIRE(game != nullptr);
 
   app.step(2);
-  const int before = stub->ticks();
+  const int before = game->ticks();
   REQUIRE(before == 2 * kTicksPerFrame);
 
   app.dispatch_event(ch(U'p'));
@@ -213,12 +213,12 @@ TEST_CASE("pause stops the simulation and resume restarts it", "[tick]") {
   // The framework keeps calling App::on_tick while an overlay is up, by design.
   // Not forwarding it is the Shell's job, and this is the only thing that
   // checks the Shell did it.
-  REQUIRE(stub->ticks() == before);
+  REQUIRE(game->ticks() == before);
 
   app.dispatch_event(key(termforge::Key::Escape));  // resume
   REQUIRE(app.state() == Shell::State::InGame);
   app.step(2);
-  REQUIRE(stub->ticks() > before);
+  REQUIRE(game->ticks() > before);
 }
 
 TEST_CASE("Escape in the selector stops the loop", "[tick][escape]") {
