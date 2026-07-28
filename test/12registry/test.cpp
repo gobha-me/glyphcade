@@ -70,12 +70,12 @@ TEST_CASE("the factory and the metadata agree", "[registry]") {
   }
 }
 
-TEST_CASE("the stub game is registered", "[registry]") {
-  // ⚠ Delete this case together with the stub game itself, when Epic 3
-  // (Minesweeper) lands. See include/termgame/games/stub/stub_game.hpp.
+TEST_CASE("minesweeper is registered", "[registry]") {
+  // No deletion condition on this one — unlike the diagnostic it replaced, this
+  // game is the product.
   bool found = false;
   for (const auto& entry : termgame::all_games()) {
-    if (entry.meta.slug == "stub") found = true;
+    if (entry.meta.slug == "minesweeper") found = true;
   }
   REQUIRE(found);
 }

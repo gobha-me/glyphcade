@@ -22,14 +22,14 @@
 #include <cstddef>
 #include <iterator>
 
-#include <termgame/games/stub/stub_game.hpp>
+#include <termgame/games/minesweeper/minesweeper.hpp>
 
 namespace termgame {
 namespace {
 
 // Menu order is this order.
 constexpr GameEntry kGames[] = {
-    {StubGame::kMeta, &make_game<StubGame>},
+    {Minesweeper::kMeta, &make_game<Minesweeper>},
 };
 
 // ── The table checks itself ─────────────────────────────────────────────────
