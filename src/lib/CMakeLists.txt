@@ -33,7 +33,8 @@ if (${PROJECT_NAME}_BUILD_LIB)
     arcade/run_guard.cpp
     arcade/shell.cpp
     arcade/all_games.cpp
-    games/stub/stub_game.cpp
+    games/minesweeper/board.cpp
+    games/minesweeper/minesweeper.cpp
   )
 
   # Compiled libs get the project's include dir PUBLIC so consumers (bin,
