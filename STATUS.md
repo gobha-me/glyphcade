@@ -30,14 +30,24 @@ file. Nine epics are filed on gitea (`xcaliber/term-game`, issues 1–9).
 | 7 — Sokoban | not started | termforge #64 → #63 |
 | 8 — Solitaire | not started | termforge #63 |
 
-### The one thing standing in the way
+### The things standing in the way
 
-termforge **[#27](https://github.com/gobha-me/termforge/issues/27)** — no
+**1. termforge [#27](https://github.com/gobha-me/termforge/issues/27)** — no
 `install()`/`export()`, so `find_package(termforge CONFIG)` cannot succeed; and
 `add_subdirectory` currently drags in termforge's bin, examples and 412 tests
 *and* defaults `CMAKE_TOOLCHAIN_FILE` out from under the consumer. **Nothing in
-this repo builds until one of the two consumption paths works.** Still open as of
-this update.
+this repo builds until one of the two consumption paths works.** Still open.
+
+**2. cpp-template [CT-15](https://github.com/gobha-me/cpp-template/issues/29)** —
+`cmake/install.cmake`'s build-tree `export(EXPORT ...)` **fails at CMake generate
+time** for any fork with a public FetchContent dependency. That is exactly us
+(we link termforge publicly), and our case is worse than the one CT-15 documents:
+because termforge registers *no* export sets at all, both the build-tree and the
+install path fail, with no rescue.
+
+→ **Read [docs/cpp-template-audit.md](docs/cpp-template-audit.md) before starting
+Epic 0.** The fix is small (delete the `export(EXPORT ...)` block from our copy),
+but hitting it cold at generate time is an afternoon lost.
 
 ---
 
