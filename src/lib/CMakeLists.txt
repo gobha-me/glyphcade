@@ -22,10 +22,18 @@ if (${PROJECT_NAME}_BUILD_LIB)
   # Note the spelling split, and do not "fix" it: the project, the repo and the
   # CMake target are term-game; the include dir and the C++ namespace are
   # termgame, because a hyphen is illegal in a namespace.
+  #
+  # One target, not one per game. DESIGN.md's destination is a static library
+  # per game; that is deferred until a second real game exists and there is
+  # something to isolate. Today games live in their own directories — which is
+  # the part that actually buys self-containment — and compile in here. When the
+  # second game lands, these lines move to games/<slug>/CMakeLists.txt.
   add_library(${PROJECT_NAME}_lib STATIC
     build_info.cpp
     arcade/run_guard.cpp
-    arcade/boot_app.cpp
+    arcade/shell.cpp
+    arcade/all_games.cpp
+    games/stub/stub_game.cpp
   )
 
   # Compiled libs get the project's include dir PUBLIC so consumers (bin,
@@ -49,8 +57,10 @@ if (${PROJECT_NAME}_BUILD_LIB)
   # — without this, they compile include/lib.hpp at whatever their default is.
   target_compile_features(${PROJECT_NAME}_lib PUBLIC cxx_std_23)
 
-  # PUBLIC, not PRIVATE: include/termgame/arcade/boot_app.hpp derives from
-  # termforge::App and names termforge types in its interface, so every consumer
+  # PUBLIC, not PRIVATE: include/termgame/arcade/shell.hpp derives from
+  # termforge::App and holds termforge widgets by value, and arcade/game.hpp
+  # names termforge::Screen and termforge::Event in its interface, so every
+  # consumer
   # — src/bin, every test, anything downstream — needs termforge's headers and
   # its archive. This is also why cmake/project-config.cmake.in carries a
   # find_dependency(termforge) line.

@@ -23,7 +23,7 @@ export(EXPORT ${PROJECT_NAME}Targets
 ```
 
 `export(EXPORT)` requires every non-imported dependency to be in a **build**
-export set. term-game links termforge **publicly** — `BootApp` derives from
+export set. term-game links termforge **publicly** — the `Shell` derives from
 `termforge::App` and exposes it through our headers, so `PRIVATE` was never
 available — and at audit time termforge registered *no* export sets at all. The
 predicted failure, at CMake *generate* time:

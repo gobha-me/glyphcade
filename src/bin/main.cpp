@@ -1,11 +1,10 @@
 // term-game — the single binary.
 //
-// Epic 0 opens a placeholder. Epic 1 replaces BootApp with the Shell, which
-// owns the game registry and the selector UI; this file should stay roughly
-// this size when it does.
+// Everything is in the Shell: the terminal, the loop, the selector, the game
+// registry. This file should stay roughly this size forever.
 
-#include <termgame/arcade/boot_app.hpp>
 #include <termgame/arcade/run_guard.hpp>
+#include <termgame/arcade/shell.hpp>
 
 auto main() -> int {
   return termgame::guarded_run([] {
@@ -15,7 +14,7 @@ auto main() -> int {
     // screen. Hoist this above the guarded_run call and a thrown frame leaves
     // the terminal wedged. run_guard.cpp explains why in full;
     // test/21exception fails if this moves.
-    termgame::BootApp app;
+    termgame::Shell app;
     return app.run();
   });
 }
