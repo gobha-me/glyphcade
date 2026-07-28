@@ -30,7 +30,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
   # second game lands, these lines move to games/<slug>/CMakeLists.txt.
   add_library(${PROJECT_NAME}_lib STATIC
     build_info.cpp
-    arcade/run_guard.cpp
+    arcade/exception_boundary.cpp
     arcade/shell.cpp
     arcade/all_games.cpp
     games/minesweeper/board.cpp

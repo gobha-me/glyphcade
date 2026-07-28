@@ -63,7 +63,7 @@ else ()
   #            Terminal::leave_raw(), and the App::test_run_guarded /
   #            test_winch_hooked probes — which is what lets test/21exception
   #            assert the guarantee rather than take the release note's word
-  #            for it. This is the tag that retired guarded_run's
+  #            for it. This is the tag that retired run_or_report's
   #            terminal-restore job; gitea #16.
   #
   # Pin a tag, not a SHA: the find_package path above is version-gated, so both

@@ -4,8 +4,8 @@
 // leaves it (termforge#71, v0.1.10). Asserted below via test_run_guarded.
 //
 // Ours: whatever it rethrows becomes a diagnostic and exit 1 rather than
-// std::terminate. Asserted below via guarded_run. See src/lib/arcade/
-// run_guard.cpp for why that is all our half is now.
+// std::terminate. Asserted below via run_or_report. See src/lib/arcade/
+// exception_boundary.cpp for why that is all our half is now.
 //
 // ⚠ Known limit, stated rather than papered over: nothing here enters the
 // alternate screen, so no test in this file can see the escape bytes. What
@@ -19,7 +19,7 @@
 #include <stdexcept>
 
 #include <termforge/core/app.hpp>
-#include <termgame/arcade/run_guard.hpp>
+#include <termgame/arcade/exception_boundary.hpp>
 
 namespace {
 
@@ -41,7 +41,9 @@ class TeardownWitness final : public termforge::App {
     throw std::runtime_error("boom");
   }
 
-  [[nodiscard]] auto hooked_at_throw() const -> bool { return m_hooked_at_throw; }
+  [[nodiscard]] auto hooked_at_throw() const -> bool {
+    return m_hooked_at_throw;
+  }
 
  private:
   static constexpr int kFrameCap = 8;
@@ -86,7 +88,7 @@ TEST_CASE("an escaping exception becomes exit 1", "[exception]") {
   // the mechanism was retired with termforge#71, since teardown no longer
   // depends on the App being destroyed at all. The guarantee it was standing in
   // for is asserted directly by the case above, at the level it actually lives.
-  const int rc = termgame::guarded_run([] {
+  const int rc = termgame::run_or_report([] {
     TeardownWitness app;
     app.set_frame_ms(0);
     return app.test_run_guarded(20, 3, nullptr);  // rethrows
@@ -96,11 +98,11 @@ TEST_CASE("an escaping exception becomes exit 1", "[exception]") {
 }
 
 TEST_CASE("a clean return passes through untouched", "[exception]") {
-  REQUIRE(termgame::guarded_run([] { return 7; }) == 7);
+  REQUIRE(termgame::run_or_report([] { return 7; }) == 7);
 }
 
 TEST_CASE("a non-std exception is still caught", "[exception]") {
-  // The catch(...) arm. Without it this would escape guarded_run and terminate
-  // the test binary rather than failing an assertion.
-  REQUIRE(termgame::guarded_run([]() -> int { throw 42; }) == 1);
+  // The catch(...) arm. Without it this would escape the boundary and
+  // terminate the test binary rather than failing an assertion.
+  REQUIRE(termgame::run_or_report([]() -> int { throw 42; }) == 1);
 }
