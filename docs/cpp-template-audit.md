@@ -1,15 +1,20 @@
-# cpp-template audit — read before Epic 0
+# cpp-template audit — the record of why our fork diverges
 
-Audited 2026-07-28 against cpp-template `main` @ `3ed1d97`, before forking it for
-term-game. Findings feed [Epic 0](https://git.gobha.me/xcaliber/term-game/issues/1).
+Originally written 2026-07-28 against cpp-template `main` @ `3ed1d97`, *before*
+forking it, to find what would break [Epic 0](https://git.gobha.me/xcaliber/term-game/issues/1).
+Rewritten after Epic 0 landed, against `8f62930`.
 
-**One landmine, and it is on our exact path.**
+Its job now is to be the standing record of **where our copy of the template
+differs from upstream and why**, so nobody silently re-syncs a file and undoes a
+fix. The live divergences table is in [STATUS.md](STATUS.md); this is the
+reasoning behind it.
 
-### CT-15 will fail Epic 0 at CMake *generate* time
+---
 
-[cpp-template CT-15](https://github.com/gobha-me/cpp-template/issues/29).
-`cmake/install.cmake` (~line 54) emits a **build-tree** export alongside the
-install one:
+## CT-15 — the landmine that was defused before we stepped on it
+
+[CT-15](https://github.com/gobha-me/cpp-template/issues/29). `cmake/install.cmake`
+used to emit a **build-tree** export alongside the install one:
 
 ```cmake
 export(EXPORT ${PROJECT_NAME}Targets
@@ -18,13 +23,10 @@ export(EXPORT ${PROJECT_NAME}Targets
 ```
 
 `export(EXPORT)` requires every non-imported dependency to be in a **build**
-export set. term-game links termforge **publicly** — the Shell derives from
-`termforge::App` and exposes it through our headers, so `PRIVATE` is not
-available — and **termforge registers no export sets at all** (no `install()`,
-no `export()`, no `install.cmake`; its root still says `# TODO Install Template`,
-tracked as [termforge#27](https://github.com/gobha-me/termforge/issues/27)).
-
-Expected failure, by analogy with the venice-cpp reproducer:
+export set. term-game links termforge **publicly** — `BootApp` derives from
+`termforge::App` and exposes it through our headers, so `PRIVATE` was never
+available — and at audit time termforge registered *no* export sets at all. The
+predicted failure, at CMake *generate* time:
 
 ```
 CMake Error in CMakeLists.txt:
@@ -32,41 +34,99 @@ CMake Error in CMakeLists.txt:
   "termforge_lib" that is not in any export set.
 ```
 
-**Our case is worse than the one CT-15 documents.** There, only the build-tree
-path failed — `install(EXPORT)` survived because `HandleMissingTarget` found the
-dependency in *its* install export set and rewrote the reference. termforge has
-no install export set either, so **both** paths fail. There is no knob in this
-project that fixes it.
+Our case was worse than the one CT-15 documents: there, only the build-tree path
+failed, because `HandleMissingTarget` found the dependency in *its* install
+export set. termforge had neither, so both paths failed with no rescue.
 
-**Action for Epic 0:**
-1. **Delete the `export(EXPORT ...)` block** from our copy of
-   `cmake/install.cmake`. This is what the venice-cpp port did; we are the second
-   fork to do it. Leave a comment saying why, pointing at CT-15.
-2. Treat `add_subdirectory` as the supported side-by-side development path
-   (that block's only purpose was letting a consumer point `CMAKE_PREFIX_PATH`
-   at a build dir).
-3. `find_package(termforge CONFIG)` stays unusable until termforge#27 adds
-   `install(EXPORT)`. Until then, **FetchContent/add_subdirectory is the only
-   path** — plan the CMake around that rather than writing a find_package-first
-   block that cannot work yet.
+**It never fired.** Upstream fixed it at `8f62930` ("Drop the build-tree export
+so install.cmake survives a fork with a public dep"), and the block is now a
+48-line comment at `cmake/install.cmake:51-98` explaining why it must not come
+back — including the trap of reaching for `export(TARGETS ... APPEND)` to silence
+the error, which writes a `<project>::<dep>` reference that nothing defines.
 
-### Other open cpp-template issues — none blocking
+**Consequence for us: `cmake/install.cmake` is copied verbatim and needs no
+edit.** The earlier advice in this document — "delete the `export(EXPORT ...)`
+block from our copy" — is a no-op and has been removed. The analysis is kept
+because it is *why* the upstream fix exists, and because the same reasoning is
+what makes `set(termforge_INSTALL ${${PROJECT_NAME}_INSTALL})` load-bearing in
+[cmake/deps/termforge.cmake](../cmake/deps/termforge.cmake).
 
-- **[CT-12](https://github.com/gobha-me/cpp-template/issues/25)** — headers
-  install flat, should be `include/<project>/`. We already put ours under
-  `include/termgame/` per DESIGN.md, so we sidestep it. **Note the deliberate
-  spelling mismatch: the project/repo is `term-game`, the include dir and C++
-  namespace are `termgame`** — a hyphen is illegal in a namespace. Document it so
-  nobody "fixes" it later.
-- **[CT-11](https://github.com/gobha-me/cpp-template/issues/24)** —
-  `version.hpp` generates into the *source* tree. This is the same trap
-  `NEW_PROJECT.md` Step 0 warns about (it is gitignored, so a `cp -r` carries a
-  stale one while a `git clone` does not). Use `git clone`, and `rm -f
-  include/version.hpp` before the first configure.
-- **[CT-13](https://github.com/gobha-me/cpp-template/issues/26)** /
-  **[CT-10](https://github.com/gobha-me/cpp-template/issues/11)** — template
-  hygiene and drift docs. No impact on us.
+> The original audit also concluded that `find_package(termforge CONFIG)` would
+> stay unusable and that FetchContent was the only path. **That is now false.**
+> termforge v0.1.7 ships `install(EXPORT)` and `termforgeConfig.cmake`, both
+> paths work, and both give `termforge::lib` — which is why our recipe is
+> find_package-first with a FetchContent fallback.
 
-Template `main` is otherwise clean and current (`3ed1d97`), with
-`PROJECT_IS_TOP_LEVEL` guards and install/export already landed (CT-04, #23) and
-CI enforcing the dual-compiler rule (CT-08, #18).
+---
+
+## Our two divergences from the template
+
+Both are fixes carried into our copy, both filed upstream, both listed with a
+deletion condition in [STATUS.md](STATUS.md#divergences-from-cpp-template).
+
+### 1. `cmake/toolchain/default.cmake` clobbered `CMAKE_CXX_FLAGS`
+
+Upstream line 14 is a plain replace:
+
+```cmake
+set(CMAKE_CXX_FLAGS "-Wall -Wnarrowing -Wextra -pedantic")
+```
+
+A toolchain file's normal variable shadows the cache, so
+`cmake -B build -DCMAKE_CXX_FLAGS=-Werror` is **silently discarded**. Every
+cpp-template fork that puts `-Werror` in CI is therefore enforcing nothing while
+reporting green. termforge already carries the fix (`include_guard(GLOBAL)` plus
+an appending `set()`); we carry the same one.
+
+Because the fix is invisible when it regresses, CI asserts it separately:
+`grep -q -- '-Werror' build/compile_commands.json`, in
+[.gitea/workflows/ci.yaml](../.gitea/workflows/ci.yaml).
+
+### 2. `check_artifacts.cmake` rule A1 scanned every tracked file
+
+A1 is labelled *"upstream repo slug (README CI badge)"* but is implemented as
+`_scan("gobha-me/cpp-template" ".*" ...)` — every tracked file, with only
+`check_artifacts.cmake` and `NEW_PROJECT.md` excluded by content. A badge can
+only live in the README, so the `.*` makes it structurally impossible for a fork
+to document its own provenance — which NEW_PROJECT.md Step 1 explicitly
+instructs you to do ("Scaffolded from cpp-template").
+
+term-game names the slug legitimately eight times across `AGENTS.md`,
+`DESIGN.md`, `STATUS.md` and this file. Our copy narrows the path filter to
+`^README\.md$`. Accepted cost: a stale slug outside the README is no longer
+caught — outside the README it is prose, not wiring.
+
+---
+
+## Traps that were real and are still worth knowing
+
+- **`include/version.hpp` is generated and gitignored.** A `cp -r` carries a
+  stale one; a `git clone` does not (CT-11,
+  [#24](https://github.com/gobha-me/cpp-template/issues/24)). We scaffolded with
+  `git archive HEAD <paths> | tar -x`, which emits only tracked content and so
+  cannot carry it — and which also preserves the `100755` mode on
+  `cmake/startup.sh` / `cmake/shutdown.sh` that a plain `cp` drops, failing
+  artifact rule B5.
+- **`cmake/version.cmake` runs `git describe` from inside `cmake/`**, and git
+  walks *upward*. A tree without its own `.git` inherits an enclosing repo's
+  tags with no warning. Not an issue here — term-game has its own history — but
+  it is why `fetch-depth: 0` in CI is load-bearing.
+- **`check_artifacts` reads `git ls-files`.** Mid-bootstrap, before anything is
+  staged, rules B2 and B3 fail for the mechanical reason that the files they
+  correlate are untracked. `git add` first, then judge the output.
+- **CT-12** ([#25](https://github.com/gobha-me/cpp-template/issues/25)) — headers
+  install flat. We sidestep it by putting ours under `include/termgame/`, but we
+  still hit its tail: `install.cmake` lands the generated `version.hpp`, which
+  declares unprefixed globals (`PROGRAM_NAME`, `VERSION_MAJOR`, …), flat in
+  `${prefix}/include`. termforge deliberately never installs its own. Left alone
+  here — `install.cmake` stays verbatim — and reported upstream as a datapoint.
+
+## The rest
+
+**CT-13** ([#26](https://github.com/gobha-me/cpp-template/issues/26)) and
+**CT-10** ([#11](https://github.com/gobha-me/cpp-template/issues/11)) are
+template hygiene and drift docs. No impact on us.
+
+`.github/workflows/ci.yml` is **not** carried over despite NEW_PROJECT.md's
+"copy verbatim, zero edits" — that instruction assumes a GitHub fork, and
+term-game is on gitea. See [.gitea/workflows/ci.yaml](../.gitea/workflows/ci.yaml).

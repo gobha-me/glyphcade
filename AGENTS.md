@@ -40,6 +40,10 @@ half the point of this repo.
 
 ## Hard rules (project-specific)
 
+- **`term-game` and `termgame` are both correct. Do not "fix" either.** The
+  project, the gitea repo, the CMake project and every `-Dterm-game_*` option are
+  **`term-game`**; the include directory and the C++ namespace are **`termgame`**,
+  because a hyphen is illegal in a namespace. This trips everyone once.
 - **One `App`, many `Game`s.** The Shell is the only `termforge::App` — it owns
   the terminal, the loop, and the audio engine. Games are **not** `App`
   subclasses and never touch `App`, `Terminal`, or each other. Shared services
@@ -87,16 +91,62 @@ verification"* — **never as verified**. Claiming otherwise is unfounded.
 
 ## How to verify before a PR
 
+Three configurations minimum. The second is not redundant with the first: this
+container has `librtaudio-dev`, so detection defaults **ON** here and the OFF arm
+— the one CI runs and the one this repo promises always works — is only exercised
+if you ask for it.
+
 ```bash
-cmake -B build && cmake --build build && ctest --test-dir build --output-on-failure
+# 1. GCC, audio auto-detected
+cmake -B build -DCMAKE_CXX_FLAGS=-Werror && cmake --build build --parallel \
+  && ctest --test-dir build --output-on-failure
+
+# 2. GCC, audio explicitly OFF
+cmake -B build-noaudio -DTERMGAME_WITH_AUDIO=OFF -DCMAKE_CXX_FLAGS=-Werror \
+  && cmake --build build-noaudio --parallel \
+  && ctest --test-dir build-noaudio --output-on-failure
+
+# 3. Clang
 cmake -B build-clang -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain/clang.cmake \
-  && cmake --build build-clang && ctest --test-dir build-clang
+  -DCMAKE_CXX_FLAGS=-Werror && cmake --build build-clang --parallel \
+  && ctest --test-dir build-clang --output-on-failure
 ```
 
-Both compilers must build clean and pass, with and without
-`TERMGAME_WITH_AUDIO`. Anything touching *feel* — frame pacing, input latency,
-animation — also needs a human to actually play it; the agent cannot see a
-terminal or hear a speaker. Say so rather than guessing.
+Pass `-DCMAKE_CXX_FLAGS=-Werror` — and note that it only works because our
+`cmake/toolchain/default.cmake` appends rather than replaces. If you ever re-sync
+that file from cpp-template you will silently lose it; check with
+`grep -- -Werror build/compile_commands.json`. Sanitizers via
+`cmake/toolchain/{address,undefined}.cmake`.
+
+`ctest` must be green with **no `-E` exclusion** — in particular `artifact-check`
+runs in enforce mode and must print `CLEAN`. If it reports Class-B failures right
+after you add files, `git add` them first: it reads `git ls-files`, so untracked
+files look like missing ones.
+
+### Checking the terminal itself, without a human
+
+An agent has no terminal, but it can allocate a pty with `script(1)` and read
+back exactly what the app wrote. Use this instead of claiming a rendering or
+terminal-restore change is unverifiable:
+
+```bash
+{ sleep 3; printf '\033'; sleep 2; } | timeout 20 \
+  script -q -c "$PWD/build/src/bin/term-game" /tmp/pty.raw
+# entered and left the alternate screen?
+grep -c $'\033\[?1049h' /tmp/pty.raw   # 1
+grep -c $'\033\[?1049l' /tmp/pty.raw   # 1  <- terminal was restored
+# what was actually rendered (the renderer positions every cell, so text is
+# never contiguous — strip the escapes before grepping for it):
+perl -pe 's/\e\][^\a\e]*(\a|\e\\)//g; s/\e_[^\e]*\e\\//g; s/\e\[[0-9;?]*[a-zA-Z]//g' \
+  /tmp/pty.raw | tr -s ' '
+```
+
+Send input *after* setup finishes — a keystroke delivered during the capability
+probe is eaten by the DA1 response parser, and the app never sees it.
+
+This covers rendering and terminal restore. It does **not** cover *feel* — frame
+pacing, input latency, animation smoothness still need a human to play it, and
+audio needs a human to hear it. Say so rather than guessing.
 
 ## Porting from HTML-Games
 

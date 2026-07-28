@@ -8,8 +8,10 @@ arcade-of-small-games idea and the same roster to raid, but terminal-native and
 compiled instead of HTML/CSS/JS. One binary, a selector, and a set of
 self-contained games.
 
-> **Status: design phase.** Nothing is built yet. See [DESIGN.md](DESIGN.md) for
-> the architecture and the issue tracker for the epic breakdown.
+> **Status: bootstrapped.** The scaffold builds and the binary opens a terminal;
+> the games do not exist yet. See [STATUS.md](STATUS.md) for live state,
+> [DESIGN.md](DESIGN.md) for the architecture, and the issue tracker for the epic
+> breakdown.
 
 ## The idea
 
@@ -50,9 +52,11 @@ absent, so the repo builds and tests anywhere.
 cmake -B build && cmake --build build && ctest --test-dir build --output-on-failure
 ```
 
-Requires a C++23 compiler (GCC 13+ / Clang 19+). `librtaudio-dev` is optional —
-without it you get a silent but fully playable arcade.
+Requires CMake 3.28+ and a C++23 compiler (GCC 13+ / Clang 19+). TermForge is
+fetched automatically if it is not already installed. `librtaudio-dev` is
+optional — without it you get a silent but fully playable arcade; force the
+no-audio build with `-DTERMGAME_WITH_AUDIO=OFF`.
 
 ## License
 
-TBD.
+[MIT](LICENSE.md).

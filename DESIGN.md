@@ -132,10 +132,13 @@ UI thread                    lock-free SPSC ring                 audio thread
   WAV decoder, the asset pipeline, and the binary blobs in git — and it is the
   correct sound for an arcade. Venice is better spent on sprite and title art.
 
-**Development reality:** the dev container has no `/dev/snd` and no PulseAudio,
-so `TERMGAME_WITH_AUDIO` auto-detects and defaults OFF there. CI tests the mixer
-through `WavFileSink`. Real-device verification happens on hardware with
-`librtaudio-dev` installed. The abstraction is therefore not speculative — it is
+**Development reality:** the dev container has `librtaudio-dev` installed but no
+`/dev/snd` and no PulseAudio — the *library* is present, the *hardware* is not.
+So `TERMGAME_WITH_AUDIO` auto-detects to **ON** there, and the no-audio arm has
+to be built explicitly (`-DTERMGAME_WITH_AUDIO=OFF`, which is what CI runs) or it
+rots unnoticed. Either way nothing can be heard from that container, so CI tests
+the mixer through `WavFileSink` and real-device verification happens on the
+maintainer's own machine. The abstraction is therefore not speculative — it is
 load-bearing from the first commit.
 
 ### Graphics tiers
@@ -184,12 +187,13 @@ this design pass.
 
 > **This table is point-in-time — it records what was true when the design was
 > written.** [STATUS.md](STATUS.md) is the live state; check it (or `gh`) before
-> assuming anything here still blocks. #58 has already been fixed upstream.
+> assuming anything here still blocks. #27 and #58 have both been fixed
+> upstream, and #59 is in progress.
 
 | Issue | Gap | Blocks |
 |---|---|---|
-| [#27](https://github.com/gobha-me/termforge/issues/27) | No install/export; consumer options default ON | **Epic 0 — everything** |
-| [#58](https://github.com/gobha-me/termforge/issues/58) | Idle loop capped ~7.5fps; `set_frame_ms` can't raise it | all real-time games |
+| [#27](https://github.com/gobha-me/termforge/issues/27) | No install/export; consumer options default ON | ~~Epic 0~~ — **fixed in v0.1.7** |
+| [#58](https://github.com/gobha-me/termforge/issues/58) | Idle loop capped ~7.5fps; `set_frame_ms` can't raise it | ~~all real-time games~~ — **fixed** |
 | [#59](https://github.com/gobha-me/termforge/issues/59) | No `on_tick(dt)` hook | animation (worked around) |
 | [#60](https://github.com/gobha-me/termforge/issues/60) | No key release (Kitty keyboard protocol) | Tetris/Snake feel |
 | [#61](https://github.com/gobha-me/termforge/issues/61) | `Key` enum stops at F4 | UI polish |
@@ -197,35 +201,47 @@ this design pass.
 | [#63](https://github.com/gobha-me/termforge/issues/63) | `Image` has no blit/alpha compositing | sprite games |
 | [#64](https://github.com/gobha-me/termforge/issues/64) | MapWidget (Epic 3.6) | Sokoban |
 
-**#27 is the critical path.** Nothing in this repo builds until termforge is
-cleanly consumable.
+Of these, #27 and #58 are done. #59 has a Shell-side workaround *and* is being
+worked on upstream — check before writing that accumulator by hand, see
+[STATUS.md](STATUS.md). #61/#62/#63 degrade rather than block.
 
-Of these, only #58 is unworkaroundable from this side — it lives inside
-TermForge's own loop. #59 has a Shell-side workaround; #61/#62/#63 degrade
-rather than block.
+Epic 0 added one gap to the list that this design pass had not predicted:
+**`App::run()` does not restore the terminal when a frame throws.** Our
+`guarded_run` covers it; details and deletion date in STATUS.md.
 
 ---
 
 ## Repository layout
 
+**This is the destination, not a checklist to stub out.** Epic 0 built only what
+it needed; a header that does not exist yet is better than an empty one, because
+an empty `include/termgame/audio/` makes the audio engine look done. `✓` marks
+what exists today.
+
 ```
 term-game/
-├── CMakeLists.txt            # from cpp-template
-├── DESIGN.md  ROADMAP.md  AGENTS.md  README.md
+├── CMakeLists.txt            # ✓ from cpp-template
+├── DESIGN.md  AGENTS.md  README.md  STATUS.md         # ✓
 ├── include/termgame/
-│   ├── arcade/   game.hpp  registry.hpp  shell.hpp  context.hpp  scores.hpp
+│   ├── build_info.hpp        # ✓ version + build_has_audio()
+│   ├── arcade/   boot_app.hpp ✓  run_guard.hpp ✓      (Epic 0 placeholders)
+│   │              game.hpp  registry.hpp  shell.hpp  context.hpp  scores.hpp
+│   │                                                  (Epic 1)
 │   └── audio/    sink.hpp  engine.hpp  synth.hpp  ring.hpp
-├── src/lib/                  # the shared arcade + audio library
-├── src/bin/main.cpp          # the single binary
+│                                                      (Epic 2)
+├── src/lib/                  # ✓ the shared arcade + audio library
+├── src/bin/main.cpp          # ✓ the single binary
 ├── games/<slug>/             # one static lib per game, self-contained
 ├── assets/                   # venice-generated art
 ├── vendor/stb_image.h
-└── test/                     # Catch2, mirroring termforge's suite layout
+└── test/                     # ✓ Catch2, mirroring termforge's suite layout
 ```
 
 Bootstrapped from [cpp-template](https://github.com/gobha-me/cpp-template) per
 its `NEW_PROJECT.md` checklist. Project name follows the directory name, so the
-directory, the gitea repo, and the CMake project must all read `term-game`.
+directory, the gitea repo, and the CMake project must all read `term-game` —
+while the include dir and namespace read `termgame`, because a hyphen is illegal
+in a C++ namespace.
 
 ---
 

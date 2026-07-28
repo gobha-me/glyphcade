@@ -1,0 +1,123 @@
+# Gitea Actions, not GitHub Actions.
+#
+# term-game lives on git.gobha.me. cpp-template ships .github/workflows/ci.yml
+# and NEW_PROJECT.md says to copy it verbatim — that instruction assumes a
+# GitHub fork, so it is deliberately NOT carried over here. It would never
+# execute, its badge could never go green, and it references example/consumer
+# and example/public-dep, neither of which this project keeps.
+#
+# No actions/setup-* steps, for the reason HTML-Games documents in its own
+# workflow: act (the Gitea Actions runner) clones the action repo from GitHub on
+# every invocation, which costs minutes for no benefit. We use the tools already
+# in the runner image and gate on their versions instead — see the first step.
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  # Fail fast, loudly, and on the right line. The runner image's toolchain was
+  # not verifiable when this file was written, so rather than guessing it, this
+  # asserts. A regression below the floor reports itself here instead of
+  # surfacing as an incomprehensible error inside a template instantiation.
+  toolchain:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Toolchain floor
+        run: |
+          set -euo pipefail
+
+          fail=0
+          check() {  # name  actual  minimum
+            printf '%-8s %s (need >= %s)\n' "$1" "$2" "$3"
+            if [ "$(printf '%s\n%s\n' "$3" "$2" | sort -V | head -1)" != "$3" ]; then
+              echo "  ^ TOO OLD"
+              fail=1
+            fi
+          }
+
+          check cmake   "$(cmake --version | head -1 | awk '{print $3}')"  3.28
+          check g++     "$(g++ -dumpversion)"                              13
+          check clang++ "$(clang++ --version | head -1 | grep -oE '[0-9]+(\.[0-9]+)*' | head -1)" 19
+
+          if [ "$fail" -ne 0 ]; then
+            echo
+            echo "The runner image is below term-game's toolchain floor."
+            echo "This is an image problem, not a code problem — ask the"
+            echo "maintainer to bump the CI image rather than lowering the floor."
+            echo "C++23 is not optional here: termforge requires it, and clang"
+            echo "18 and earlier cannot compile std::expected against libstdc++."
+            exit 1
+          fi
+
+  build:
+    needs: toolchain
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: gcc / default
+            cxx: g++
+            toolchain: default.cmake
+          - name: clang / default
+            cxx: clang++
+            toolchain: clang.cmake
+          - name: gcc / asan
+            cxx: g++
+            toolchain: address.cmake
+          - name: gcc / ubsan
+            cxx: g++
+            toolchain: undefined.cmake
+    name: ${{ matrix.name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Leave this alone. cmake/version.cmake runs `git describe --tags`; a
+          # shallow clone finds no tags and every build silently reports 0.0.0.
+          fetch-depth: 0
+
+      # TERMGAME_WITH_AUDIO=OFF on every job. Runners have no sound hardware,
+      # and OFF is the configuration this repo promises always works — it is not
+      # the auto-detected default on a box that happens to have librtaudio-dev,
+      # so it has to be asked for explicitly or the arm rots.
+      - name: Configure
+        env:
+          CXX: ${{ matrix.cxx }}
+        run: |
+          cmake -B build \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain/${{ matrix.toolchain }} \
+            -DCMAKE_CXX_FLAGS=-Werror \
+            -DTERMGAME_WITH_AUDIO=OFF
+
+      # cpp-template's toolchain/default.cmake replaces CMAKE_CXX_FLAGS rather
+      # than appending to it, which silently discards the -Werror above and
+      # leaves CI green while enforcing nothing. We fixed that in our copy; this
+      # asserts the fix is still there. One grep, and it fails the moment
+      # somebody re-syncs the toolchain file from upstream.
+      - name: -Werror reached the compiler
+        run: grep -q -- '-Werror' build/compile_commands.json
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  # No compiler, no network, no checkout depth needed: pure CMake script that
+  # unit-tests the git-describe parser.
+  version-selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Version parser selftest
+        run: cmake -P cmake/version_selftest.cmake

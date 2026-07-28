@@ -1,0 +1,71 @@
+@PACKAGE_INIT@
+
+# Package config input for configure_package_config_file() — see
+# cmake/install.cmake. This is what a consumer's find_package(<project> CONFIG)
+# ends up executing.
+#
+# Nothing here spells the project name literally: @PROJECT_NAME@ is substituted
+# at configure time, and the project name comes from the directory name. A fork
+# copies this file verbatim.
+
+# ── Refuse a config with no targets beside it ───────────────────────────────
+# This file can be found in two places where it does not describe a usable
+# package, and in both the failure without this guard is "include could not find
+# requested file" naming a path the consumer never wrote — which reads like a
+# broken package rather than the wrong prefix or the wrong build options.
+#
+#   A build directory on CMAKE_PREFIX_PATH. This file is generated into the
+#   build tree and installed from there, so find_package finds it, but no
+#   Targets file is generated beside it: this project exports at install time
+#   only (cmake/install.cmake explains why there is no build-tree export).
+#
+#   An install prefix built with the library switched off. Then there was no
+#   target to export, and the package config was installed anyway.
+#
+# Reporting it this way rather than with FATAL_ERROR is what lets find_package
+# say "considered this prefix and rejected it, here is why", and keeps a
+# non-REQUIRED find_package optional, as its caller asked. It is the same
+# mechanism CMake's own generated Targets files use to report a dependency they
+# could not resolve.
+#
+# The message is deliberately one quoted argument: set() with several would
+# build a ;-separated list and print as one run-on line.
+if (NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
+  set(@PROJECT_NAME@_FOUND FALSE)
+  set(@PROJECT_NAME@_NOT_FOUND_MESSAGE
+      "${CMAKE_CURRENT_LIST_DIR} holds a package config but no exported targets beside it. Either it is a build tree rather than an install prefix — this project exports at install time only, so run `cmake --install` and point CMAKE_PREFIX_PATH at the prefix, or consume it with add_subdirectory() or FetchContent — or it was installed with the library disabled, and there was nothing to export.")
+  return()
+endif ()
+
+# ── Dependencies this project's exported targets refer to ───────────────────
+# Every dependency named in the installed Targets file has to be found again
+# here, or the consumer gets "The following imported targets are referenced, but
+# are missing: <dep>" — which reads like a broken package rather than a missing
+# find_package.
+#
+# The rule is *not* "public dependencies only", which is easy to assume and
+# wrong. Anything linked into an exported target reaches the Targets file: a
+# PUBLIC or INTERFACE link appears directly, and a PRIVATE link into a static
+# library appears wrapped in $<LINK_ONLY:...>, because a consumer still has to
+# link it. CMake checks both. Only dependencies of something that is never
+# exported — the executable, the tests — can be left out.
+#
+# The other half of that rule lives in cmake/deps/: a dependency that reaches
+# the Targets file must also have been installed and exported by *its* build, or
+# install(EXPORT) cannot resolve it and this package is never produced at all.
+# See the install-visibility note in cmake/deps/catch2.cmake.
+#
+# Use find_dependency, not find_package: it forwards REQUIRED/QUIET and reports
+# a miss as "package X not found because dependency Y was missing".
+#
+# termforge is linked PUBLIC into term-game_lib (the Shell derives from
+# termforge::App and names its types in our headers), so an installed
+# term-gameTargets.cmake references termforge::lib and this line is what lets a
+# consumer resolve it. Version 0.1 to match cmake/deps/termforge.cmake — see the
+# SameMinorVersion note there.
+include(CMakeFindDependencyMacro)
+find_dependency(termforge 0.1)
+
+include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
+
+check_required_components(@PROJECT_NAME@)
