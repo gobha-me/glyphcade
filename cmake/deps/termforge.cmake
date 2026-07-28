@@ -17,11 +17,20 @@
 # HTTPS, not SSH: github.com has no key on the dev container or on CI runners.
 # git.gobha.me is the SSH-only forge; github.com is not.
 
-# Version 0.1, not 0.1.7: termforge's package version file uses
-# SameMinorVersion, so this matches any installed 0.1.x. It is also safe against
-# a stale system copy — 0.1.6 and earlier ship no termforgeConfig.cmake at all,
-# so CONFIG mode cannot find them.
-find_package(termforge 0.1 QUIET CONFIG)
+# 0.1.9, not 0.1 — and the patch level here is load-bearing, not pedantry.
+#
+# termforge's package version file is SameMinorVersion: it accepts a candidate
+# whose major.minor match AND whose version is >= the one requested. Asking for
+# "0.1" therefore accepts *any* installed 0.1.x, including 0.1.7 — which has no
+# App::set_tick_hz. The Shell calls it, so that acceptance would turn a clean
+# "your installed package is too old, falling back to FetchContent" into a wall
+# of compiler errors in shell.cpp, on whichever machine happens to have a stale
+# system copy and nowhere else.
+#
+# This is the first time we depend on API introduced in a *patch* release. A
+# floor has to be expressed at the granularity the dependency actually moves at,
+# or it is not a floor.
+find_package(termforge 0.1.9 QUIET CONFIG)
 
 if (termforge_FOUND)
   message(STATUS "termforge: ${termforge_VERSION} via find_package")
@@ -30,11 +39,20 @@ else ()
     set(TERMFORGE_URI https://github.com/gobha-me/termforge.git)
   endif ()
 
-  # v0.1.7 is the first tag containing the install/export work (termforge #27);
-  # every earlier tag is unconsumable. Pin a tag, not a SHA: the find_package
-  # path above is version-gated, so both paths should describe the same thing.
+  # Why this tag, in the order the floor was raised:
+  #   v0.1.7 — first tag with install/export (#27); everything before is
+  #            unconsumable, which is the floor Epic 0 shipped against.
+  #   v0.1.8 — on_tick(dt), set_tick_hz(n), set_max_tick_dt(dt) (#59). This is
+  #            the one we cannot do without: the Shell configures termforge's
+  #            fixed-timestep accumulator and implements none of it. DESIGN.md
+  #            used to describe hand-rolling one; that paragraph is gone.
+  #   v0.1.9 — Key::F5–F12 (#61). Not used yet; taken because it is the tip and
+  #            splitting the pin across two tags buys nothing.
+  #
+  # Pin a tag, not a SHA: the find_package path above is version-gated, so both
+  # acquisition paths should describe the same thing in the same vocabulary.
   if (NOT TERMFORGE_TAG)
-    set(TERMFORGE_TAG v0.1.7)
+    set(TERMFORGE_TAG v0.1.9)
   endif ()
 
   # termforge's own options already default to PROJECT_IS_TOP_LEVEL, so as a

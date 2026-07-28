@@ -8,10 +8,11 @@ arcade-of-small-games idea and the same roster to raid, but terminal-native and
 compiled instead of HTML/CSS/JS. One binary, a selector, and a set of
 self-contained games.
 
-> **Status: bootstrapped.** The scaffold builds and the binary opens a terminal;
-> the games do not exist yet. See [STATUS.md](STATUS.md) for live state,
-> [DESIGN.md](DESIGN.md) for the architecture, and the issue tracker for the epic
-> breakdown.
+> **Status: the arcade runs.** The shell and its selector work — pick a game,
+> play it, pause it, come back to the menu. The only game in the menu today is a
+> diagnostic stub; the first real one is Minesweeper. See [STATUS.md](STATUS.md)
+> for live state, [DESIGN.md](DESIGN.md) for the architecture, and the issue
+> tracker for the epic breakdown.
 
 ## The idea
 
@@ -23,7 +24,7 @@ graphics from a stdlib-only C++23 API.
 
 | # | Game | Dogfoods |
 |---|------|----------|
-| 1 | Shell + selector | ListWidget, Frame, dialogs, theme |
+| 1 | Shell + selector ✓ | ListWidget, Frame, dialogs, FocusRing, `on_tick` |
 | 2 | Minesweeper | mouse routing, grid rendering |
 | 3 | 2048 | tween animation |
 | 4 | Snake | real-time tick |

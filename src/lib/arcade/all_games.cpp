@@ -1,0 +1,68 @@
+// term-game — THE registry. Adding a game is one line here and nothing
+// anywhere else.
+//
+// ⚠ Never replace this with self-registering statics. The tempting shape is
+//
+//     static const auto reg = register_game<Minesweeper>();   // DON'T
+//
+// in each game's .cpp. It works in an executable and silently fails in a static
+// library: the linker drops object files nothing references, taking the
+// registrar with them, and the game just never appears in the menu — no
+// warning at compile time, no error at link time, no diagnostic at run time,
+// only a player who cannot find Minesweeper. The workarounds (--whole-archive,
+// $<LINK_LIBRARY:WHOLE_ARCHIVE,...>, OBJECT libraries) are each platform- or
+// generator-sensitive.
+//
+// This table has no mechanism to fail. The only way into it is typing a type's
+// name, which requires including its header, which requires the type to be
+// complete — so a typo, a renamed class or a deleted game is a compile error.
+
+#include <termgame/arcade/registry.hpp>
+
+#include <cstddef>
+#include <iterator>
+
+#include <termgame/games/stub/stub_game.hpp>
+
+namespace termgame {
+namespace {
+
+// Menu order is this order.
+constexpr GameEntry kGames[] = {
+    {StubGame::kMeta, &make_game<StubGame>},
+};
+
+// ── The table checks itself ─────────────────────────────────────────────────
+// Both of the mistakes below are invisible until a player hits them, and both
+// are decidable at compile time, so they are decided at compile time.
+
+// A duplicate slug makes save data, high scores and any future deep-link
+// ambiguous, and the menu shows two rows that are not obviously different.
+constexpr auto slugs_are_unique() -> bool {
+  for (std::size_t i = 0; i < std::size(kGames); ++i) {
+    for (std::size_t j = i + 1; j < std::size(kGames); ++j) {
+      if (kGames[i].meta.slug == kGames[j].meta.slug) return false;
+    }
+  }
+  return true;
+}
+static_assert(slugs_are_unique(), "two registered games share a slug");
+
+// An icon whose measured width disagrees with its rendered width shifts every
+// cell to its right for the rest of the run. See icon_is_safe() in
+// arcade/game_meta.hpp for why this is not paranoia.
+constexpr auto icons_are_safe() -> bool {
+  for (const auto& entry : kGames) {
+    if (!icon_is_safe(entry.meta.icon)) return false;
+  }
+  return true;
+}
+static_assert(icons_are_safe(),
+              "a registered game's icon is not exactly one two-column "
+              "grapheme — see icon_is_safe() in arcade/game_meta.hpp");
+
+}  // namespace
+
+auto all_games() noexcept -> std::span<const GameEntry> { return kGames; }
+
+}  // namespace termgame

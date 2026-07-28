@@ -64,6 +64,24 @@ half the point of this repo.
 - **Fixed timestep, clamped delta.** Game logic advances in constant-`dt` ticks,
   and the real frame delta is clamped so a breakpoint or a laptop suspend cannot
   deliver one enormous `dt`. Determinism here is what makes logic testable.
+  **This is `termforge::App::set_tick_hz` / `set_max_tick_dt` (#59, v0.1.8) —
+  do not hand-roll an accumulator, in the Shell or in a game.** And do not read
+  a clock inside `Game::tick`: `dt` is the only time that exists there, which is
+  exactly what makes a game drivable by N ticks with no `Screen` and no TTY.
+- **The Shell never chains to `termforge::App::on_event`.** The base default
+  quits on Escape; inside a game Escape means "back to the menu", and the two
+  cannot both be true if the base runs. So `Shell::on_event` is total and
+  handles Ctrl+C itself, because it is no longer inheriting it. ⚠ Every
+  termforge example ends its `on_event` with `App::on_event(ev);` — **do not
+  "restore" that line.** `test/11selector` fails if you do.
+- **A running game owns the whole `Screen`.** The Shell draws no chrome over it,
+  so `draw()` coordinates and `MouseEvent` coordinates are the same coordinates.
+  A game that assumes an offset is a game that is wrong somewhere else too.
+- **A `GameMeta` icon must pass `icon_is_safe()`.** It is a `static_assert` in
+  `src/lib/arcade/all_games.cpp`, not a convention. Variation-selector emoji
+  (⚒️ ⚔️ ⚙️) measure one column and render two, which shifts every cell to their
+  right for the rest of the run — and looks identical to a safe icon in an
+  editor. Pick from U+1F300+ or leave it empty.
 - **Game logic must not know about rendering.** Animation is a presentation layer
   over already-resolved state, never a participant in it.
 
@@ -143,6 +161,26 @@ perl -pe 's/\e\][^\a\e]*(\a|\e\\)//g; s/\e_[^\e]*\e\\//g; s/\e\[[0-9;?]*[a-zA-Z]
 
 Send input *after* setup finishes — a keystroke delivered during the capability
 probe is eaten by the DA1 response parser, and the app never sees it.
+
+**The Epic 1 acceptance flow, end to end, in the same harness** — selector,
+into a game, back out, quit:
+
+```bash
+{ sleep 3; printf '\r'; sleep 3; printf '\033'; sleep 2; printf '\033'; sleep 2; } | \
+  timeout 30 script -q -c "$PWD/build/src/bin/term-game" /tmp/pty.raw
+```
+
+Then check both tiers, because they render differently and CI only ever sees
+one. Bare (the fallback driver reports no colour, so the Shell picks
+`BorderStyle::Ascii`) should show `Up/Down select`, no icon, and the
+`no colour capability` notice. Re-run with `TERM=xterm-256color
+COLORTERM=truecolor` and it should show `↑↓ select`, the 🧪 icon, `38;2;`
+truecolor SGR in the raw capture, and **no** notice.
+
+⚠ The renderer diffs, so a string is written in full only the first time. Do not
+expect to find `ticks: 42` in the capture — later frames only repaint the digits
+that changed. Look for a *sequence* of distinct `elapsed: N.NNs` values instead;
+that is the evidence the simulation is advancing.
 
 This covers rendering and terminal restore. It does **not** cover *feel* — frame
 pacing, input latency, animation smoothness still need a human to play it, and
