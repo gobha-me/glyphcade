@@ -61,10 +61,22 @@ endif ()
 # termforge is linked PUBLIC into term-game_lib (the Shell derives from
 # termforge::App and names its types in our headers), so an installed
 # term-gameTargets.cmake references termforge::lib and this line is what lets a
-# consumer resolve it. Version 0.1 to match cmake/deps/termforge.cmake — see the
-# SameMinorVersion note there.
+# consumer resolve it.
+#
+# ⚠ 0.1.15, at patch granularity, and it must track the floor in
+# cmake/deps/termforge.cmake exactly. This line used to say 0.1 while that file
+# said 0.1.10 — with a comment claiming the two matched, which they did not.
+#
+# The reason to align them is stronger than symmetry, because termforge's
+# version file is SameMinorVersion and "0.1" therefore accepts any 0.1.x. The
+# Shell holds a termforge::ListWidget BY VALUE, in a header we install; v0.1.11
+# added members to that class. So a consumer resolving an older 0.1.x compiles
+# our public header against one object layout while term-game_lib was built
+# against another. Nothing fails to find, nothing fails to link — the sizes just
+# disagree. Anything we hold by value in an installed header makes the build
+# floor an ABI floor too, and this is the line that enforces it consumer-side.
 include(CMakeFindDependencyMacro)
-find_dependency(termforge 0.1)
+find_dependency(termforge 0.1.15)
 
 include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
 
