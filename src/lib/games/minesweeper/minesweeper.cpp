@@ -338,9 +338,15 @@ auto Minesweeper::draw_grid(termforge::Screen& screen) -> void {
 
   // ⚠ The cursor is a PAIR OF CHARACTERS, not a colour. FallbackDriver discards
   // colour entirely, so a highlight-based cursor is invisible at exactly the
-  // tier this repo promises always works — the same failure the Shell's
-  // selector gutter marker exists to work around (termforge #72). Both brackets
-  // land inside the frame by construction: the furthest is
+  // tier this repo promises always works — the same reasoning termforge applied
+  // to ListWidget's own selection marker in v0.1.11 (#72).
+  //
+  // This one is not a workaround and has no deletion condition: a cursor over a
+  // grid of cells is Minesweeper's own affordance, not a missing framework
+  // feature. The Shell used to carry a marker that WAS a workaround, and it is
+  // gone (gitea #17) — do not read the two as the same thing and delete this.
+  //
+  // Both brackets land inside the frame by construction: the furthest is
   // gutter_x(cols-1) + 2 == origin_x + 2*cols, which is the trailing column.
   const int cy = m_layout.row_y(m_cursor.row);
   screen.write_text(m_layout.gutter_x(m_cursor.col), cy, "[", kCursorFg, bg);
