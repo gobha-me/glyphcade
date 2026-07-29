@@ -30,6 +30,8 @@
 
 #include <termgame/arcade/context.hpp>
 #include <termgame/arcade/game.hpp>
+#include <termgame/audio/engine.hpp>
+#include <termgame/audio/sink.hpp>
 
 namespace termgame {
 
@@ -39,7 +41,16 @@ namespace termgame {
 // the Probe in test/10render.
 class Shell : public termforge::App {
  public:
+  // Silent: a NullSink, which opens successfully and never pulls. Every
+  // existing test and probe subclass constructs the Shell this way and is
+  // unaffected by Epic 2.
   Shell();
+
+  // ⚠ THE AUDIO INJECTION SEAM, and the reason gitea #13 came out the way it
+  // did. The Shell owns an engine but does not choose its sink: src/bin hands
+  // it a device, a test hands it a WavFileSink, and the RtAudio backend
+  // therefore never has to be reachable from this library at all.
+  explicit Shell(std::unique_ptr<audio::AudioSink> sink);
 
   enum class State { Selector, InGame, Paused };
 
@@ -70,6 +81,18 @@ class Shell : public termforge::App {
     return m_list.selected();
   }
 
+  // Read-only, for tests: play_count() records intent, so a binding assertion
+  // works identically on a build that can make no sound.
+  //
+  // ⚠ Deliberately the SHELL's engine and not the Game's. Asserting through
+  // here sidesteps the "never touch the Game* after dispatching a key it
+  // consumes" trap structurally rather than by discipline — the Shell destroys
+  // the game inside dispatch_event(), but the Shell itself is still very much
+  // alive. See STATUS.md and test/15minesweeper-ui.
+  [[nodiscard]] auto audio() const noexcept -> const audio::Engine& {
+    return m_audio;
+  }
+
   auto on_event(const termforge::Event& ev) -> void override;
   auto on_tick(std::chrono::duration<double> dt) -> void override;
   auto on_render(termforge::Screen& screen) -> void override;
@@ -92,6 +115,9 @@ class Shell : public termforge::App {
   auto draw_too_small(termforge::Screen& screen) -> void;
 
   State m_state{State::Selector};
+  audio::Engine m_audio;
+  // Stashed at construction, emitted on the first frame. See sync_capabilities.
+  std::string m_audio_notice;
   GameContext m_ctx;
   std::unique_ptr<Game> m_game;  // null unless InGame or Paused
   bool m_release_game{false};    // deferred destruction; see apply_transitions

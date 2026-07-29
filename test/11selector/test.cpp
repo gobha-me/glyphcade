@@ -441,3 +441,131 @@ TEST_CASE("the selector survives entering and leaving repeatedly",
     REQUIRE(app.current_game() == nullptr);
   }
 }
+
+// ── Menu SFX ────────────────────────────────────────────────────────────────
+//
+// Asserted through Shell::audio().play_count(), which counts INTENT rather than
+// sound. Two consequences worth knowing before extending these:
+//
+//   * they pass identically on the TERMGAME_WITH_AUDIO=OFF arm CI runs, because
+//     a NullSink Shell still records what was asked for; and
+//   * no sink injection is needed anywhere, so nothing here touches the disk.
+//
+// ⚠ MenuMove cannot be positively asserted yet, and that is a property of the
+// roster rather than of the binding. all_games() has exactly one entry, and
+// ListWidget clamps, so Up/Down/Home/End/wheel move the selection NOWHERE — the
+// edge detector correctly stays silent because nothing moved. The negative case
+// below is therefore the real one today, and the positive case sits behind the
+// same `size() > 1` guard the "arrow keys move the selection" case above
+// already uses, for the same reason. Epic 4 unlocks it.
+//
+// ⚠ AND SO IS THE `m_state == State::Selector` GUARD in both handlers UNTESTED,
+// which was established by mutation rather than assumed: deleting it from the
+// mouse path leaves this whole file green. With one game a click on row 0 does
+// not change the selection, so MenuMove does not fire with or without it.
+//
+// The guard is still correct and is deliberately kept — the moment a second
+// game exists, a click on a NON-selected row moves the selection and fires
+// on_select in the same call, and without the guard that one gesture emits two
+// sounds. But "kept because the argument is sound" is a weaker claim than
+// "kept because a test says so", and the difference belongs in writing rather
+// than in a comment that implies coverage this file does not have. Recorded in
+// STATUS.md's Epic 2 deferral table; it becomes testable with Epic 4.
+
+TEST_CASE("entering a game plays the select sound", "[selector][audio]") {
+  using termgame::audio::SfxId;
+
+  Probe app;
+  app.step();
+  REQUIRE(app.audio().play_count(SfxId::MenuSelect) == 0);
+
+  app.dispatch_event(key(termforge::Key::Enter));
+
+  REQUIRE(app.state() == Shell::State::InGame);
+  REQUIRE(app.audio().play_count(SfxId::MenuSelect) == 1);
+}
+
+TEST_CASE("a click that enters a game plays select, not move",
+          "[selector][audio]") {
+  // One gesture, one sound. ⚠ This does NOT currently discriminate the State
+  // guard in the mouse path — see the note above; with one game the click does
+  // not move the selection, so MenuMove stays silent either way. What it does
+  // pin is that entering by mouse and entering by Enter agree, which is the
+  // property that would break if the two paths ever grew separate bindings.
+  using termgame::audio::SfxId;
+
+  Probe app;
+  app.step();  // ListWidget::rect() is only set inside on_render — trap 2
+
+  // ⚠ The same coordinates as "a click in the marker gutter selects its row"
+  // above, and unconditionally asserted. An `if (state == InGame)` here would
+  // pass silently the day the layout moves and the click stops landing — which
+  // is precisely the shape of test that reports green while checking nothing.
+  app.dispatch_event(click(kMarkX, kRow0));
+
+  REQUIRE(app.state() == Shell::State::InGame);
+  REQUIRE(app.audio().play_count(SfxId::MenuSelect) == 1);
+  REQUIRE(app.audio().play_count(SfxId::MenuMove) == 0);
+}
+
+TEST_CASE("a key that moves nothing makes no sound", "[selector][audio]") {
+  // ⚠ THE case, given a one-game roster — and the one that stays meaningful
+  // however long the roster grows, because Up at the top and Down at the bottom
+  // always clamp. Binding the arrow keys directly instead of edge-detecting the
+  // selection would make every one of these blip.
+  using termgame::audio::SfxId;
+
+  Probe app;
+  app.step();
+  REQUIRE(app.selector_index() == 0);
+
+  app.dispatch_event(key(termforge::Key::Up));    // already at the top
+  app.dispatch_event(key(termforge::Key::Home));  // already at Home
+  REQUIRE(app.selector_index() == 0);
+  REQUIRE(app.audio().play_count(SfxId::MenuMove) == 0);
+
+  app.dispatch_event(key(termforge::Key::End));
+  if (termgame::all_games().size() == 1) {
+    // End on a one-item list is also a no-op, so still silent.
+    REQUIRE(app.audio().play_count(SfxId::MenuMove) == 0);
+  }
+}
+
+TEST_CASE("moving the selection plays the move sound", "[selector][audio]") {
+  // Behind the roster guard — see the note above. This is the positive half,
+  // and it starts running for free the moment a second game is registered.
+  if (termgame::all_games().size() < 2) return;
+
+  using termgame::audio::SfxId;
+
+  Probe app;
+  app.step();
+
+  app.dispatch_event(key(termforge::Key::Down));
+  REQUIRE(app.selector_index() == 1);
+  REQUIRE(app.audio().play_count(SfxId::MenuMove) == 1);
+  REQUIRE(app.audio().play_count(SfxId::MenuSelect) == 0);
+
+  app.dispatch_event(key(termforge::Key::Up));
+  REQUIRE(app.audio().play_count(SfxId::MenuMove) == 2);
+}
+
+TEST_CASE("a silent build still records what was asked for",
+          "[selector][audio]") {
+  // ⚠ What makes every assertion above arm-independent. A default Shell holds a
+  // NullSink, so play() posts nothing and the ring stays empty — but the intent
+  // counters still move. If Engine::play() ever stopped short-circuiting, the
+  // dropped() counter here would start climbing instead.
+  using termgame::audio::SfxId;
+
+  Probe app;
+  app.step();
+  app.dispatch_event(key(termforge::Key::Enter));
+
+  REQUIRE(app.audio().play_count(SfxId::MenuSelect) == 1);
+
+  const auto stats = app.audio().stats();
+  REQUIRE(stats.pushed == 0);
+  REQUIRE(stats.dropped == 0);
+  REQUIRE(stats.silenced >= 1);
+}
