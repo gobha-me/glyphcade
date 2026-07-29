@@ -14,11 +14,6 @@ namespace {
 
 constexpr termforge::Rgb kAccent{0x00, 0xFF, 0x80};
 
-// The gutter the selector reserves to the left of the ListWidget for its own
-// selection marker. See draw_selector() for why the widget's own highlight is
-// not enough.
-constexpr int kMarkerCols = 2;
-
 }  // namespace
 
 Shell::Shell() : m_title("term-game " + std::string(version_string())) {
@@ -391,32 +386,36 @@ auto Shell::draw_selector(termforge::Screen& screen) -> void {
   m_list_frame.draw(screen);
 
   const termforge::Rect inner = m_list_frame.content_rect();
-  if (inner.w > kMarkerCols && inner.h > 0) {
-    m_list.set_geometry({inner.x + kMarkerCols, inner.y, inner.w - kMarkerCols,
-                         inner.h});
-    m_list.draw(screen);
+  if (inner.w > 0 && inner.h > 0) {
+    // ⚠ set_style, and it is load-bearing — not symmetry with the frame above.
+    //
+    // ListWidget picks its marker from mark_glyphs(style), and ONLY
+    // BorderStyle::Ascii yields '>'; every other family yields '▸' (U+25B8).
+    // The default is BorderStyle::Single. So dropping this line puts three
+    // bytes of UTF-8 on a terminal we have already concluded cannot draw a box
+    // — the bottom tier this repo promises always works. It is silent: the
+    // widget renders, the layout is identical, and only the glyph is wrong.
+    // test/11selector asserts the whole selector screen is 7-bit for this.
+    m_list.set_style(style);
 
-    // ⚠ The selection marker is ours, and it is a workaround.
+    // The FULL content rect, gutter included. Until termforge v0.1.11 this
+    // shrank by two columns and the selector hand-drew "> " into the gap,
+    // because ListWidget's only selection affordance was a theme inversion and
+    // FallbackDriver discards colour — so on the bottom tier the selected row
+    // was byte-identical to every other one. #72 moved that upstream: the
+    // marker now lives in a two-column gutter ListWidget reserves on every row.
     //
-    // ListWidget has no colour setters at termforge v0.1.9 (its fg/bg members
-    // are private with no accessors) and its only selection affordance is the
-    // theme::kFocusFg/kFocusBg inversion — which FallbackDriver discards,
-    // because it drops colour entirely. So on the bottom tier the selected row
-    // is indistinguishable, on exactly the terminal AGENTS.md says must always
-    // work, and in exactly the driver every headless test runs under.
+    // Handing back the two columns costs the text nothing, which is worth
+    // knowing before anyone "fixes" the width: the widget computes
+    // text_x = rect.x + gutter_cols() and max_w = rect.w - gutter - 1, so at
+    // 60x20 the item text starts at x=3 with 19 columns either way. Identical
+    // before and after — no layout moved.
     //
-    // A character, not a colour — the same reasoning termforge's own
-    // examples/motion.cpp gives for drawing with '#'. Known limitation: a click
-    // in this gutter lands outside m_list.rect() and does not select.
-    //
-    // Filed upstream against termforge; delete this block and give the width
-    // back to the list when ListWidget can mark its own selection.
-    if (const int sel = m_list.selected(); sel >= 0) {
-      const int row = inner.y + (sel - m_list.scroll_offset());
-      if (row >= inner.y && row < inner.y + inner.h) {
-        screen.write_text(inner.x, row, "> ", kAccent, termforge::theme::kBg);
-      }
-    }
+    // What did change is that the gutter is now INSIDE rect(). The workaround
+    // documented the opposite as a known limitation: a click on the marker
+    // landed outside m_list.rect() and did not select. It selects now.
+    m_list.set_geometry(inner);
+    m_list.draw(screen);
   }
 
   if (with_detail) {
