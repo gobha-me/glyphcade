@@ -93,8 +93,19 @@ terminal**, and **failures are the feature**.
 - **Game logic** — drive N fixed ticks, assert state. No `Screen`, no TTY. If a
   rule can only be tested by playing, the model and the view are tangled.
 - **Rendering** — draw into an offscreen `Screen`, assert cells.
-- **Audio** — render through `WavFileSink` and assert samples. Golden files per
-  SFX; a mixer test that N simultaneous voices neither clip nor drift.
+- **Audio** — render through `WavFileSink` and assert samples. A mixer test that
+  N simultaneous voices neither clip nor drift.
+
+  ⚠ This used to say "golden files per SFX", which contradicted the no-binary-
+  blobs rule two sections up and was a portability trap besides. What ships
+  instead is a **compact numeric fingerprint** per effect — frames exact; peak,
+  RMS and zero-crossing count within tolerances — committed as source text in
+  `test/18audio-synth`, plus a **bit-exact self-determinism** check that two
+  renders inside one build match. A committed cross-toolchain byte digest is
+  deliberately NOT asserted: the synth is measurably byte-identical across GCC
+  -O0/-O2/-O3 and Clang, but "we measured it" is not "it is specified", and a
+  digest would turn a future glibc bump into a mystery failure that looks like a
+  synth bug. Same distinction `board.hpp` makes about `<random>`.
 - **The SPSC ring** — TSan-clean producer/consumer test. This is the one place a
   bug is a heisenbug, so it gets the most adversarial treatment.
 
@@ -220,6 +231,18 @@ Read `test/pty_restore_probe.cpp` before "fixing" it to match.
 This covers rendering and terminal restore. It does **not** cover *feel* — frame
 pacing, input latency, animation smoothness still need a human to play it, and
 audio needs a human to hear it. Say so rather than guessing.
+
+**But audio can at least be captured for someone who can hear it.** Since Epic 2:
+
+```bash
+TERMGAME_AUDIO_WAV=/tmp/session.wav ./build/src/bin/term-game
+```
+
+returns a `WavFileSink` instead of a device, in **both** audio arms, and
+`Shell::on_tick` pumps it once per frame — so the file follows the game clock
+rather than wall time and is deterministic under a fake clock. Play the session,
+send the wav. That is the only way anything in this container gets judged by
+ear, and it is how the SFX bank is meant to be tuned.
 
 ## Porting from HTML-Games
 

@@ -2,7 +2,7 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-07-29** (Epic 3, then gitea #16 and #17)
+**Last updated: 2026-07-29** (Epic 2 — audio)
 
 ---
 
@@ -23,13 +23,24 @@ same four things the diagnostic existed to prove, while also being a game.
 `test/11selector`, `test/12registry` and `test/13tick` now point at it.
 
 ⚠ What is verified is *rendering and rules*, not **feel**. Click latency, cursor
-responsiveness and whether the board is pleasant to play still need a human, and
-there is no sound at all.
+responsiveness and whether the board is pleasant to play still need a human.
+Minesweeper now asks for sounds (Epic 2, below), but whether they are the RIGHT
+sounds is equally a question only an ear can answer.
 
-**Next move: Epic 2 (audio, gitea [#3](https://git.gobha.me/xcaliber/term-game/issues/3))** —
-Minesweeper is the SFX consumer waiting for it, and `Board`'s verbs already
-return "did anything change", which is where reveal/flag/explode/win will bind.
-Epics 4 (2048) and 5 (Snake) are equally unblocked; nothing blocks any of them.
+**Epic 2 has landed.** There is an audio engine: a lock-free SPSC command ring,
+integer-phase oscillators with a linear envelope, an eight-voice mixer that
+cannot clip, three sinks, and SFX bound into both the selector and Minesweeper.
+gitea [#13](https://git.gobha.me/xcaliber/term-game/issues/13) is decided and
+enforced by a test. See "What Epic 2 built" below.
+
+⚠ **It has never been heard.** Nothing in this container can play a sound. What
+is verified is that it builds in six arms, that the offline path renders what it
+claims to, and that the no-device path degrades correctly — not that the bank
+sounds good, or indeed that a real device works at all.
+
+**Next move: Epic 4 (2048) or Epic 5 (Snake)** — both unblocked, and 2048 is
+worth slightly more because a second registered game turns four currently-inert
+selector assertions live (see the deferral table below).
 
 Since Epic 3, two housekeeping issues have landed.
 gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16) moved the pin to
@@ -55,7 +66,7 @@ together, so it is worth stating once rather than leaving implied.
 |---|---|---|
 | 0 — Bootstrap | **done** | — |
 | 1 — Arcade shell | **done** | — |
-| 2 — Audio engine | **ready** | — |
+| 2 — Audio engine | **done** | — |
 | 3 — Minesweeper | **done** | — |
 | 4 — 2048 | **ready** | — |
 | 5 — Snake | **ready** | — |
@@ -87,8 +98,8 @@ was nothing for us to delete. See
   — `find_package(termforge ... CONFIG)` first, FetchContent as the fallback.
   Epic 0 pinned v0.1.7; the pin is now **v0.1.15** — see below.
 - **`TERMGAME_WITH_AUDIO`** auto-detection in [cmake/audio.cmake](cmake/audio.cmake).
-  Nothing links rtaudio yet; Epic 2 owns that, and it is an export question —
-  see the note at the bottom of that file.
+  Epic 2 answered the export question (gitea #13): rtaudio is linked by
+  `src/audio_backend/` alone, which is never installed and never exported.
 - **`run_or_report`** — the process's exception boundary. Until v0.1.10 it was
   also the terminal-restore workaround for termforge #71; that half is
   upstream's now, and what is left converts an escaping exception into a
@@ -141,7 +152,7 @@ Every one of these is a decision with a condition attached, not an oversight.
 
 | Deferred | Condition to revisit |
 |---|---|
-| Audio in `GameContext` | Epic 2 — do not guess the handle before the engine exists (gitea [#3](https://git.gobha.me/xcaliber/term-game/issues/3)) |
+| Audio in `GameContext` | **shipped in Epic 2** as `audio() -> const audio::Player&`, additively, exactly as the seam promised |
 | High-score persistence | the *second* scoring game, not the first — gitea [#14](https://git.gobha.me/xcaliber/term-game/issues/14) |
 | One static library target per game | the second real game; today `src/lib/games/<slug>/` compiles into `term-game_lib`. Minesweeper was the first, so this now triggers on the **next** one |
 | `StubGame` | **done** — deleted by Epic 3 |
@@ -208,9 +219,94 @@ Clang builds.
 
 | Deferred | Condition to revisit |
 |---|---|
-| **SFX** (reveal, flag, explode, win) | Epic 2 does not exist yet — gitea [#3](https://git.gobha.me/xcaliber/term-game/issues/3). `Board::reveal/cycle_mark/chord` already return "did anything change", which is the binding point. Issue [#4](https://git.gobha.me/xcaliber/term-game/issues/4) scoped audio as optional, degrading to silence. |
+| **SFX** (reveal, flag, explode, win) | **shipped in Epic 2.** Bound in `minesweeper.cpp` via `announce()`, which compares board state across the verb — `Board` learned nothing about audio. |
 | **High-score persistence** | the *second* scoring game — gitea [#14](https://git.gobha.me/xcaliber/term-game/issues/14). `GameContext` has no persistence seam, and a fresh `Game` is built per entry, so an in-memory best time would die on quit-to-menu. The timer and mine counter ship; only the record does not. |
 | A minimum terminal size in `GameMeta` | Hard needs 63x20 and the Shell's floor is 20x8, so the selector will launch a board the terminal cannot show. Epic 3 ships the in-game too-small screen instead — gitea [#15](https://git.gobha.me/xcaliber/term-game/issues/15). |
+
+---
+
+## What Epic 2 built
+
+A complete audio path, offline-testable end to end, with the device backend
+quarantined outside the exported package.
+
+- **`audio/ring.hpp`** — a lock-free SPSC command ring. Monotonic 64-bit indices
+  masked at use, so it holds exactly N with no sacrificial slot; acquire/release
+  pairing between the slot write and the index publish; the two indices padded
+  onto separate cache lines.
+- **`audio/synth.hpp`** — `Wave`, a linear `Adsr`, `SfxSpec`, and an eight-entry
+  bank: Click, Reveal, Flag, Explode, Win, Lose, MenuMove, MenuSelect.
+- **`audio/sink.hpp`** — `AudioSink` plus `NullSink` and `WavFileSink`. No
+  rtaudio anywhere near it.
+- **`audio/engine.hpp`** — the mixer, the `Engine`, and the `Player` handle a
+  game is given.
+- **`src/audio_backend/`** — the RtAudio backend, in a target that is never
+  installed and never exported.
+
+### Decisions worth not re-litigating
+
+| Decision | Why |
+|---|---|
+| The ring drops the **newest** command, not the oldest | gitea #3 said oldest; that cannot be done inside the SPSC contract without the producer writing the consumer's index. The issue was amended. |
+| No `sin`/`exp` anywhere — integer phase, linear envelopes | glibc's transcendentals are not correctly-rounded and move between versions; `-ffp-contract` defaults differ. Same argument `board.hpp` makes for splitmix64. Result: byte-identical output across GCC -O0/-O2/-O3 and Clang -O2. |
+| Numeric fingerprints, **not** golden files | AGENTS.md asked for golden files and forbade binary blobs two sections earlier. A cross-toolchain byte digest is also a portability trap; "we measured it identical" is not "it is specified". |
+| Headroom by `static_assert`, not a limiter | 8 voices × 1/8 FS cannot clip, provably. A limiter is something you must HEAR to trust. Cost: one sound peaks at −18 dBFS. |
+| `play()` short-circuits on a Discard sink | Otherwise the ring fills once and `dropped()` climbs forever on the `TERMGAME_WITH_AUDIO=OFF` arm CI runs — destroying the one counter that means "the audio thread is in trouble". |
+| rtaudio in a never-exported target (gitea #13) | A PRIVATE link still reaches the exported Targets file as `$<LINK_ONLY:...>`. Guarded by the `audio-export-clean` ctest. |
+
+### Mutation-tested, and three of them changed the code
+
+Not a formality — these all looked correct and were not:
+
+1. `announce()` took the verb's `bool` and returned early on false. Deleting
+   that guard left the suite green, because the state and revealed-count
+   comparisons already subsume it. **The parameter was removed.**
+2. `announce_mark()`'s `bool` guard could *also* be deleted with the suite
+   green — but for the opposite reason: nothing covered it. **A test was added**
+   ("marking a revealed cell is silent"), and the guard is load-bearing.
+3. The zero-crossing tolerance was `max(2, 1%)`, and a semitone of pitch error
+   on Click (660→623 Hz) passed straight through — ±2 crossings is ±6.5% on a
+   24 ms effect, and a square wave's peak and RMS do not move with frequency.
+   **Tightened to `max(1, 0.2%)`.**
+4. `audio-export-clean` was mutation-tested with the exact violation it exists
+   for — a PRIVATE `PkgConfig::RTAUDIO` link into `term-game_lib` — and catches
+   it, confirming PRIVATE is no defence.
+
+### ⚠ Traps in this area
+
+- **`Engine::play()` must keep short-circuiting on a Discard sink.** It reads as
+  a redundant branch. It is what keeps `dropped()` meaningful on the arm CI runs.
+- **`Engine::render` OVERWRITES; `Voice`/`Mixer` ADD.** It is the top of the
+  render stack. Making it add too gives a device the previous block again, as an
+  echo that grows.
+- **`Shell::on_tick`'s `m_audio.pump(dt)` sits ABOVE the pause gate**, and is not
+  test scaffolding — without it an offline sink writes an empty file.
+- **The audio notice is emitted BEFORE the ASCII-tier one** in
+  `sync_capabilities()`, because `m_notice` keeps only the most recent message
+  and the colour notice is the one `test/11selector` and the pty recipe assert on.
+- **`TERMGAME_WITH_AUDIO` now looks unused inside `src/lib`** — no audio source
+  is `#ifdef`'d on it. It is not unused: it is what `build_has_audio()` reports
+  and what `test/00bootstrap` asserts against CMake's own belief.
+
+### What Epic 2 deliberately did not build
+
+| Deferred | Condition to revisit |
+|---|---|
+| **A tuned bank** | Nothing here has been heard. Render a session with `TERMGAME_AUDIO_WAV=/tmp/session.wav ./build/src/bin/term-game` and listen; the fingerprints in `test/18audio-synth` record what the bank IS, not what it should sound like, and are expected to move when it is retuned. |
+| **In-game cursor-move SFX** | A blip per keystroke under a held arrow key needs a rate limit; a rate limit needs a clock; `dt` inside `Game::tick` is the only clock a game may read. A feel decision requiring an ear. |
+| **A positive `MenuMove` assertion** | `all_games()` has one entry and `ListWidget` clamps, so nothing moves the selection at runtime. The test exists behind a `size() > 1` guard and goes live with Epic 4. |
+| **Coverage of the `State::Selector` guard** in both selector handlers | Established by mutation: deleting it from the mouse path leaves the suite green, because with one game a click does not move the selection. Kept because the argument is sound; untested until a second game exists. |
+| **Detune / per-play gain** | Detune needs `2^(cents/1200)`, i.e. `exp`, i.e. the portability trap the synth was written to avoid. Nothing consumes either yet. |
+| **A limiter** | Would let the bank be louder than −18 dBFS. Must be heard to be trusted. |
+
+### An upstream gap this surfaced
+
+`termforge::App::setup` and `::teardown` are **private and non-virtual**, so a
+subclass has no hook to bring up and tear down its own resources inside the
+loop's lifetime. The audio device therefore opens in the `Shell` constructor —
+before any terminal exists to report a failure on — and the failure message is
+stashed and drained on the first frame through `sync_capabilities()`. It works,
+but it is upstream's shape forcing ours. Worth a `gh` issue against termforge.
 
 ---
 
