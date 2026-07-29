@@ -34,6 +34,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
     arcade/shell.cpp
     arcade/all_games.cpp
     audio/sink.cpp
+    audio/synth.cpp
     games/minesweeper/board.cpp
     games/minesweeper/minesweeper.cpp
   )
