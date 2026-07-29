@@ -15,8 +15,9 @@
 # This file spent three epics red. Every run failed in 2-3 seconds, including
 # `version-selftest`, which is nothing but a checkout and `cmake -P` — a
 # compiler-free job cannot fail that fast for a code reason. The runner image
-# simply has no CMake, no GCC and no Clang; it is a Node/Docker image, which is
-# all its other consumer (HTML-Games) has ever needed from it.
+# has no CMake and no Clang (it does have gcc — see the probe results below);
+# it is a Node/Docker image, which is all its other consumer (HTML-Games) has
+# ever needed from it.
 #
 # So we stop negotiating with the host image and bring our own. `debian:trixie`
 # clears the whole floor from base repos in one apt-get — cmake 3.31, gcc 14,
