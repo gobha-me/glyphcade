@@ -282,10 +282,11 @@ auto Shell::apply_transitions() -> void {
   refresh_detail();
 }
 
-auto Shell::quit_app() -> void {
-  m_quit_requested = true;
-  quit();
-}
+// One line, and it stays a named function anyway: this is the single place
+// Escape-in-the-selector and Ctrl+C both funnel through, and the escape rule at
+// the top of shell.hpp is entirely about that routing. Inlining quit() at the
+// two call sites would scatter the decision that rule protects.
+auto Shell::quit_app() -> void { quit(); }
 
 auto Shell::sync_capabilities() -> void {
   if (m_caps_synced) return;

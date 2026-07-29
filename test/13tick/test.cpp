@@ -222,8 +222,13 @@ TEST_CASE("pause stops the simulation and resume restarts it", "[tick]") {
 }
 
 TEST_CASE("Escape in the selector stops the loop", "[tick][escape]") {
-  // End-to-end corroboration of quit_requested() through the real loop, with
-  // real bytes rather than a synthesised Event.
+  // End-to-end corroboration of App::running() through the real loop, with real
+  // bytes rather than a synthesised Event.
+  //
+  // Safe to assert after the run here, unlike the two cases in test/11selector
+  // that have to assert before their step(): run() is ONE uninterrupted
+  // test_run_frames, so nothing re-arms m_running between quit() and the check.
+  // That is the reason run() exists separately from step() — see the note above.
   TickProbe app;
   app.set_frame_ms(kFrameMs);
   app.pending.push_back("\x1b");
@@ -236,5 +241,5 @@ TEST_CASE("Escape in the selector stops the loop", "[tick][escape]") {
   // wait_frame grants the grace window, frame 2 flushes and dispatches, and
   // quit() ends the loop before frame 3.
   REQUIRE(app.renders == 2);
-  REQUIRE(app.quit_requested());
+  REQUIRE_FALSE(app.running());
 }
