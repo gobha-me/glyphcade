@@ -16,7 +16,10 @@ constexpr termforge::Rgb kAccent{0x00, 0xFF, 0x80};
 
 }  // namespace
 
-Shell::Shell() : m_title("term-game " + std::string(version_string())) {
+Shell::Shell() : Shell(std::make_unique<audio::NullSink>()) {}
+
+Shell::Shell(std::unique_ptr<audio::AudioSink> sink)
+    : m_title("term-game " + std::string(version_string())) {
   // ⚠ Nothing here may touch driver(), terminal() or screen(). App::m_driver is
   // a null unique_ptr until setup() (or test_run_frames) builds one, and
   // driver() dereferences it — a capability query in this constructor is a null
@@ -33,6 +36,20 @@ Shell::Shell() : m_title("term-game " + std::string(version_string())) {
   // is the "a breakpoint or a laptop suspend cannot deliver one enormous dt"
   // rule in AGENTS.md, and test/13tick pins it at this layer.
   set_tick_hz(kTickHz);
+
+  // ⚠ The engine opens HERE, not in setup(), and that is upstream's constraint
+  // rather than a preference: termforge::App::setup and ::teardown are private
+  // and non-virtual, so a subclass has no hook to bring up its own resources
+  // inside the loop's lifetime. The consequence is that a device failure
+  // happens before any terminal exists to report it on — hence the stash below,
+  // drained on the first frame by sync_capabilities(), which exists for exactly
+  // this class of "cannot be done in the constructor" problem.
+  //
+  // Filed upstream; see STATUS.md.
+  if (auto opened = m_audio.open(std::move(sink)); !opened) {
+    m_audio_notice = "audio: " + opened.error() + " — running silent";
+  }
+  m_ctx.set_audio(&m_audio);
 
   m_title.set_align(termforge::Label::Align::Center);
   m_title.set_colors(kAccent, termforge::theme::kBg);
@@ -99,8 +116,16 @@ auto Shell::on_event(const termforge::Event& ev) -> void {
 
   if (const auto* mouse = std::get_if<termforge::MouseEvent>(&ev)) {
     if (m_state == State::Selector) {
+      // Same edge detection as the key path, for the same reason — the wheel
+      // moves the selection through ListWidget without firing on_select, and a
+      // click moves it and then fires on_select. The State guard is what makes
+      // the click case emit only MenuSelect.
+      const int before = m_list.selected();
       if (mouse->pressed) m_ring.focus_at(mouse->x, mouse->y);
       route_mouse(*mouse, {&m_list});
+      if (m_state == State::Selector && m_list.selected() != before) {
+        m_audio.play(audio::SfxId::MenuMove);
+      }
       return;
     }
     if (m_game) {
@@ -138,9 +163,27 @@ auto Shell::on_event(const termforge::Event& ev) -> void {
 
 auto Shell::handle_selector_key(const termforge::Event& ev,
                                 const termforge::KeyEvent& key) -> void {
+  const int before = m_list.selected();
+
   // The ring first: ListWidget owns Up/Down/PageUp/PageDown/Home/End/Enter, and
   // Enter reaches enter_selected_game() through its on_select callback.
-  if (m_ring.handle_key(ev)) return;
+  if (m_ring.handle_key(ev)) {
+    // ⚠ EDGE-DETECTED on the selection, not bound to keys. ListWidget owns
+    // Up/Down/PageUp/PageDown/Home/End and exposes no per-key hook, so binding
+    // the arrow keys here would sound on a Down that clamped and moved nothing,
+    // and stay silent on Home/End. "Did the selection move" is the only honest
+    // question.
+    //
+    // ⚠ And the state check is not belt-and-braces. Enter also goes through
+    // m_ring.handle_key(), and its on_select fires enter_selected_game() INSIDE
+    // that call — so by the time control returns here the Shell may already be
+    // InGame, and without the guard entering a game would emit MenuMove as well
+    // as MenuSelect.
+    if (m_state == State::Selector && m_list.selected() != before) {
+      m_audio.play(audio::SfxId::MenuMove);
+    }
+    return;
+  }
 
   // Escape quits the app HERE and only here. The paired case is in
   // handle_in_game_key, where the same key means "back to the menu".
@@ -172,6 +215,21 @@ auto Shell::handle_in_game_key(const termforge::Event& ev,
 // ── Simulation ──────────────────────────────────────────────────────────────
 
 auto Shell::on_tick(std::chrono::duration<double> dt) -> void {
+  // ⚠ ABOVE the pause gate, and not test scaffolding.
+  //
+  // An offline sink has no audio thread, so the UI thread is both producer and
+  // consumer for it — still one of each, still a legal SPSC pairing. Without
+  // this call a WavFileSink handed to the Shell would produce an empty file.
+  // No-op for a device sink, which pulls itself, and for a NullSink, which is
+  // never pulled at all.
+  //
+  // Above the gate because a sound already in flight must finish while the
+  // pause dialog is up, and because the selector needs audio too.
+  //
+  // 48000/60 == 800 exactly, so under test/13tick's fake clock this renders a
+  // whole number of frames per tick and the resulting wav is deterministic.
+  m_audio.pump(dt);
+
   // The framework keeps ticking while an overlay is up, by design — only the
   // app knows whether its simulation is a game (pause it) or a progress
   // animation (keep going). So the pause gate is ours.
@@ -231,6 +289,11 @@ auto Shell::enter_selected_game() -> void {
   const auto games = all_games();
   const int index = m_list.selected();
   if (index < 0 || static_cast<std::size_t>(index) >= games.size()) return;
+
+  // After the range guard, so a click on an empty list is silent as well as
+  // harmless. Enter and a left click both arrive here — ListWidget fires
+  // on_select for each — so the two entry paths cannot drift apart.
+  m_audio.play(audio::SfxId::MenuSelect);
 
   // A NEW object, from the registry's factory. Freshness is structural: there
   // is no previous instance to have leaked a field. See registry.hpp.
@@ -294,6 +357,26 @@ auto Shell::sync_capabilities() -> void {
 
   const termforge::Capabilities caps = driver().capabilities();
   m_ctx.set_capabilities(caps);
+
+  // Degradation is an event, never a silent downgrade (AGENTS.md) — so a device
+  // we asked for and could not get is reported, drained here because the
+  // constructor had no terminal to report it on.
+  //
+  // ⚠ Emitted BEFORE the ASCII-tier notice below, and the order is load-bearing
+  // because m_notice keeps only the most recent message. The colour notice is
+  // the one test/11selector and the AGENTS.md pty recipe assert on, so it must
+  // be the one that survives when both fire.
+  //
+  // ⚠ Nothing is reported when the build simply has no RtAudio backend. There
+  // was never an audio path to fall back FROM, build_has_audio() already says
+  // so, and a permanent footer line on every CI and no-audio run is noise
+  // rather than a degradation event. Likewise nothing is reported for a dropped
+  // command or a stolen voice — those are counters, not events.
+  if (!m_audio_notice.empty()) {
+    on_event(termforge::Event{termforge::ErrorEvent{
+        termforge::Severity::Warning, "audio", m_audio_notice}});
+    m_audio_notice.clear();
+  }
 
   // There is NO capability bit for "can render box drawing" (termforge #16), so
   // this is a heuristic and is labelled as one: a driver reporting no colour at

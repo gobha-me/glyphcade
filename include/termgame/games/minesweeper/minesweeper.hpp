@@ -14,10 +14,14 @@
 //    auxclick only, and most trackpads have no middle button.
 //  * There is a question-mark mark state. The reference has none.
 //
-// SFX are absent because Epic 2 does not exist yet (gitea #3); Board's verbs
-// already return "did anything change", which is where they will bind. There is
-// no high-score persistence because GameContext has no seam for it and STATUS.md
-// defers that to the second scoring game (gitea #14).
+// SFX bind in THIS file and nowhere lower (Epic 2, gitea #3). Board's verbs
+// return "did anything change", and announce() turns that plus a state
+// comparison into a sound. Board itself learns nothing about audio — audio is
+// presentation, and AGENTS.md keeps game logic clear of presentation for the
+// same reason it keeps it clear of rendering.
+//
+// There is no high-score persistence because GameContext has no seam for it and
+// STATUS.md defers that to the second scoring game (gitea #14).
 
 #include <chrono>
 #include <cstdint>
@@ -96,6 +100,27 @@ class Minesweeper final : public Game {
  private:
   auto handle_key(const termforge::KeyEvent& key) -> bool;
   auto handle_mouse(const termforge::MouseEvent& mouse) -> bool;
+
+  // The audible consequence of a player verb, decided by comparing the board
+  // ACROSS the call.
+  //
+  // ⚠ This exists because Board cannot answer the question and must not learn
+  // to. reveal() returns the same `true` for "opened some cells" and "stood on
+  // a mine" (board.cpp), and chord() reaches lose() and win() transitively
+  // through reveal() — so the sound is a function of the STATE TRANSITION, not
+  // of the return value. Teaching Board to report which one happened would be
+  // teaching game logic about presentation, which AGENTS.md forbids for exactly
+  // the reason it forbids Board knowing about rendering.
+  //
+  // One helper rather than two because chord needs precisely the same
+  // comparison reveal does. It deliberately does NOT take the verb's bool —
+  // see the note at its definition for why that turned out to be redundant.
+  auto announce(minesweeper::State before, int revealed_before) -> void;
+
+  // The same idea for the marking verb, which needs a different question asked
+  // (what did the cell become) rather than a different answer to the same one.
+  auto announce_mark(minesweeper::Coord at, bool changed) -> void;
+
   auto new_game(minesweeper::Level level) -> void;
   auto move_cursor(int dr, int dc) -> void;
   auto draw_status(termforge::Screen& screen) -> void;

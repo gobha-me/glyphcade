@@ -180,10 +180,34 @@ UI thread                    lock-free SPSC ring                 audio thread
   - `WavFileSink` — renders the mix to disk. This is the interesting one: it
     makes the entire audio path **deterministically testable offline**, which is
     the same offline-testability discipline TermForge applies to its drivers.
-- **SFX are synthesized, not sampled.** Square/triangle/noise oscillators plus an
-  ADSR envelope, with each effect a small declarative struct. This removes the
-  WAV decoder, the asset pipeline, and the binary blobs in git — and it is the
-  correct sound for an arcade. Venice is better spent on sprite and title art.
+- **SFX are synthesized, not sampled.** Square/triangle/saw/noise oscillators
+  plus a linear ADSR, with each effect a small declarative struct. This removes
+  the WAV decoder, the asset pipeline, and the binary blobs in git — and it is
+  the correct sound for an arcade. Venice is better spent on sprite and title
+  art.
+
+**What Epic 2 decided, and why** — four things that are not obvious from the
+diagram, all with their full argument at the implementation site:
+
+- **The ring drops the NEWEST command, not the oldest**, and gitea #3 was
+  amended to say so. Drop-oldest cannot be done inside the SPSC contract: it
+  means the producer advancing the consumer's index, which turns a lock-free
+  queue into a CAS problem and puts a retry loop on the audio thread. See
+  `include/termgame/audio/ring.hpp`.
+- **Integer phase, integer sweeps, linear envelopes — no `sin`, no `exp`.** Not
+  for speed: glibc's transcendentals are not correctly-rounded and move between
+  versions, and `-ffp-contract` defaults differ between compilers. The same
+  argument `board.hpp` makes for hand-rolling splitmix64. It works — the output
+  is byte-identical across GCC -O0/-O2/-O3 and Clang -O2.
+- **Headroom is arithmetic, not a limiter.** Eight voices capped at 1/8 FS each
+  cannot clip, and that is a `static_assert` rather than something you have to
+  hear to trust. The honest cost is that one sound peaks at −18 dBFS.
+- **rtaudio is linked by exactly one never-exported target** (gitea #13). See
+  the note at the bottom of `cmake/audio.cmake`, and the `audio-export-clean`
+  ctest that keeps it true.
+
+The mixer and voice pool live in `audio/engine.hpp` and the SFX bank in
+`audio/synth.hpp`, rather than in headers of their own.
 
 **Development reality:** the dev container has `librtaudio-dev` installed but no
 `/dev/snd` and no PulseAudio — the *library* is present, the *hardware* is not.
@@ -299,8 +323,9 @@ term-game/
 │   │              registry.hpp ✓  shell.hpp ✓         (Epic 1)
 │   │              scores.hpp                   (deferred — see GameContext)
 │   ├── games/<slug>/ ✓       # a game's own headers; see the note below
-│   └── audio/    sink.hpp  engine.hpp  synth.hpp  ring.hpp
+│   └── audio/    sink.hpp ✓ engine.hpp ✓ synth.hpp ✓ ring.hpp ✓
 │                                                      (Epic 2)
+├── src/audio_backend/        # ✓ rtaudio, in a NEVER-exported target (#13)
 ├── src/lib/                  # ✓ the shared arcade + audio library
 ├── src/lib/games/<slug>/ ✓   # a game's sources, until per-game targets exist
 ├── src/bin/main.cpp          # ✓ the single binary
@@ -325,8 +350,10 @@ without a terminal.**
 
 - **Game logic** — drive N fixed ticks, assert state. No `Screen`, no TTY.
 - **Rendering** — draw into an offscreen `Screen`, assert cells.
-- **Audio** — render through `WavFileSink`, assert samples. Golden-file tests for
-  each SFX; a mixer test that N simultaneous voices neither clip nor drift.
+- **Audio** — render through `WavFileSink`, assert samples. A compact numeric
+  fingerprint per SFX (not a golden file — see AGENTS.md), a bit-exact
+  self-determinism check, and a mixer test that N simultaneous voices neither
+  clip nor drift.
 - **The ring buffer** — TSan-clean producer/consumer test. This is the one piece
   where a bug is a heisenbug, so it gets the most adversarial treatment.
 

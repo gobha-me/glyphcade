@@ -23,6 +23,33 @@ target_include_directories(${PROJECT_NAME}
 
 # The library carries termforge::lib PUBLIC, so this one line brings the
 # framework with it.
+#
+# ⚠ The audio backend is linked SEPARATELY and by name, not through
+# ${PROJECT_NAME}::lib, and that separation is gitea #13's decision made
+# structural: the library must never reference rtaudio, or the imported target's
+# name lands in the exported term-gameTargets.cmake and an installed package
+# cannot resolve it. See src/audio_backend/CMakeLists.txt.
+#
+# It carries ${PROJECT_NAME}::lib PUBLIC, so the line below would be enough on
+# its own — both are kept because the binary genuinely depends on both, and
+# because a reader should not have to know the backend's link type to see that
+# the arcade library is linked.
+#
+# Unconditional: the target exists in both audio arms and only its source file
+# differs, which is what keeps this file and main.cpp identical either way.
 target_link_libraries(${PROJECT_NAME}
   PRIVATE ${PROJECT_NAME}::lib
+  PRIVATE ${PROJECT_NAME}_audio_backend
+)
+
+# ⚠ Spelled without the :: alias on purpose — src/audio_backend deliberately has
+# none, because an alias is what an exported target looks like and that one must
+# never be exported (gitea #13). It carries ${PROJECT_NAME}::lib PUBLIC, so the
+# line above is redundant with this one; both are kept so that removing the
+# backend does not silently take the library link with it.
+#
+# This is where make_device_sink() comes from, and it is the ONLY path by which
+# rtaudio reaches the binary. The library knows nothing about it.
+target_link_libraries(${PROJECT_NAME}
+  PRIVATE ${PROJECT_NAME}_audio_backend
 )
