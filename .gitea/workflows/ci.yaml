@@ -8,8 +8,25 @@
 #
 # No actions/setup-* steps, for the reason HTML-Games documents in its own
 # workflow: act (the Gitea Actions runner) clones the action repo from GitHub on
-# every invocation, which costs minutes for no benefit. We use the tools already
-# in the runner image and gate on their versions instead — see the first step.
+# every invocation, which costs minutes for no benefit.
+#
+# ── Why every compiling job runs in a container ──────────────────────────────
+#
+# This file spent three epics red. Every run failed in 2-3 seconds, including
+# `version-selftest`, which is nothing but a checkout and `cmake -P` — a
+# compiler-free job cannot fail that fast for a code reason. The runner image
+# simply has no CMake, no GCC and no Clang; it is a Node/Docker image, which is
+# all its other consumer (HTML-Games) has ever needed from it.
+#
+# So we stop negotiating with the host image and bring our own. `debian:trixie`
+# clears the whole floor from base repos in one apt-get — cmake 3.31, gcc 14,
+# clang 19.1 — and ships util-linux, so `script(1)` exists for the pty-restore
+# test. Verified by running all five matrix arms in that image before this file
+# was ever pushed, not assumed from the package lists.
+#
+# The alternative was asking the maintainer to bump the runner image. That
+# fixes it for one repo on one host and silently un-fixes it the next time the
+# image is rebuilt; pinning the image here is version-controlled and reviewable.
 
 name: CI
 
@@ -23,13 +40,98 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Fail fast, loudly, and on the right line. The runner image's toolchain was
-  # not verifiable when this file was written, so rather than guessing it, this
-  # asserts. A regression below the floor reports itself here instead of
-  # surfacing as an incomprehensible error inside a template instantiation.
+  # ⚠ TEMPORARY — delete this job before merging.
+  #
+  # Gitea 1.25.4 does not expose Actions logs to the API from a dev container:
+  # /api/v1/repos/{o}/{r}/actions/runs/{n}/jobs returns an empty list even for
+  # runs that succeeded, and every log endpoint 404s. The only signal that
+  # crosses that gap is a job's NAME and whether it passed.
+  #
+  # So each probe below is a question phrased as a job name, answered by its
+  # exit status. One run, and the runner stops being a black box. This is
+  # scaffolding for a blind loop and has no business in a workflow that reports
+  # honestly, which is why it comes back out.
+  probe:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: host has cmake
+            run: cmake --version
+          - name: host has g++ 13+
+            run: test "$(g++ -dumpversion | cut -d. -f1)" -ge 13
+          - name: host has clang++ 19+
+            run: test "$(clang++ --version | head -1 | grep -oE '[0-9]+' | head -1)" -ge 19
+          - name: host has git
+            run: git --version
+          - name: host is root
+            run: test "$(id -u)" -eq 0
+          - name: host apt works
+            run: apt-get update -qq
+          # No tool dependency on purpose. Every other way of asking this
+          # question (curl, wget, git ls-remote) fails for two different reasons
+          # and the job status cannot tell them apart.
+          - name: host reaches github
+            run: timeout 20 bash -c 'cat < /dev/null > /dev/tcp/github.com/443'
+    name: 'probe: ${{ matrix.name }}'
+    steps:
+      - run: ${{ matrix.run }}
+
+  # ⚠ TEMPORARY — delete with the probe job above.
+  #
+  # Asks the one question the rest of this file depends on: does act_runner
+  # honour `container:` at all? A host-mode runner IGNORES it silently, so a
+  # naive probe would run on the host and pass, telling us the opposite of the
+  # truth. Asserting the image's own identity cannot false-positive that way.
+  probe-container:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:trixie
+    name: 'probe: container support'
+    steps:
+      - name: This must be Debian trixie, not the host
+        run: |
+          cat /etc/os-release
+          . /etc/os-release
+          test "$VERSION_CODENAME" = trixie
+
+  # ⚠ TEMPORARY — delete with the probe jobs above.
+  #
+  # cpp-template derives project() from the DIRECTORY NAME, so PROGRAM_NAME
+  # follows wherever the checkout lands and test/00bootstrap asserts on it. A
+  # workspace named anything but term-game reddens that test and the reason is
+  # nowhere near the failure. Found the hard way: the local container rehearsal
+  # of this change checked out into /src and 00bootstrap failed with
+  # `"src" == "term-game"`.
+  probe-workspace:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:trixie
+    name: 'probe: workspace dir is term-game'
+    steps:
+      - name: Tools
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            git ca-certificates nodejs
+      - uses: actions/checkout@v4
+      - run: test "$(basename "$PWD")" = term-game
+
+  # Fail fast, loudly, and on the right line. This used to be a report on an
+  # unknown host image; now it asserts the container we chose, so it is
+  # deterministic — if it ever fails, the base image moved under us.
   toolchain:
     runs-on: ubuntu-latest
+    container:
+      image: debian:trixie
     steps:
+      - name: Install toolchain
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            build-essential clang cmake
+
       - name: Toolchain floor
         run: |
           set -euo pipefail
@@ -49,9 +151,8 @@ jobs:
 
           if [ "$fail" -ne 0 ]; then
             echo
-            echo "The runner image is below term-game's toolchain floor."
-            echo "This is an image problem, not a code problem — ask the"
-            echo "maintainer to bump the CI image rather than lowering the floor."
+            echo "debian:trixie no longer clears term-game's toolchain floor."
+            echo "Pin a newer image in this file rather than lowering the floor."
             echo "C++23 is not optional here: termforge requires it, and clang"
             echo "18 and earlier cannot compile std::expected against libstdc++."
             exit 1
@@ -60,6 +161,8 @@ jobs:
   build:
     needs: toolchain
     runs-on: ubuntu-latest
+    container:
+      image: debian:trixie
     strategy:
       fail-fast: false
       matrix:
@@ -89,12 +192,37 @@ jobs:
             build_type: RelWithDebInfo
     name: ${{ matrix.name }}
     steps:
+      # ⚠ This step runs BEFORE the checkout, and the order is load-bearing
+      # twice over:
+      #
+      #   git   — actions/checkout falls back to a tarball download when git is
+      #           missing. That leaves no .git, `git describe --tags` in
+      #           cmake/version.cmake finds nothing, and every build silently
+      #           reports 0.0.0. It is the same failure fetch-depth: 0 exists to
+      #           prevent, arriving by a different road.
+      #   nodejs — actions/checkout is a JavaScript action and the runner needs
+      #           a node interpreter inside the container to execute it. A bare
+      #           distro image has none. This is the one line that looks like it
+      #           belongs in a JS project and does not.
+      - name: Install toolchain
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            build-essential clang cmake git ca-certificates nodejs
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
           # Leave this alone. cmake/version.cmake runs `git describe --tags`; a
           # shallow clone finds no tags and every build silently reports 0.0.0.
           fetch-depth: 0
+
+      # actions/checkout leaves the workspace owned by a different uid than the
+      # one the steps run as, and git refuses to operate on it. Without this,
+      # `git describe --tags` fails and the version silently falls back to 0.0.0
+      # — same symptom as a shallow clone, different cause.
+      - name: Trust the workspace
+        run: git config --global --add safe.directory "$PWD"
 
       # TERMGAME_WITH_AUDIO=OFF on every job. Runners have no sound hardware,
       # and OFF is the configuration this repo promises always works — it is not
@@ -124,11 +252,20 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
-  # No compiler, no network, no checkout depth needed: pure CMake script that
-  # unit-tests the git-describe parser.
+  # No compiler and no network needed: pure CMake script that unit-tests the
+  # git-describe parser. It still needs the container, because cmake is exactly
+  # what the host image does not have — this job failing in 3 seconds is the
+  # clearest evidence there was of what was actually wrong.
   version-selftest:
     runs-on: ubuntu-latest
+    container:
+      image: debian:trixie
     steps:
+      - name: Install toolchain
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            cmake git ca-certificates nodejs
       - name: Checkout
         uses: actions/checkout@v4
       - name: Version parser selftest
