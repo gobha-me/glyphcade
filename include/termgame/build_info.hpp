@@ -22,10 +22,18 @@ namespace termgame {
 
 // True iff this library was compiled with the RtAudio backend enabled.
 //
-// ⚠ This reports how the build was configured, not whether sound will come out.
-// Nothing links rtaudio yet (Epic 2 owns the audio engine), and a machine can
-// have the library without having a device — the dev container is exactly that
-// case: librtaudio-dev installed, no /dev/snd.
+// ⚠ This reports how the build was CONFIGURED, not whether sound will come out.
+// A machine can have librtaudio-dev without having a device — the dev container
+// is exactly that case — in which case this answers true and the engine still
+// degrades to silence at open() time. Ask Engine::kind() for what is actually
+// happening.
+//
+// ⚠ Since Epic 2 the TERMGAME_WITH_AUDIO definition behind this looks unused
+// inside src/lib, because no audio source is #ifdef'd on it any more — the
+// rtaudio backend lives in its own target (gitea #13). It is not unused. This
+// function is its only reader, and test/00bootstrap compares the answer against
+// the value CMake believed, which is what catches "the option exists but never
+// reached the compiler". Do not delete the definition as dead.
 [[nodiscard]] auto build_has_audio() noexcept -> bool;
 
 }  // namespace termgame
