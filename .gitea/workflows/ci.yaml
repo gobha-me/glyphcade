@@ -39,85 +39,35 @@ on:
       - main
   workflow_dispatch:
 
+# ── What the probe run established, so nobody has to run it again ───────────
+#
+# The first push of this file carried a temporary matrix of one-line jobs, each
+# NAMED for the question it answered, because a job's name and pass/fail are the
+# only signal that crosses the missing-logs gap. They were deleted once they had
+# reported. What they said, on run 8:
+#
+#   host has cmake ................ FAIL   <- the entire three-epic mystery
+#   host has clang++ 19+ .......... FAIL
+#   host has g++ 13+ .............. pass
+#   host has git .................. pass
+#   host is root .................. pass
+#   host apt works ................ pass
+#   host reaches github ........... pass
+#   container support ............. pass   <- act_runner honours `container:`
+#   workspace dir is term-game .... pass
+#
+# Two consequences worth keeping:
+#
+#   - The host could have been patched in place (root + apt both work), but it
+#     has gcc and not clang, and no apt-reachable clang >= 19 on an Ubuntu
+#     runner. The container was the cheaper correct answer, not merely the
+#     tidier one.
+#   - `workspace dir is term-game` is not paranoia. cpp-template derives
+#     project() from the directory name, PROGRAM_NAME follows it, and
+#     test/00bootstrap asserts on it — the local rehearsal of this change
+#     checked out into /src and failed with `"src" == "term-game"`.
+
 jobs:
-  # ⚠ TEMPORARY — delete this job before merging.
-  #
-  # Gitea 1.25.4 does not expose Actions logs to the API from a dev container:
-  # /api/v1/repos/{o}/{r}/actions/runs/{n}/jobs returns an empty list even for
-  # runs that succeeded, and every log endpoint 404s. The only signal that
-  # crosses that gap is a job's NAME and whether it passed.
-  #
-  # So each probe below is a question phrased as a job name, answered by its
-  # exit status. One run, and the runner stops being a black box. This is
-  # scaffolding for a blind loop and has no business in a workflow that reports
-  # honestly, which is why it comes back out.
-  probe:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: host has cmake
-            run: cmake --version
-          - name: host has g++ 13+
-            run: test "$(g++ -dumpversion | cut -d. -f1)" -ge 13
-          - name: host has clang++ 19+
-            run: test "$(clang++ --version | head -1 | grep -oE '[0-9]+' | head -1)" -ge 19
-          - name: host has git
-            run: git --version
-          - name: host is root
-            run: test "$(id -u)" -eq 0
-          - name: host apt works
-            run: apt-get update -qq
-          # No tool dependency on purpose. Every other way of asking this
-          # question (curl, wget, git ls-remote) fails for two different reasons
-          # and the job status cannot tell them apart.
-          - name: host reaches github
-            run: timeout 20 bash -c 'cat < /dev/null > /dev/tcp/github.com/443'
-    name: 'probe: ${{ matrix.name }}'
-    steps:
-      - run: ${{ matrix.run }}
-
-  # ⚠ TEMPORARY — delete with the probe job above.
-  #
-  # Asks the one question the rest of this file depends on: does act_runner
-  # honour `container:` at all? A host-mode runner IGNORES it silently, so a
-  # naive probe would run on the host and pass, telling us the opposite of the
-  # truth. Asserting the image's own identity cannot false-positive that way.
-  probe-container:
-    runs-on: ubuntu-latest
-    container:
-      image: debian:trixie
-    name: 'probe: container support'
-    steps:
-      - name: This must be Debian trixie, not the host
-        run: |
-          cat /etc/os-release
-          . /etc/os-release
-          test "$VERSION_CODENAME" = trixie
-
-  # ⚠ TEMPORARY — delete with the probe jobs above.
-  #
-  # cpp-template derives project() from the DIRECTORY NAME, so PROGRAM_NAME
-  # follows wherever the checkout lands and test/00bootstrap asserts on it. A
-  # workspace named anything but term-game reddens that test and the reason is
-  # nowhere near the failure. Found the hard way: the local container rehearsal
-  # of this change checked out into /src and 00bootstrap failed with
-  # `"src" == "term-game"`.
-  probe-workspace:
-    runs-on: ubuntu-latest
-    container:
-      image: debian:trixie
-    name: 'probe: workspace dir is term-game'
-    steps:
-      - name: Tools
-        run: |
-          apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-            git ca-certificates nodejs
-      - uses: actions/checkout@v4
-      - run: test "$(basename "$PWD")" = term-game
-
   # Fail fast, loudly, and on the right line. This used to be a report on an
   # unknown host image; now it asserts the container we chose, so it is
   # deterministic — if it ever fails, the base image moved under us.
