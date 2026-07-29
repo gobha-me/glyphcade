@@ -91,6 +91,11 @@ include(${CMAKE_CURRENT_LIST_DIR}/cmake/audio.cmake)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/src/lib)
 
 if (${PROJECT_NAME}_BUILD_BIN)
+  # Gated on BUILD_BIN, not on TERMGAME_WITH_AUDIO: the target exists in both
+  # arms and only its source file changes (see src/audio_backend/CMakeLists.txt).
+  # The binary is its only consumer, so with no binary there is nothing to link
+  # it — and it is never installed, so nothing else can want it.
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/src/audio_backend)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/src/bin)
 endif ()
 
