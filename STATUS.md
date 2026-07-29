@@ -110,9 +110,9 @@ was nothing for us to delete. See
   terminal down before the throw reached us, and our boundary turned it into
   exit 1), `pty-restore` (the same claim in a real pty, where the escape bytes
   are visible — added by gitea #16).
-- **CI** at [.gitea/workflows/ci.yaml](.gitea/workflows/ci.yaml) — written, not
-  yet proven green; the runner image's toolchain was not verifiable when it was
-  written, which is why its first job asserts the floor rather than assuming it.
+- **CI** at [.gitea/workflows/ci.yaml](.gitea/workflows/ci.yaml) — **green since
+  gitea [#10](https://git.gobha.me/xcaliber/term-game/issues/10)**; see the CI
+  section below for what it runs and why it took three epics to get there.
 
 Epic 0's `BootApp` no longer exists — Epic 1 replaced it with the Shell.
 
@@ -485,6 +485,78 @@ early assertions look exactly like something to tidy up.
 
 `test/13tick` needs no reordering and says why: its `run()` is one uninterrupted
 `test_run_frames`, so nothing re-arms `m_running` between `quit()` and the check.
+
+---
+
+## CI, and why it was red for three epics
+
+Gitea Actions at [.gitea/workflows/ci.yaml](.gitea/workflows/ci.yaml). Green as
+of gitea [#10](https://git.gobha.me/xcaliber/term-game/issues/10) — before that
+**every run since Epic 0 failed**, including the merge of PR #19.
+
+**The cause was not in this repo.** Every job died in 2–3 seconds, including
+`version-selftest`, which is nothing but a checkout and `cmake -P`. A
+compiler-free job cannot fail that fast for a code reason. The runner image has
+no CMake and no Clang — it is a Node/Docker image, which is all its other
+consumer (HTML-Games, on the same runner) has ever needed from it. The
+`toolchain` job diagnosed this correctly on every single run; nobody could read
+what it said.
+
+⚠ **Gitea 1.25.4 does not expose Actions logs to the API.**
+`/api/v1/repos/{o}/{r}/actions/runs/{n}/jobs` returns an empty list *even for
+runs that succeeded*, and every log endpoint 404s or 500s. From a dev container
+the only signal is a job's **name** and whether it passed. That is why #10 was
+split out of Epic 0 in the first place, and it is still true — plan on it if CI
+ever goes red again. The technique that worked: a temporary matrix of one-line
+jobs, each *named for the question it answers*, so the answers arrive as job
+statuses. They were deleted once they had reported.
+
+**What it runs now.** Every compiling job declares
+`container: image: debian:trixie`, which clears the whole floor from base repos
+in one `apt-get` — cmake 3.31, gcc 14, clang 19.1 — and ships util-linux, so
+`script(1)` exists for `pty-restore`. The matrix is gcc/default, clang/default,
+ASan, UBSan and TSan, all with `-DCMAKE_CXX_FLAGS=-Werror` and
+`-DTERMGAME_WITH_AUDIO=OFF`.
+
+Pinning the image *here* rather than asking for the runner image to be bumped is
+deliberate: a bumped image fixes one repo on one host and silently un-fixes
+itself the next time it is rebuilt. This is version-controlled and reviewable.
+
+### Three lines in that file look like clutter and are load-bearing
+
+| Line | What breaks without it |
+|---|---|
+| `nodejs` installed into a C++ build container | `actions/checkout` is a JavaScript action; the runner needs an interpreter **inside** the container to execute it |
+| `git` installed **before** the checkout, not with the compilers | `actions/checkout` falls back to a tarball, leaving no `.git`; `git describe --tags` finds nothing and the build silently reports `0.0.0` |
+| `git config --global --add safe.directory "$PWD"` | same `0.0.0` symptom from a third cause — checkout leaves the workspace owned by another uid and git refuses to read it |
+
+All three fail *silently or confusingly*, which is why they are commented at
+their sites as well as here.
+
+### ⚠ The project name follows the checkout directory name
+
+cpp-template derives `project()` from the directory name, so `PROGRAM_NAME`
+follows wherever the checkout lands, and `test/00bootstrap` asserts on it. A
+workspace named anything but `term-game` reddens that test with a message
+(`"src" == "term-game"`) that points nowhere near the cause. Found by tripping
+over it: the local container rehearsal of #10 checked out into `/src`. Gitea's
+workspace is `.../xcaliber/term-game`, so it holds — but it is an assumption,
+not a guarantee, and it was verified with a probe rather than assumed.
+
+### There is no CI badge, deliberately
+
+`git.gobha.me` does not serve badge routes. The URL Gitea's own API advertises
+as this workflow's `badge_url` returns 404, as do `/badges/release.svg`,
+`issues.svg` and `stars.svg` — and so does the equivalent URL for a sibling repo
+whose workflow has been succeeding for months. It is an instance setting, not
+something this repo can fix, so README links the Actions page in words instead.
+Tracked in gitea [#21](https://git.gobha.me/xcaliber/term-game/issues/21).
+
+Consequence worth noting: `check_artifacts` rule A1 is narrowed to
+`^README\.md$` on the grounds that its label is "README CI badge" (see the
+divergences table below). With no badge to protect, A1 is currently inert
+either way; gitea [#12](https://git.gobha.me/xcaliber/term-game/issues/12) still
+owns reverting the narrowing when upstream narrows it.
 
 ---
 
