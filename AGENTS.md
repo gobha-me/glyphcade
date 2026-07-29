@@ -109,7 +109,7 @@ verification"* — **never as verified**. Claiming otherwise is unfounded.
 
 ## How to verify before a PR
 
-Three configurations minimum. The second is not redundant with the first: this
+Four configurations minimum. The second is not redundant with the first: this
 container has `librtaudio-dev`, so detection defaults **ON** here and the OFF arm
 — the one CI runs and the one this repo promises always works — is only exercised
 if you ask for it.
@@ -128,7 +128,25 @@ cmake -B build-noaudio -DTERMGAME_WITH_AUDIO=OFF -DCMAKE_CXX_FLAGS=-Werror \
 cmake -B build-clang -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain/clang.cmake \
   -DCMAKE_CXX_FLAGS=-Werror && cmake --build build-clang --parallel \
   && ctest --test-dir build-clang --output-on-failure
+
+# 4. Thread sanitizer — the arm that judges the audio command ring
+cmake -B build-tsan -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain/thread.cmake \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_CXX_FLAGS=-Werror \
+  && cmake --build build-tsan --parallel \
+  && ctest --test-dir build-tsan --output-on-failure
 ```
+
+⚠ **TSan is its own build, never a flag added to another one** — it does not
+compose with ASan or UBSan. It needs an explicit `-DCMAKE_BUILD_TYPE`, because
+`cmake/toolchain/thread.cmake` deliberately does not force one (forcing `-O2`
+there would clobber the Debug default's `-O0 -g` for everyone).
+
+The audio engine's SPSC command ring is the reason this arm exists: it is the one
+place in the repo where a bug is a heisenbug, so "green without TSan" says
+nothing about it. `30sanitizer-smoke` proves the sanitizer is actually engaged
+rather than silently absent — under TSan it must **print a `ThreadSanitizer`
+report**, which is what `test/CMakeLists.txt` turns into the pass condition. A
+green run with no report is a no-op toolchain, not a clean tree.
 
 Pass `-DCMAKE_CXX_FLAGS=-Werror` — and note that it only works because our
 `cmake/toolchain/default.cmake` appends rather than replaces. If you ever re-sync
