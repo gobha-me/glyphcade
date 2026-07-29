@@ -33,6 +33,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
     arcade/exception_boundary.cpp
     arcade/shell.cpp
     arcade/all_games.cpp
+    audio/engine.cpp
     audio/sink.cpp
     audio/synth.cpp
     games/minesweeper/board.cpp
