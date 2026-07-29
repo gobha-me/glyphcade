@@ -306,7 +306,11 @@ subclass has no hook to bring up and tear down its own resources inside the
 loop's lifetime. The audio device therefore opens in the `Shell` constructor —
 before any terminal exists to report a failure on — and the failure message is
 stashed and drained on the first frame through `sync_capabilities()`. It works,
-but it is upstream's shape forcing ours. Worth a `gh` issue against termforge.
+but it is upstream's shape forcing ours. Filed as termforge
+[#97](https://github.com/gobha-me/termforge/issues/97), asking for protected
+`on_start()`/`on_stop()` hooks called inside the terminal's lifetime. The
+workaround is commented at both sites; its deletion condition is that issue
+shipping.
 
 ---
 
