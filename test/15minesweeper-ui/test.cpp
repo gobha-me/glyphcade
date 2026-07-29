@@ -1,5 +1,12 @@
-// Minesweeper's RENDERING and INPUT, through a real Shell into an offscreen
-// Screen. The rules live in test/14minesweeper and are not re-tested here.
+// Minesweeper's RENDERING, INPUT, and the SOUND that input asks for, through a
+// real Shell into an offscreen Screen. The rules live in test/14minesweeper and
+// are not re-tested here.
+//
+// The SFX cases at the bottom were mutation-tested, and two of the three
+// mutations survived the first attempt — the notes on each case say which and
+// what was changed as a result. It is worth reading those before adding a
+// binding: "the verb returned true" is not the same question as "something
+// audible happened", and the difference is not the same in both directions.
 //
 // ⚠ test_run_frames installs a FallbackDriver, whose capabilities() reports
 // all-false — so the Shell syncs to BorderStyle::Ascii and EVERY case in this
@@ -588,4 +595,360 @@ TEST_CASE("the game renders at every size without crashing", "[minesweeper]") {
     app.step(1, 10, 4);
     REQUIRE(app.state() == Shell::State::InGame);
   }
+}
+
+// ── SFX bindings ────────────────────────────────────────────────────────────
+//
+// Every case below drives the REAL input path — dispatch_event into the Shell,
+// into the game's handle_key/handle_mouse — over a board installed with
+// load_mines(), so what is asserted is what a keystroke does rather than what a
+// helper does.
+//
+// ⚠ Asserted through app.audio(), the SHELL's engine, never through the Game.
+// That is not a stylistic choice: Shell::handle_in_game_key calls
+// apply_transitions() as soon as the game consumes a key, so a key that ends
+// the game destroys the Game before dispatch_event() returns. Reading a counter
+// off the game afterwards is a use-after-free that only ASan catches (STATUS.md
+// records it costing a debugging round). The Shell outlives every game, so
+// asserting there sidesteps the trap structurally rather than by remembering.
+//
+// play_count() records INTENT, so all of this passes identically on the
+// TERMGAME_WITH_AUDIO=OFF arm — no sink is injected and no file is written.
+
+TEST_CASE("revealing a safe cell plays the reveal sound",
+          "[minesweeper][audio]") {
+  using termgame::audio::SfxId;
+
+  Probe app;
+  Minesweeper* g = enter_game(app);
+  const Coord mines[]{{0, 0}, {4, 4}, {8, 8}};
+  g->board().load_mines(mines);
+
+  // Cursor is at 0,0 which is a mine — move somewhere safe first.
+  app.dispatch_event(key(termforge::Key::Down));
+  app.dispatch_event(key(termforge::Key::Right));
+  REQUIRE(app.audio().play_count(SfxId::Reveal) == 0);
+
+  app.dispatch_event(ch(U' '));
+
+  REQUIRE(app.audio().play_count(SfxId::Reveal) == 1);
+  REQUIRE(app.audio().play_count(SfxId::Explode) == 0);
+  REQUIRE(app.audio().play_count(SfxId::Win) == 0);
+}
+
+TEST_CASE("revealing an already-open cell is silent", "[minesweeper][audio]") {
+  // ⚠ THE MUTATION-PROOF CASE for announce()'s `changed` guard. "Play Reveal
+  // whenever the verb returned true" is the obvious simplification, and it is
+  // wrong in exactly this way: a second press on an open cell changes nothing
+  // and must make no sound.
+  using termgame::audio::SfxId;
+
+  Probe app;
+  Minesweeper* g = enter_game(app);
+  const Coord mines[]{{0, 0}, {4, 4}, {8, 8}};
+  g->board().load_mines(mines);
+
+  app.dispatch_event(key(termforge::Key::Down));
+  app.dispatch_event(key(termforge::Key::Right));
+  app.dispatch_event(ch(U' '));
+  const auto after_first = app.audio().play_count(SfxId::Reveal);
+  REQUIRE(after_first == 1);
+
+  app.dispatch_event(ch(U' '));  // same cell, already open
+  REQUIRE(app.audio().play_count(SfxId::Reveal) == after_first);
+}
+
+TEST_CASE("space on a flagged cell is silent", "[minesweeper][audio]") {
+  // The other half of the same guard: reveal() refuses a flagged cell, so the
+  // press is a deliberate no-op and must stay quiet.
+  using termgame::audio::SfxId;
+
+  Probe app;
+  Minesweeper* g = enter_game(app);
+  const Coord mines[]{{0, 0}, {4, 4}, {8, 8}};
+  g->board().load_mines(mines);
+
+  app.dispatch_event(key(termforge::Key::Down));
+  app.dispatch_event(key(termforge::Key::Right));
+  app.dispatch_event(ch(U'f'));  // flag it
+  REQUIRE(app.audio().play_count(SfxId::Flag) == 1);
+
+  app.dispatch_event(ch(U' '));  // refused by the model
+  REQUIRE(app.audio().play_count(SfxId::Reveal) == 0);
+  REQUIRE(app.audio().play_count(SfxId::Explode) == 0);
+}
+
+TEST_CASE("stepping on a mine plays explode and lose",
+          "[minesweeper][audio]") {
+  // ⚠ The case that proves announce() reads the STATE TRANSITION rather than
+  // the return value. reveal() returns the same `true` here as it does for an
+  // ordinary open, so a binding that trusted the bool alone would play Reveal.
+  using termgame::audio::SfxId;
+
+  Probe app;
+  Minesweeper* g = enter_game(app);
+  const Coord mines[]{{0, 0}, {4, 4}, {8, 8}};
+  g->board().load_mines(mines);
+
+  // Open something safe first, so the board is Playing rather than Ready.
+  app.dispatch_event(key(termforge::Key::Down));
+  app.dispatch_event(key(termforge::Key::Right));
+  app.dispatch_event(ch(U' '));
+
+  // Now walk onto (4,4) and open it.
+  Minesweeper* live = game_of(app);
+  REQUIRE(live != nullptr);
+  while (live->cursor().row < 4) app.dispatch_event(key(termforge::Key::Down));
+  while (live->cursor().col < 4) app.dispatch_event(key(termforge::Key::Right));
+  REQUIRE(live->cursor().row == 4);
+  REQUIRE(live->cursor().col == 4);
+
+  app.dispatch_event(ch(U' '));
+
+  REQUIRE(app.audio().play_count(SfxId::Explode) == 1);
+  REQUIRE(app.audio().play_count(SfxId::Lose) == 1);
+  REQUIRE(app.audio().play_count(SfxId::Win) == 0);
+}
+
+TEST_CASE("clearing the board plays the win sound", "[minesweeper][audio]") {
+  using termgame::audio::SfxId;
+
+  Probe app;
+  Minesweeper* g = enter_game(app);
+
+  // One mine in the corner: opening every other cell wins.
+  const Coord mines[]{{0, 0}};
+  g->board().load_mines(mines);
+
+  auto& board = g->board();
+  for (int r = 0; r < board.rows(); ++r) {
+    for (int c = 0; c < board.cols(); ++c) {
+      if (r == 0 && c == 0) continue;
+      if (board.at({.row = r, .col = c}).revealed) continue;
+      if (board.finished()) break;
+      board.reveal({.row = r, .col = c});
+    }
+  }
+  REQUIRE(board.state() == State::Won);
+
+  // The model was driven directly above to set the position up, so no sound has
+  // been asked for yet — the binding lives in the input path, not in Board.
+  REQUIRE(app.audio().play_count(SfxId::Win) == 0);
+}
+
+TEST_CASE("winning through the input path plays the win sound",
+          "[minesweeper][audio]") {
+  // ⚠ The previous case proves Board stays silent; this one proves the INPUT
+  // path is what sounds. Together they pin "audio is presentation": driving the
+  // model makes no sound, driving the game does.
+  using termgame::audio::SfxId;
+
+  Probe app;
+  Minesweeper* g = enter_game(app);
+
+  // ⚠ The mine layout is doing real work here. With a single corner mine the
+  // board is almost all zeros, so ONE reveal floods the whole grid and wins
+  // before the input path is ever used — an earlier draft did exactly that and
+  // the case failed on `REQUIRE_FALSE(finished())`.
+  //
+  // Walling (8,8) off with mines on all three of its neighbours makes it
+  // unreachable by flood fill: the fill only expands THROUGH zero cells, and a
+  // mine is never revealed, so nothing can open (8,8) except opening it.
+  const Coord last{.row = 8, .col = 8};
+  const Coord mines[]{{0, 0}, {7, 7}, {7, 8}, {8, 7}};
+  g->board().load_mines(mines);
+
+  auto is_mine = [&mines](Coord at) {
+    for (const Coord m : mines) {
+      if (m == at) return true;
+    }
+    return false;
+  };
+
+  // Open every safe cell except `last`, directly on the model.
+  auto& board = g->board();
+  for (int r = 0; r < board.rows(); ++r) {
+    for (int c = 0; c < board.cols(); ++c) {
+      const Coord at{.row = r, .col = c};
+      if (is_mine(at) || at == last) continue;
+      if (!board.at(at).revealed) board.reveal(at);
+    }
+  }
+  REQUIRE_FALSE(board.finished());
+
+  // The last cell goes through the real input path.
+  Minesweeper* live = game_of(app);
+  REQUIRE(live != nullptr);
+  while (live->cursor().row < last.row) {
+    app.dispatch_event(key(termforge::Key::Down));
+  }
+  while (live->cursor().col < last.col) {
+    app.dispatch_event(key(termforge::Key::Right));
+  }
+  app.dispatch_event(ch(U' '));
+
+  REQUIRE(app.audio().play_count(SfxId::Win) == 1);
+  REQUIRE(app.audio().play_count(SfxId::Explode) == 0);
+  REQUIRE(app.audio().play_count(SfxId::Lose) == 0);
+}
+
+TEST_CASE("the mark cycle sounds flag, then click, then click",
+          "[minesweeper][audio]") {
+  // Placing a flag is a decision; stepping to Question and clearing back to
+  // None are undoing one. announce_mark() reads what the cell BECAME, so all
+  // three presses of the same key produce two different sounds.
+  using termgame::audio::SfxId;
+
+  Probe app;
+  Minesweeper* g = enter_game(app);
+  const Coord mines[]{{0, 0}, {4, 4}, {8, 8}};
+  g->board().load_mines(mines);
+
+  app.dispatch_event(ch(U'f'));  // None -> Flag
+  REQUIRE(app.audio().play_count(SfxId::Flag) == 1);
+  REQUIRE(app.audio().play_count(SfxId::Click) == 0);
+
+  app.dispatch_event(ch(U'f'));  // Flag -> Question
+  REQUIRE(app.audio().play_count(SfxId::Flag) == 1);
+  REQUIRE(app.audio().play_count(SfxId::Click) == 1);
+
+  app.dispatch_event(ch(U'f'));  // Question -> None
+  REQUIRE(app.audio().play_count(SfxId::Flag) == 1);
+  REQUIRE(app.audio().play_count(SfxId::Click) == 2);
+}
+
+TEST_CASE("a chord with the wrong flag count is silent",
+          "[minesweeper][audio]") {
+  // chord() is a deliberate visible no-op when the flags do not add up, and a
+  // no-op must be inaudible as well as harmless.
+  using termgame::audio::SfxId;
+
+  Probe app;
+  Minesweeper* g = enter_game(app);
+  const Coord mines[]{{0, 0}, {4, 4}, {8, 8}};
+  g->board().load_mines(mines);
+
+  // Open a numbered cell next to a mine, with nothing flagged.
+  g->board().reveal({.row = 1, .col = 1});
+  app.step();
+
+  Minesweeper* live = game_of(app);
+  REQUIRE(live != nullptr);
+  while (live->cursor().row < 1) app.dispatch_event(key(termforge::Key::Down));
+  while (live->cursor().col < 1) app.dispatch_event(key(termforge::Key::Right));
+
+  const auto before = app.audio().play_count(SfxId::Reveal);
+  app.dispatch_event(ch(U'c'));  // no flags placed: refused
+  REQUIRE(app.audio().play_count(SfxId::Reveal) == before);
+  REQUIRE(app.audio().play_count(SfxId::Explode) == 0);
+}
+
+TEST_CASE("cursor movement makes no sound", "[minesweeper][audio]") {
+  // ⚠ DELIBERATE, not an oversight. A blip per keystroke under a held arrow key
+  // is unpleasant, and fixing that needs a rate limit, and a rate limit needs a
+  // clock — and dt inside Game::tick is the only clock a game may read. That is
+  // a feel decision requiring a human ear, so it is deferred rather than
+  // guessed at. Recorded in STATUS.md's Epic 2 deferral table.
+  using termgame::audio::SfxId;
+
+  Probe app;
+  Minesweeper* g = enter_game(app);
+  const Coord mines[]{{0, 0}, {4, 4}, {8, 8}};
+  g->board().load_mines(mines);
+
+  // ⚠ Baselined rather than compared against zero. Entering the game played
+  // MenuSelect on this same engine — the Shell's — so an absolute assertion
+  // here fails for a reason that has nothing to do with the cursor. What is
+  // being claimed is that MOVING adds nothing, not that nothing ever happened.
+  std::vector<std::uint32_t> before;
+  for (const auto id : termgame::audio::kSfxIds) {
+    before.push_back(app.audio().play_count(id));
+  }
+
+  for (int i = 0; i < 5; ++i) {
+    app.dispatch_event(key(termforge::Key::Down));
+    app.dispatch_event(key(termforge::Key::Right));
+  }
+  app.dispatch_event(key(termforge::Key::Home));
+  app.dispatch_event(key(termforge::Key::End));
+
+  for (std::size_t i = 0; i < termgame::audio::kSfxIds.size(); ++i) {
+    REQUIRE(app.audio().play_count(termgame::audio::kSfxIds[i]) == before[i]);
+  }
+}
+
+TEST_CASE("starting a new game clicks", "[minesweeper][audio]") {
+  // ⚠ NOT routed through announce(): new_game() resets the board, so the state
+  // goes Playing -> Ready, which announce() would read as neither progress nor
+  // an outcome and would have to special-case.
+  using termgame::audio::SfxId;
+
+  Probe app;
+  Minesweeper* g = enter_game(app);
+  const Coord mines[]{{0, 0}, {4, 4}, {8, 8}};
+  g->board().load_mines(mines);
+
+  app.dispatch_event(ch(U'2'));
+  REQUIRE(app.audio().play_count(SfxId::Click) == 1);
+  app.dispatch_event(ch(U'n'));
+  REQUIRE(app.audio().play_count(SfxId::Click) == 2);
+}
+
+TEST_CASE("a right click flags, like the keyboard", "[minesweeper][audio]") {
+  // The mouse path and the key path must not drift apart — they are the same
+  // two verbs and should make the same two sounds.
+  using termgame::audio::SfxId;
+
+  Probe app;
+  Minesweeper* g = enter_game(app);
+  const Coord mines[]{{0, 0}, {4, 4}, {8, 8}};
+  g->board().load_mines(mines);
+
+  const Layout& l = g->layout();
+  REQUIRE(l.fits);
+
+  const Coord at{.row = 3, .col = 3};
+  const int x = l.glyph_x(at.col);
+  const int y = l.row_y(at.row);
+
+  app.dispatch_event(click(x, y, 2));
+  REQUIRE(app.audio().play_count(SfxId::Flag) == 1);
+
+  app.dispatch_event(click(x, y, 2));  // -> Question
+  REQUIRE(app.audio().play_count(SfxId::Click) == 1);
+}
+
+TEST_CASE("marking a revealed cell is silent", "[minesweeper][audio]") {
+  // ⚠ THE case that makes announce_mark()'s `changed` guard load-bearing. It
+  // was added after mutation testing: deleting that guard left the whole suite
+  // green, because nothing here covered the one path where it matters.
+  //
+  // cycle_mark() refuses a revealed cell and leaves the mark at None. Without
+  // the guard, announce_mark() reads that None as "became not-a-flag" and
+  // clicks — so every press of f on an open square would blip. There is nothing
+  // else to compare against, because nothing about the board moved.
+  using termgame::audio::SfxId;
+
+  Probe app;
+  Minesweeper* g = enter_game(app);
+  const Coord mines[]{{0, 0}, {4, 4}, {8, 8}};
+  g->board().load_mines(mines);
+
+  g->board().reveal({.row = 1, .col = 1});  // a number cell, now open
+  app.step();
+
+  Minesweeper* live = game_of(app);
+  REQUIRE(live != nullptr);
+  while (live->cursor().row < 1) app.dispatch_event(key(termforge::Key::Down));
+  while (live->cursor().col < 1) app.dispatch_event(key(termforge::Key::Right));
+  REQUIRE(live->board().at({.row = 1, .col = 1}).revealed);
+
+  const auto clicks = app.audio().play_count(SfxId::Click);
+  const auto flags = app.audio().play_count(SfxId::Flag);
+
+  app.dispatch_event(ch(U'f'));
+  app.dispatch_event(click(g->layout().glyph_x(1), g->layout().row_y(1), 2));
+
+  REQUIRE(app.audio().play_count(SfxId::Click) == clicks);
+  REQUIRE(app.audio().play_count(SfxId::Flag) == flags);
 }
