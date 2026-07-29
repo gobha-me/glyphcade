@@ -19,6 +19,7 @@ find_package(RtAudio QUIET CONFIG)
 if (RtAudio_FOUND)
   set(_termgame_audio_found TRUE)
   set(_termgame_audio_how "find_package(RtAudio CONFIG) ${RtAudio_VERSION}")
+  set(TERMGAME_RTAUDIO_TARGET RtAudio::rtaudio)
 else ()
   find_package(PkgConfig QUIET)
 
@@ -28,6 +29,7 @@ else ()
     if (RTAUDIO_FOUND)
       set(_termgame_audio_found TRUE)
       set(_termgame_audio_how "pkg-config rtaudio ${RTAUDIO_VERSION}")
+      set(TERMGAME_RTAUDIO_TARGET PkgConfig::RTAUDIO)
     endif ()
   endif ()
 endif ()
@@ -58,16 +60,40 @@ else ()
   message(STATUS "TERMGAME_WITH_AUDIO=OFF — NullSink / WavFileSink only")
 endif ()
 
-# ⚠ Nothing is linked against rtaudio yet, and that is deliberate — Epic 2 owns
-# the audio engine. It is also an export question, not laziness: linking
-# PkgConfig::RTAUDIO into the exported term-game_lib writes that imported
-# target's name into term-gameTargets.cmake, and the installed package then
-# needs find_dependency(PkgConfig) plus a pkg_check_modules re-run inside
-# cmake/project-config.cmake.in to resolve it. Real design work with no consumer
-# yet; Epic 0 leaves the question open rather than guessing at it.
+# ── Where rtaudio is linked, and where it must never be (gitea #13) ─────────
 #
-# What Epic 0 does ship is the decision made observable: src/lib gets
-# TERMGAME_WITH_AUDIO as a PRIVATE compile definition, and the library reports
-# it at runtime through termgame::build_has_audio(). test/00bootstrap asserts
-# the two agree, which is what catches "the option exists but never reached the
-# compiler".
+# DECIDED, and the decision is load-bearing rather than stylistic. rtaudio is
+# linked by exactly one target — ${PROJECT_NAME}_audio_backend, in
+# src/audio_backend/ — which is never installed and never exported.
+#
+# The trap being avoided: linking ${TERMGAME_RTAUDIO_TARGET} into the exported
+# term-game_lib writes that imported target's name into term-gameTargets.cmake,
+# and an installed package then cannot resolve it, because PkgConfig::RTAUDIO
+# only exists in a build tree that ran pkg_check_modules. ⚠ A PRIVATE link still
+# counts — CMake records it on the exported target as $<LINK_ONLY:...>, because a
+# consumer still has to link it. Judge by what links it, not by the keyword; the
+# rule is spelled out at length in cmake/project-config.cmake.in.
+#
+# The two options not taken, and why:
+#
+#   * find_dependency(PkgConfig) plus a pkg_check_modules re-run inside
+#     project-config.cmake.in. Works, but puts a pkg-config requirement in every
+#     consumer's path, and makes the exported package's contents depend on how
+#     the build box was provisioned.
+#   * gating install(EXPORT) off entirely. Simplest and arguably honest, since
+#     nothing is expected to find_package(term-game) — but the export currently
+#     works end to end and is this repo's cheapest build-health signal.
+#
+# Keeping the backend out preserves both: install(EXPORT) is untouched by Epic 2,
+# and cmake/project-config.cmake.in still names termforge and nothing else.
+#
+# The OFF arm differs by exactly one thing: which source file
+# src/audio_backend/ compiles. Same target name, same link line from src/bin,
+# same main.cpp, same installed headers, same exported package.
+#
+# What Epic 0 shipped and this keeps: src/lib gets TERMGAME_WITH_AUDIO as a
+# PRIVATE compile definition and the library reports it at runtime through
+# termgame::build_has_audio(), which test/00bootstrap asserts against CMake's own
+# belief. ⚠ That definition now looks unused inside src/lib, because no audio
+# source is #ifdef'd on it any more — it is not. It is what makes "the option
+# exists but never reached the compiler" a red test rather than a silent lie.

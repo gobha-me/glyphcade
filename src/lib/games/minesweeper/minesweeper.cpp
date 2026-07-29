@@ -76,6 +76,11 @@ auto Minesweeper::new_game(Level level) -> void {
   m_seed = r.next();
   m_board.reset(minesweeper::preset(level), m_seed);
   m_cursor = Coord{.row = m_board.rows() / 2, .col = m_board.cols() / 2};
+
+  // ⚠ NOT routed through announce(), and not because it was forgotten: reset()
+  // moves the state Playing -> Ready, which announce() would read as neither
+  // progress nor an outcome. A new board is an acknowledgement, so it clicks.
+  if (m_ctx != nullptr) m_ctx->audio().play(audio::SfxId::Click);
 }
 
 auto Minesweeper::move_cursor(int dr, int dc) -> void {
@@ -95,6 +100,66 @@ auto Minesweeper::on_event(const termforge::Event& ev) -> bool {
   // Resize, paste and error events are declined. The layout is recomputed from
   // the Screen's own size every frame, so a resize needs no handling here.
   return false;
+}
+
+auto Minesweeper::announce(minesweeper::State before,
+                           int revealed_before) -> void {
+  if (m_ctx == nullptr) return;
+
+  // ⚠ The verb's bool is deliberately NOT a parameter, and that is a finding
+  // rather than an oversight. An earlier version took it and returned early on
+  // false; mutation testing showed removing that guard changed nothing, because
+  // the two comparisons below already subsume it — a verb that did nothing
+  // moved neither the state nor the revealed count, so it falls through to
+  // silence on its own. Carrying the bool as well would be a second, weaker
+  // statement of the same fact, and the kind of redundancy that later reads as
+  // load-bearing.
+  //
+  // A verb that did nothing IS silent, and that matters: there is no deny blip
+  // in the bank and inventing one is a feel decision nobody who cannot hear it
+  // should make. Revealing an open cell, pressing space on a flag, and chording
+  // with the wrong flag count all arrive here and all leave quietly.
+  const auto now = m_board.state();
+
+  if (now == minesweeper::State::Lost && before != minesweeper::State::Lost) {
+    // Two sounds, one line apart, on purpose: Explode is the detonation
+    // impulse and Lose is the falling tone after it. The mixer has eight
+    // voices and this is what an arcade does.
+    m_ctx->audio().play(audio::SfxId::Explode);
+    m_ctx->audio().play(audio::SfxId::Lose);
+    return;
+  }
+
+  if (now == minesweeper::State::Won && before != minesweeper::State::Won) {
+    m_ctx->audio().play(audio::SfxId::Win);
+    return;
+  }
+
+  // Ordinary progress. Guarded on the count rather than on `changed` alone,
+  // because cycle_mark() also reports a change and has its own sound.
+  if (m_board.revealed_count() > revealed_before) {
+    m_ctx->audio().play(audio::SfxId::Reveal);
+  }
+}
+
+// A marking verb's sound, chosen by what the cell became. Flag is its own
+// sound; clearing back to None, or stepping to Question, is a plain click —
+// placing a flag is a decision and the other two are undoing one.
+//
+// ⚠ HERE the bool IS load-bearing, unlike in announce() above, and the
+// asymmetry is the whole reason the two are separate functions. cycle_mark()
+// refuses a revealed cell and leaves the mark at None — so without this guard
+// that refusal would read as "became not-a-flag" and click. There is nothing
+// else to compare against, because nothing about the board moved.
+//
+// test/15minesweeper-ui pins it ("marking a revealed cell is silent"); it was
+// added after mutation testing showed the guard could be deleted with the suite
+// still green.
+auto Minesweeper::announce_mark(minesweeper::Coord at, bool changed) -> void {
+  if (m_ctx == nullptr || !changed) return;
+  m_ctx->audio().play(m_board.at(at).mark == minesweeper::Mark::Flag
+                          ? audio::SfxId::Flag
+                          : audio::SfxId::Click);
 }
 
 auto Minesweeper::handle_key(const termforge::KeyEvent& key) -> bool {
@@ -120,22 +185,42 @@ auto Minesweeper::handle_key(const termforge::KeyEvent& key) -> bool {
         m_done = true;
         return true;
       }
-      m_board.reveal(m_cursor);
+      {
+        const auto before = m_board.state();
+        const int seen = m_board.revealed_count();
+        m_board.reveal(m_cursor);
+        announce(before, seen);
+      }
       return true;
     case Key::Char: break;
     default: return false;
   }
 
   switch (key.ch) {
-    case U' ':
+    case U' ': {
+      const auto before = m_board.state();
+      const int seen = m_board.revealed_count();
       m_board.reveal(m_cursor);
+      announce(before, seen);
       return true;
+    }
     case U'k': case U'K': move_cursor(-1, 0); return true;
     case U'j': case U'J': move_cursor(1, 0); return true;
     case U'h': case U'H': move_cursor(0, -1); return true;
     case U'l': case U'L': move_cursor(0, 1); return true;
-    case U'f': case U'F': m_board.cycle_mark(m_cursor); return true;
-    case U'c': case U'C': m_board.chord(m_cursor); return true;
+    case U'f': case U'F':
+      announce_mark(m_cursor, m_board.cycle_mark(m_cursor));
+      return true;
+    case U'c': case U'C': {
+      const auto before = m_board.state();
+      const int seen = m_board.revealed_count();
+      m_board.chord(m_cursor);
+      announce(before, seen);
+      return true;
+    }
+    // ⚠ NOT routed through announce(). new_game() resets the board, so the
+    // state goes Playing -> Ready, which announce() would have to special-case
+    // to avoid reading as progress.
     case U'n': case U'N': new_game(m_level); return true;
     case U'1': new_game(Level::Easy); return true;
     case U'2': new_game(Level::Medium); return true;
@@ -174,17 +259,26 @@ auto Minesweeper::handle_mouse(const termforge::MouseEvent& mouse) -> bool {
       // trackpads have no middle button — which would make chording, a core
       // part of playing well, unreachable for most players. Left-click on a
       // revealed cell is otherwise a dead gesture, so binding it costs nothing.
-      if (m_board.at(*hit).revealed) {
-        m_board.chord(*hit);
-      } else {
-        m_board.reveal(*hit);
+      {
+        const auto before = m_board.state();
+        const int seen = m_board.revealed_count();
+        if (m_board.at(*hit).revealed) {
+          m_board.chord(*hit);
+        } else {
+          m_board.reveal(*hit);
+        }
+        announce(before, seen);
       }
       return true;
-    case 1:
+    case 1: {
+      const auto before = m_board.state();
+      const int seen = m_board.revealed_count();
       m_board.chord(*hit);
+      announce(before, seen);
       return true;
+    }
     case 2:
-      m_board.cycle_mark(*hit);
+      announce_mark(*hit, m_board.cycle_mark(*hit));
       return true;
     default:
       return false;

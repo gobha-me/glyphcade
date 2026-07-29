@@ -33,9 +33,21 @@ if (${PROJECT_NAME}_BUILD_LIB)
     arcade/exception_boundary.cpp
     arcade/shell.cpp
     arcade/all_games.cpp
+    audio/engine.cpp
+    audio/sink.cpp
+    audio/synth.cpp
     games/minesweeper/board.cpp
     games/minesweeper/minesweeper.cpp
   )
+
+  # ⚠ The audio sources above link NO rtaudio, and that is the gitea #13
+  # decision rather than an omission. Only the abstract AudioSink, NullSink and
+  # WavFileSink live here; the RtAudio backend is a separate, never-installed
+  # target in src/audio_backend/. Linking PkgConfig::RTAUDIO into this library
+  # would write that imported target's name into term-gameTargets.cmake — a
+  # PRIVATE link still counts, as $<LINK_ONLY:...> — and the installed package
+  # would then be unresolvable anywhere pkg_check_modules had not run. See the
+  # rule spelled out in cmake/project-config.cmake.in.
 
   # Compiled libs get the project's include dir PUBLIC so consumers (bin,
   # tests, downstream) inherit it transitively.

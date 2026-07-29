@@ -76,6 +76,17 @@ jobs:
           - name: gcc / ubsan
             cxx: g++
             toolchain: undefined.cmake
+          # The only job with a build_type. TSan is usually built at -O2 for
+          # usable performance and readable stacks, and cmake/toolchain/
+          # thread.cmake deliberately does NOT force one (that would clobber the
+          # Debug default's -O0 -g), so the choice has to be made here.
+          #
+          # ⚠ Not composable with asan or ubsan — TSan is its own job, never a
+          # flag added to another one.
+          - name: gcc / tsan
+            cxx: g++
+            toolchain: thread.cmake
+            build_type: RelWithDebInfo
     name: ${{ matrix.name }}
     steps:
       - name: Checkout
@@ -95,6 +106,7 @@ jobs:
         run: |
           cmake -B build \
             -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain/${{ matrix.toolchain }} \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type || 'Debug' }} \
             -DCMAKE_CXX_FLAGS=-Werror \
             -DTERMGAME_WITH_AUDIO=OFF
 

@@ -65,6 +65,33 @@ else ()
   )
 endif ()
 
+# The gitea #13 guard: install to a scratch prefix and assert the exported
+# Targets file names no rtaudio. Standalone, like the checks above — it is a
+# cmake -P script, not a `<dir>-test` executable.
+#
+# ⚠ This is the ONLY thing standing between Epic 2's export decision and one
+# plausible-looking target_link_libraries line. The damage that line would do is
+# invisible from inside this repo — everything stays green and only a downstream
+# find_package(term-game) breaks, on someone else's machine. See
+# cmake/check_export.cmake for why a PRIVATE link is not a defence.
+#
+# Gated on _INSTALL because there is nothing to inspect without install rules.
+if (${PROJECT_NAME}_INSTALL AND TARGET ${PROJECT_NAME}::lib)
+  message(STATUS "Configuring test setup audio-export-clean")
+  add_test(
+    NAME audio-export-clean
+    COMMAND ${CMAKE_COMMAND}
+            -DBUILD_DIR=${PROJECT_BINARY_DIR}
+            -DPROJECT=${PROJECT_NAME}
+            -P ${PROJECT_SOURCE_DIR}/cmake/check_export.cmake
+  )
+else ()
+  message(STATUS
+    "audio-export-clean not configured — ${PROJECT_NAME}_INSTALL is off, so "
+    "there is no exported package to inspect. gitea #13's guard is ABSENT in "
+    "this configuration, not passing.")
+endif ()
+
 file(GLOB TEST_DIRS ${CMAKE_CURRENT_LIST_DIR}/*)
 
 # Say this once, at configure time, instead of letting it surface as a link error

@@ -7,22 +7,21 @@
 // which is what keeps a game from reaching sideways into the Shell and what
 // makes a game testable by handing it a context and nothing else.
 //
-// What ships in Epic 1 is deliberately small: the probed capability tier, the
-// border family the Shell picked from it, and quit_to_menu(). Two services
-// DESIGN.md names are seams, not omissions, and are left unfilled on purpose:
+// Epic 1 shipped three things: the probed capability tier, the border family
+// the Shell picked from it, and quit_to_menu(). Epic 2 (gitea #3) added audio()
+// — the seam this file reserved, filled in exactly as promised, additively and
+// without disturbing a single existing game.
 //
-//   * AUDIO — Epic 2 (gitea #3). The engine does not exist yet. Inventing its
-//     handle here would pin an API before anything has consumed it, and the one
-//     thing worse than a missing accessor is a wrong one that six games already
-//     call.
+// One service DESIGN.md names is still a seam rather than an omission:
+//
 //   * HIGH SCORES — deferred. No game produces a score yet, and a persistence
 //     format chosen before there is anything to persist is a format that gets
-//     migrated. Tracked separately on gitea.
-//
-// Both are additive: a new accessor on this class breaks no existing game.
+//     migrated. Tracked separately on gitea (#14).
 
 #include <termforge/core/types.hpp>
 #include <termforge/widgets/glyphs.hpp>
+
+#include <termgame/audio/engine.hpp>
 
 namespace termgame {
 
@@ -51,6 +50,25 @@ class GameContext {
     return m_border;
   }
 
+  // Sound effects.
+  //
+  // ⚠ NEVER null, and that is the whole design. A context with no engine hands
+  // back an empty Player whose play() is a no-op, so a game writes
+  //
+  //     ctx.audio().play(audio::SfxId::Reveal);
+  //
+  // with no null check, no has_audio(), and no #ifdef anywhere. "This build
+  // makes no sound" stays a property of the ENGINE rather than a shape all
+  // dozen call sites have to carry — the same choice border_style() above
+  // already makes, where the default is the floor rather than an optional.
+  //
+  // A Player exposes only play(). Opening, closing and pumping the engine
+  // belong to the Shell that owns it, and a game must not be able to reach
+  // them.
+  [[nodiscard]] auto audio() const noexcept -> const audio::Player& {
+    return m_audio;
+  }
+
   // Ask the Shell to return to the selector.
   //
   // ⚠ DEFERRED, never immediate, and that deferral is the whole point.
@@ -75,11 +93,17 @@ class GameContext {
   auto set_border_style(termforge::BorderStyle style) noexcept -> void {
     m_border = style;
   }
+  auto set_audio(audio::Engine* engine) noexcept -> void {
+    m_audio = audio::Player{engine};
+  }
 
  private:
   termforge::Capabilities m_caps{};
   termforge::BorderStyle m_border{termforge::BorderStyle::Ascii};
   bool m_quit_to_menu{false};
+  // Empty until the Shell sets it, which is what makes a bare GameContext in a
+  // test silent rather than a crash.
+  audio::Player m_audio{};
 };
 
 }  // namespace termgame
