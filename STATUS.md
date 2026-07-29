@@ -2,7 +2,7 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-07-28** (Epic 3, then gitea #16)
+**Last updated: 2026-07-29** (Epic 3, then gitea #16 and #17)
 
 ---
 
@@ -31,10 +31,21 @@ Minesweeper is the SFX consumer waiting for it, and `Board`'s verbs already
 return "did anything change", which is where reveal/flag/explode/win will bind.
 Epics 4 (2048) and 5 (Snake) are equally unblocked; nothing blocks any of them.
 
-Since Epic 3, gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16) has
-landed: the pin moved to termforge **v0.1.10** and the `guarded_run` workaround
-was retired. See the exception-boundary section below for what survived it and
-why.
+Since Epic 3, two housekeeping issues have landed.
+gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16) moved the pin to
+termforge v0.1.10 and retired the `guarded_run` workaround — see the
+exception-boundary section below for what survived it and why. gitea
+[#17](https://git.gobha.me/xcaliber/term-game/issues/17) moved it again, to
+**v0.1.15**, and retired **both remaining workarounds**: the selector's gutter
+marker and `Shell::quit_requested()`.
+
+**There are now no workarounds left in this repo.** Three termforge issues were
+filed from building it — [#71](https://github.com/gobha-me/termforge/issues/71),
+[#72](https://github.com/gobha-me/termforge/issues/72) and
+[#73](https://github.com/gobha-me/termforge/issues/73) — all three were fixed
+upstream, and all three of our stopgaps are gone, each on the deletion condition
+it was written with. That loop closing is the thesis of running the two projects
+together, so it is worth stating once rather than leaving implied.
 
 ---
 
@@ -57,9 +68,11 @@ why.
 [#58](https://github.com/gobha-me/termforge/issues/58) (frame pacing),
 [#59](https://github.com/gobha-me/termforge/issues/59) (`on_tick`) and
 [#61](https://github.com/gobha-me/termforge/issues/61) (F5–F12) are all closed,
-and we pin **v0.1.10** to get them, plus
+and we pin **v0.1.15** to get them, plus
 [#71](https://github.com/gobha-me/termforge/issues/71) (terminal restore on the
-exception path). cpp-template CT-15 was fixed upstream at
+exception path), [#72](https://github.com/gobha-me/termforge/issues/72)
+(`ListWidget` marks its own selection) and
+[#73](https://github.com/gobha-me/termforge/issues/73) (`App::running()`). cpp-template CT-15 was fixed upstream at
 `8f62930`; the build-tree `export(EXPORT ...)` block no longer exists, so there
 was nothing for us to delete. See
 [docs/cpp-template-audit.md](docs/cpp-template-audit.md) for what those cost us.
@@ -72,7 +85,7 @@ was nothing for us to delete. See
   directory name, as does the gitea repo).
 - **termforge consumed** via [cmake/deps/termforge.cmake](cmake/deps/termforge.cmake)
   — `find_package(termforge ... CONFIG)` first, FetchContent as the fallback.
-  Epic 0 pinned v0.1.7; the pin is now **v0.1.10** — see below.
+  Epic 0 pinned v0.1.7; the pin is now **v0.1.15** — see below.
 - **`TERMGAME_WITH_AUDIO`** auto-detection in [cmake/audio.cmake](cmake/audio.cmake).
   Nothing links rtaudio yet; Epic 2 owns that, and it is an export question —
   see the note at the bottom of that file.
@@ -132,8 +145,8 @@ Every one of these is a decision with a condition attached, not an oversight.
 | High-score persistence | the *second* scoring game, not the first — gitea [#14](https://git.gobha.me/xcaliber/term-game/issues/14) |
 | One static library target per game | the second real game; today `src/lib/games/<slug>/` compiles into `term-game_lib`. Minesweeper was the first, so this now triggers on the **next** one |
 | `StubGame` | **done** — deleted by Epic 3 |
-| `Shell::quit_requested()` | delete when termforge [#73](https://github.com/gobha-me/termforge/issues/73) lands; it is duplicated state that exists only because `App::m_running` is unreadable — **still open** |
-| The selector's gutter marker | delete when termforge [#72](https://github.com/gobha-me/termforge/issues/72) lands, and give the two columns back to the list |
+| `Shell::quit_requested()` | **done** — retired by gitea [#17](https://git.gobha.me/xcaliber/term-game/issues/17); termforge [#73](https://github.com/gobha-me/termforge/issues/73) shipped `App::running()` in v0.1.14. ⚠ Not a drop-in: see the section below |
+| The selector's gutter marker | **done** — retired by gitea [#17](https://git.gobha.me/xcaliber/term-game/issues/17); termforge [#72](https://github.com/gobha-me/termforge/issues/72) shipped in v0.1.11 and the two columns went back to the list |
 
 ---
 
@@ -213,18 +226,18 @@ Clang builds.
 | [#62](https://github.com/gobha-me/termforge/issues/62) | `Cell` has no text attributes | open — costs Minesweeper a column per cell (63 vs 33 for Hard); commented with that number |
 | [#63](https://github.com/gobha-me/termforge/issues/63) | `Image` has no blit/alpha compositing | open |
 | [#64](https://github.com/gobha-me/termforge/issues/64) | MapWidget (Epic 3.6) | open |
-| [#75](https://github.com/gobha-me/termforge/issues/75) | Mouse tracking mode hardcoded to `?1002h`; no `?1003h`, no way to disable | open — filed from Epic 3; not a blocker |
+| [#75](https://github.com/gobha-me/termforge/issues/75) | Mouse tracking mode hardcoded to `?1002h`; no `?1003h`, no way to disable | **closed — shipped as `Terminal::set_mouse_mode` in v0.1.15, and we are pinned to it — but nothing calls it.** The default, `MouseMode::Drag`, is byte-for-byte what we already emitted, so taking the tag changed nothing. `MouseMode::Motion` is what Minesweeper wants for buttonless hover; deferred to gitea [#18](https://git.gobha.me/xcaliber/term-game/issues/18) because it is a *feel* change and the dev container cannot verify feel |
 | [#71](https://github.com/gobha-me/termforge/issues/71) | `App::run()` skips `teardown()` on a throw | **closed — shipped in v0.1.10, and we are on it** (gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16)). The terminal-restore workaround is gone; our boundary survives as a diagnostic. `test/21exception` asserts the upstream guarantee via `test_winch_hooked()`, `pty-restore` asserts the escape bytes. |
-| [#72](https://github.com/gobha-me/termforge/issues/72) | `ListWidget` selection invisible at the fallback tier | open — gutter marker covers it |
-| [#73](https://github.com/gobha-me/termforge/issues/73) | No way to observe `quit()`; `test_run_frames` re-arms `m_running` | open — `Shell::quit_requested()` covers it |
+| [#72](https://github.com/gobha-me/termforge/issues/72) | `ListWidget` selection invisible at the fallback tier | **closed — shipped in v0.1.11, and we are on it** (gitea [#17](https://git.gobha.me/xcaliber/term-game/issues/17)). Our gutter marker is gone and the two columns went back to the list. The marker is `ListWidget`'s now, on by default and **inside `rect()`**, so a click on it selects — which the workaround could not do. `test/11selector` asserts the glyph in cell text at the ASCII tier, coverage the workaround never had. |
+| [#73](https://github.com/gobha-me/termforge/issues/73) | No way to observe `quit()`; `test_run_frames` re-arms `m_running` | **closed — shipped in v0.1.14, and we are on it** (gitea [#17](https://git.gobha.me/xcaliber/term-game/issues/17)). ⚠ `App::running()` is **not** a drop-in for the accessor it replaced: it is not sticky, and `test_run_frames` still re-arms `m_running` on entry. Assert it *before* the `step()` you needed for a state transition, or it is vacuous. |
 
 Check state with `gh` rather than trusting this table if it looks stale.
 
-### The pin is v0.1.10, and the version request is patch-level
+### The pin is v0.1.15, and the version request is patch-level
 
-`cmake/deps/termforge.cmake` asks `find_package(termforge 0.1.10 …)`, not `0.1`.
+`cmake/deps/termforge.cmake` asks `find_package(termforge 0.1.15 …)`, not `0.1`.
 termforge's package version file is `SameMinorVersion`, so `0.1` accepts *any*
-installed 0.1.x, and that bites in two ways:
+installed 0.1.x, and that bites in three ways:
 
 - **0.1.7** has no `set_tick_hz`, so accepting it turns "your copy is too old,
   falling back to FetchContent" into a wall of compiler errors in `shell.cpp`,
@@ -233,12 +246,26 @@ installed 0.1.x, and that bites in two ways:
   does not restore the terminal when a frame throws. Nothing fails. The only
   symptom is a wedged terminal, on one developer's machine, on the day something
   happens to throw.
+- **0.1.10** compiles, links and runs clean, and shows **no selection marker at
+  all** on the fallback tier. Since gitea #17 the Shell does not draw one — it
+  relies on `ListWidget` doing it, which 0.1.10's cannot. The suite stays green,
+  because no test can see another package's glyphs.
 
-The second is why this matters more than it looks. It is the second time we
-depend on API introduced in a *patch* release and the first where missing it is
-**silent** — a floor at minor granularity would not have caught it in any way.
-(The same argument is in the comment at the top of `cmake/deps/termforge.cmake`;
-those two places should always say the same thing.)
+The last two are why this matters more than it looks: three times now we have
+depended on API introduced in a *patch* release, and twice missing it is
+**silent**. A floor at minor granularity would not have caught any of the three.
+
+⚠ From 0.1.11 this is also an **ABI** floor. That release added members to
+`ListWidget`, and `Shell` holds one *by value* in `arcade/shell.hpp`, which we
+install. A consumer resolving an older 0.1.x compiles our public header against
+a different object layout than `term-game_lib` was built with — no link error,
+just disagreement about a size. Anything held by value in an installed header
+turns the build floor into an ABI floor.
+
+The same argument is in the comment at the top of `cmake/deps/termforge.cmake`,
+and the floor is repeated in `cmake/project-config.cmake.in` for the consumer
+side. **All three places must say the same thing**; the config file used to say
+`0.1` while claiming to match, which is exactly the drift to watch for.
 
 ### `App::run()` used not to restore the terminal on the exception path
 
@@ -281,20 +308,83 @@ that is no longer load-bearing:
   restores the terminal and the test passes even with the upstream guard removed.
   That was found by mutating it, not by reading it.
 
-### `ListWidget` cannot show its selection at the bottom tier
+### `ListWidget` used not to show its selection at the bottom tier
 
 Found building Epic 1's selector, and filed as
 [#72](https://github.com/gobha-me/termforge/issues/72). `ListWidget`'s only
-selection affordance is the `theme::kFocusFg`/`kFocusBg` inversion, its colour
-members are private with no setters, and `FallbackDriver` discards colour
-entirely — so on a bare TTY the selected row is byte-identical to every other
+selection affordance was the `theme::kFocusFg`/`kFocusBg` inversion, its colour
+members were private with no setters, and `FallbackDriver` discards colour
+entirely — so on a bare TTY the selected row was byte-identical to every other
 row. That is the tier this repo promises always works, *and* the tier every
 headless test runs under, since `test_run_frames` installs the fallback driver.
 
-Our workaround is a two-column gutter with a `>` marker, drawn in
-`Shell::draw_selector` from the widget's public `selected()`/`scroll_offset()`.
-It has a deletion date and a known limitation: a click in the gutter lands
-outside `m_list.rect()` and does not select.
+Our workaround was a two-column gutter with a `>` marker, drawn in
+`Shell::draw_selector` from the widget's public `selected()`/`scroll_offset()`,
+with a known limitation: a click in the gutter landed outside `m_list.rect()`
+and did not select.
+
+**Fixed in v0.1.11**, and we are on it (gitea
+[#17](https://git.gobha.me/xcaliber/term-game/issues/17)). Upstream says the
+selection twice — inverted colours *and* a marker glyph in a gutter the widget
+reserves on every row, on by default, sourced from `mark_glyphs(BorderStyle)` so
+it degrades to ASCII with everything else. The Shell's block is gone and the
+list gets its full rect back.
+
+**Handing the two columns back cost the text nothing**, which is worth recording
+because it looks like it should have moved something: `ListWidget` computes
+`text_x = rect.x + gutter_cols()` and `max_w = rect.w - gutter - 1`, so at 60x20
+the item text still starts at x=3 with 19 columns, before and after. Nothing in
+the layout shifted — which is also why no *existing* test could see this change.
+The workaround's limitation is now inverted into a guarantee: upstream's gutter
+is inside `rect()`, so a click on the marker selects its row.
+
+⚠ **`m_list.set_style(style)` is load-bearing.** Only `BorderStyle::Ascii` yields
+`>`; every other family yields `▸` (U+25B8), and the widget's default is
+`Single`. Dropping that one line puts three bytes of UTF-8 on a terminal that has
+told us it cannot draw a box. This is not hypothetical — it is what the pty
+capture showed mid-branch, before the call was added.
+
+**What proves it now**, since the workaround shipped for two epics with *no* test
+at all — `test/11selector` had 13 cases and none of them looked at the marker:
+
+- the selected row differs from an unselected one in **cell text**, not colour,
+  read back through `Screen::at()` under the fallback driver, and the mark moves
+  with the arrow keys.
+- the whole selector screen is 7-bit at the ASCII tier — the only assertion that
+  catches a dropped `set_style`.
+- a click in the marker gutter enters that row's game.
+
+Mutation-tested: dropping `set_style` reddens the marker and 7-bit cases,
+`set_marker_enabled(false)` reddens the marker case, and restoring the old
+`inner.x + 2` shrink reddens the marker and click cases.
+
+### `App` had no way to observe `quit()`
+
+Filed as [#73](https://github.com/gobha-me/termforge/issues/73) while writing
+Epic 1's state-machine tests. `App::quit()` set a private `m_running` with no
+reader, and `test_run_frames` re-arms it on entry, so a headless test could not
+distinguish "Escape quit the app" from "Escape did nothing" — which is the single
+most important regression in that epic. Our workaround was `Shell::quit_requested`,
+a latched bool duplicating state the framework already had.
+
+**Fixed in v0.1.14** (`App::running()`), and we are on it (gitea
+[#17](https://git.gobha.me/xcaliber/term-game/issues/17)).
+
+⚠ **It is not a drop-in, and the difference is silent.** `m_quit_requested` was
+sticky; `running()` is not, because `test_run_frames` still sets `m_running =
+true` on entry. So `running()` answers "did a quit happen during the *last* run",
+not "has one ever happened". Six of the eight call sites inverted directly; two
+asserted *after* a `step()` they needed for a state transition, and there the
+substitution is vacuous — both moved above their step.
+
+Demonstrated rather than argued, by mutating `request_to_menu()` so returning to
+the menu also quits (the state still becomes `Selector`, so only the loop state
+can see it): the assertion before the step goes **red**, the same assertion after
+the step **passes**. `test/11selector`'s trap list carries this, because the two
+early assertions look exactly like something to tidy up.
+
+`test/13tick` needs no reordering and says why: its `run()` is one uninterrupted
+`test_run_frames`, so nothing re-arms `m_running` between `quit()` and the check.
 
 ---
 

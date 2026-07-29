@@ -7,13 +7,28 @@
 // feeds raw bytes through test_pump, so the escape-sequence decoder is covered
 // at least once.
 //
-// ⚠ Two traps for whoever extends this file:
+// ⚠ Four traps for whoever extends this file:
 //
 //   1. Dialog::begin_result()'s latch clears only on the next draw(). A test
 //      that pauses, answers, and pauses again without running a frame in
 //      between will find the second answer silently ignored. Run one frame.
 //   2. ListWidget::rect() is only set inside Shell::on_render, so anything
 //      geometry-dependent needs a frame first.
+//   3. Everything here renders at the ASCII tier. test_run_frames installs a
+//      FallbackDriver, which reports no colour, so the Shell probes
+//      BorderStyle::Ascii and every glyph family resolves to its 7-bit form —
+//      the selection marker is '>' here and '▸' on a capable terminal. That is
+//      the tier worth testing (it is the one the repo promises always works),
+//      but do not write a case that only holds there and call it universal.
+//   4. App::running() is NOT STICKY. test_run_frames sets m_running = true on
+//      entry, so running() answers "did a quit happen during the last run",
+//      not "has one ever happened". Assert it BEFORE the step() you needed for
+//      a state transition; after that step it is true again whatever the
+//      dispatched key did, and REQUIRE(app.running()) passes vacuously. Two
+//      cases below assert it early for exactly that reason — do not tidy them
+//      down beside the other post-step assertions. (Shell::quit_requested()
+//      used to hide this by latching; it was a workaround for termforge #73
+//      and went with gitea #17.)
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -55,6 +70,38 @@ class Probe final : public Shell {
 [[nodiscard]] auto ctrl_c() -> termforge::Event {
   return termforge::Event{termforge::KeyEvent{
       .key = termforge::Key::Char, .ch = U'c', .ctrl = true}};
+}
+
+[[nodiscard]] auto click(int x, int y, int button = 0, bool pressed = true)
+    -> termforge::Event {
+  return termforge::Event{termforge::MouseEvent{
+      .x = x, .y = y, .button = button, .pressed = pressed}};
+}
+
+[[nodiscard]] auto cell_text(Probe& app, int x, int y) -> std::string {
+  return app.screen().at(x, y).text;
+}
+
+// The whole row, as the screen holds it. Blank cells contribute nothing —
+// Screen::fill_rect leaves Cell::text empty rather than writing a space.
+[[nodiscard]] auto row_text(Probe& app, int y) -> std::string {
+  std::string out;
+  for (int x = 0; x < app.screen().cols(); ++x) out += cell_text(app, x, y);
+  return out;
+}
+
+// Every byte of every cell on the screen must be 7-bit. Same helper, same
+// reason, as test/15minesweeper-ui.
+[[nodiscard]] auto all_seven_bit(Probe& app) -> bool {
+  auto& s = app.screen();
+  for (int y = 0; y < s.rows(); ++y) {
+    for (int x = 0; x < s.cols(); ++x) {
+      for (const char c : s.at(x, y).text) {
+        if (static_cast<unsigned char>(c) >= 0x80) return false;
+      }
+    }
+  }
+  return true;
 }
 
 // Looked up rather than hardcoded — the roster will grow, and menu order is
@@ -110,6 +157,80 @@ TEST_CASE("arrow keys move the selection", "[selector]") {
     app.dispatch_event(key(termforge::Key::Up));
     REQUIRE(app.selector_index() == 0);
   }
+}
+
+// ── The selection marker ────────────────────────────────────────────────────
+//
+// Until termforge v0.1.11 the Shell drew this itself, into a two-column gutter
+// it carved out of the list's rect, and NOTHING in this file asserted it. The
+// workaround shipped untested for two epics. Upstream owns the marker now
+// (#72, gitea #17), so these are the cases that should have existed all along —
+// they pin the behaviour, not the implementation, and would have gone red for
+// either one.
+//
+// Geometry, recomputed the way draw_selector does it for the Probe's 60x20:
+// body_y = 1, body_h = h - 3 = 17; with_detail since 60 >= kDetailPaneMinCols;
+// list_w = max(24, 60 * 2 / 5) = 24; so the frame is {0,1,24,17} and its
+// content_rect() is {1,2,22,15}. The marker sits in the gutter's first column.
+constexpr int kMarkX = 1;
+constexpr int kRow0 = 2;
+
+// No comma in this name, deliberately: Catch2 splits a command-line test spec
+// on commas, so a case whose name contains one cannot be run by name.
+TEST_CASE("the selected row is marked in TEXT and not colour",
+          "[selector][mark]") {
+  // ⚠ The point of the whole case. test_run_frames installs a FallbackDriver,
+  // which discards colour outright — so a selection stated only as a theme
+  // inversion is invisible here and on any bare TTY. Asserting on cell text is
+  // what makes "you can see what is selected" a testable claim.
+  Probe app;
+  app.step();
+
+  // Anchor the row rather than trusting the constant: if the layout moves, this
+  // fails loudly instead of quietly comparing two blank cells.
+  REQUIRE(row_text(app, kRow0).find(termgame::all_games().front().meta.title) !=
+          std::string::npos);
+
+  // '>' and not '▸' because the fallback tier is the ASCII tier — mark_glyphs()
+  // keys off BorderStyle, and Shell::draw_selector passes the one it probed.
+  REQUIRE(cell_text(app, kMarkX, kRow0) == ">");
+
+  if (termgame::all_games().size() > 1) {
+    // ⚠ .empty(), not " ". fill_rect leaves Cell::text empty; it does not write
+    // a space. Asserting " " here fails against a correct implementation.
+    REQUIRE(cell_text(app, kMarkX, kRow0 + 1).empty());
+
+    app.dispatch_event(key(termforge::Key::Down));
+    app.step();
+    REQUIRE(cell_text(app, kMarkX, kRow0).empty());
+    REQUIRE(cell_text(app, kMarkX, kRow0 + 1) == ">");
+  }
+}
+
+TEST_CASE("the selector screen is 7-bit at the ASCII tier", "[selector][mark]") {
+  // The only thing that catches a dropped m_list.set_style(style). ListWidget
+  // defaults to BorderStyle::Single, whose marker is '▸' (U+25B8) — three bytes
+  // of UTF-8 on a terminal that has told us it cannot draw a box. Observed on a
+  // pty during gitea #17, not hypothesised.
+  Probe app;
+  app.step();
+  REQUIRE(all_seven_bit(app));
+}
+
+TEST_CASE("a click in the marker gutter selects its row", "[selector][mark]") {
+  // The workaround's known limitation, inverted into a guarantee. Its gutter
+  // was carved out of the list's rect, so a click at kMarkX missed the widget
+  // entirely and did nothing; upstream's gutter is inside rect(). This case is
+  // red under the old geometry, where the list began at x = 3.
+  Probe app;
+  app.step();
+  REQUIRE(app.state() == Shell::State::Selector);
+
+  app.dispatch_event(click(kMarkX, kRow0));
+  REQUIRE(app.state() == Shell::State::InGame);
+  REQUIRE(app.current_game() != nullptr);
+  REQUIRE(app.current_game()->meta().slug ==
+          termgame::all_games().front().meta.slug);
 }
 
 TEST_CASE("real escape sequences reach the list", "[selector]") {
@@ -168,16 +289,16 @@ TEST_CASE("Escape quits in the selector but returns to the menu in a game",
   {
     Probe app;
     app.step();
-    REQUIRE_FALSE(app.quit_requested());
+    REQUIRE(app.running());
     app.dispatch_event(key(termforge::Key::Escape));
-    REQUIRE(app.quit_requested());
+    REQUIRE_FALSE(app.running());
   }
   {
     Probe app;
     enter_game(app);
     app.dispatch_event(key(termforge::Key::Escape));
     REQUIRE(app.state() == Shell::State::Selector);
-    REQUIRE_FALSE(app.quit_requested());
+    REQUIRE(app.running());
     app.step();
     REQUIRE(app.current_game() == nullptr);
   }
@@ -188,13 +309,13 @@ TEST_CASE("Ctrl+C quits from every state", "[selector][escape]") {
     Probe app;
     app.step();
     app.dispatch_event(ctrl_c());
-    REQUIRE(app.quit_requested());
+    REQUIRE_FALSE(app.running());
   }
   {
     Probe app;
     enter_game(app);
     app.dispatch_event(ctrl_c());
-    REQUIRE(app.quit_requested());
+    REQUIRE_FALSE(app.running());
   }
   {
     // The interesting one: App::dispatch_event routes Ctrl+C past the overlay
@@ -206,7 +327,7 @@ TEST_CASE("Ctrl+C quits from every state", "[selector][escape]") {
     app.dispatch_event(ch(U'p'));
     REQUIRE(app.state() == Shell::State::Paused);
     app.dispatch_event(ctrl_c());
-    REQUIRE(app.quit_requested());
+    REQUIRE_FALSE(app.running());
   }
 }
 
@@ -257,11 +378,16 @@ TEST_CASE("the pause dialog's Menu answer returns to the selector",
 
   // ConfirmDialog's unconditional Y hotkey = the "yes" button, labelled "Menu".
   app.dispatch_event(ch(U'y'));
+
+  // ⚠ BEFORE the step, not after — see trap 4. "Menu" must return to the
+  // selector, not quit the app, and the step below re-arms m_running and would
+  // hide it if it did.
+  REQUIRE(app.running());
+
   app.step();
   REQUIRE(app.state() == Shell::State::Selector);
   REQUIRE(app.current_game() == nullptr);
   REQUIRE(app.overlay_count() == 0);
-  REQUIRE_FALSE(app.quit_requested());
 }
 
 TEST_CASE("a game can end itself", "[selector][lifetime]") {
@@ -304,9 +430,14 @@ TEST_CASE("the selector survives entering and leaving repeatedly",
   for (int i = 0; i < 5; ++i) {
     enter_game(app);
     app.dispatch_event(key(termforge::Key::Escape));
+
+    // ⚠ BEFORE the step — see trap 4. Escape inside a game means "back to the
+    // menu", never "quit", and that is the escape rule this whole file exists
+    // to pin. Asserted after the step it is vacuous on every iteration.
+    REQUIRE(app.running());
+
     app.step();
     REQUIRE(app.state() == Shell::State::Selector);
     REQUIRE(app.current_game() == nullptr);
-    REQUIRE_FALSE(app.quit_requested());
   }
 }
