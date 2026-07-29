@@ -7,7 +7,7 @@
 // feeds raw bytes through test_pump, so the escape-sequence decoder is covered
 // at least once.
 //
-// ⚠ Two traps for whoever extends this file:
+// ⚠ Four traps for whoever extends this file:
 //
 //   1. Dialog::begin_result()'s latch clears only on the next draw(). A test
 //      that pauses, answers, and pauses again without running a frame in
@@ -20,6 +20,15 @@
 //      the selection marker is '>' here and '▸' on a capable terminal. That is
 //      the tier worth testing (it is the one the repo promises always works),
 //      but do not write a case that only holds there and call it universal.
+//   4. App::running() is NOT STICKY. test_run_frames sets m_running = true on
+//      entry, so running() answers "did a quit happen during the last run",
+//      not "has one ever happened". Assert it BEFORE the step() you needed for
+//      a state transition; after that step it is true again whatever the
+//      dispatched key did, and REQUIRE(app.running()) passes vacuously. Two
+//      cases below assert it early for exactly that reason — do not tidy them
+//      down beside the other post-step assertions. (Shell::quit_requested()
+//      used to hide this by latching; it was a workaround for termforge #73
+//      and went with gitea #17.)
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -280,16 +289,16 @@ TEST_CASE("Escape quits in the selector but returns to the menu in a game",
   {
     Probe app;
     app.step();
-    REQUIRE_FALSE(app.quit_requested());
+    REQUIRE(app.running());
     app.dispatch_event(key(termforge::Key::Escape));
-    REQUIRE(app.quit_requested());
+    REQUIRE_FALSE(app.running());
   }
   {
     Probe app;
     enter_game(app);
     app.dispatch_event(key(termforge::Key::Escape));
     REQUIRE(app.state() == Shell::State::Selector);
-    REQUIRE_FALSE(app.quit_requested());
+    REQUIRE(app.running());
     app.step();
     REQUIRE(app.current_game() == nullptr);
   }
@@ -300,13 +309,13 @@ TEST_CASE("Ctrl+C quits from every state", "[selector][escape]") {
     Probe app;
     app.step();
     app.dispatch_event(ctrl_c());
-    REQUIRE(app.quit_requested());
+    REQUIRE_FALSE(app.running());
   }
   {
     Probe app;
     enter_game(app);
     app.dispatch_event(ctrl_c());
-    REQUIRE(app.quit_requested());
+    REQUIRE_FALSE(app.running());
   }
   {
     // The interesting one: App::dispatch_event routes Ctrl+C past the overlay
@@ -318,7 +327,7 @@ TEST_CASE("Ctrl+C quits from every state", "[selector][escape]") {
     app.dispatch_event(ch(U'p'));
     REQUIRE(app.state() == Shell::State::Paused);
     app.dispatch_event(ctrl_c());
-    REQUIRE(app.quit_requested());
+    REQUIRE_FALSE(app.running());
   }
 }
 
@@ -369,11 +378,16 @@ TEST_CASE("the pause dialog's Menu answer returns to the selector",
 
   // ConfirmDialog's unconditional Y hotkey = the "yes" button, labelled "Menu".
   app.dispatch_event(ch(U'y'));
+
+  // ⚠ BEFORE the step, not after — see trap 4. "Menu" must return to the
+  // selector, not quit the app, and the step below re-arms m_running and would
+  // hide it if it did.
+  REQUIRE(app.running());
+
   app.step();
   REQUIRE(app.state() == Shell::State::Selector);
   REQUIRE(app.current_game() == nullptr);
   REQUIRE(app.overlay_count() == 0);
-  REQUIRE_FALSE(app.quit_requested());
 }
 
 TEST_CASE("a game can end itself", "[selector][lifetime]") {
@@ -416,9 +430,14 @@ TEST_CASE("the selector survives entering and leaving repeatedly",
   for (int i = 0; i < 5; ++i) {
     enter_game(app);
     app.dispatch_event(key(termforge::Key::Escape));
+
+    // ⚠ BEFORE the step — see trap 4. Escape inside a game means "back to the
+    // menu", never "quit", and that is the escape rule this whole file exists
+    // to pin. Asserted after the step it is vacuous on every iteration.
+    REQUIRE(app.running());
+
     app.step();
     REQUIRE(app.state() == Shell::State::Selector);
     REQUIRE(app.current_game() == nullptr);
-    REQUIRE_FALSE(app.quit_requested());
   }
 }

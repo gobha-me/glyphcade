@@ -60,16 +60,6 @@ class Shell : public termforge::App {
     return m_game.get();
   }
 
-  // ⚠ Workaround with a deletion date. App::m_running is private with no
-  // accessor, AND test_run_frames() re-arms it on entry — so a headless test
-  // cannot distinguish "Escape quit the app" from "Escape did nothing". That
-  // distinction is this epic's headline regression (see the escape rule above),
-  // so it gets an observable of its own. Filed upstream; delete this and the
-  // m_quit_requested member when App can report its own run state.
-  [[nodiscard]] auto quit_requested() const noexcept -> bool {
-    return m_quit_requested;
-  }
-
   // The Epic 1 acceptance criterion "the registry lists every linked game",
   // expressed as something a test can read. ListWidget::item_count() is not
   // reachable through a private member.
@@ -105,7 +95,6 @@ class Shell : public termforge::App {
   GameContext m_ctx;
   std::unique_ptr<Game> m_game;  // null unless InGame or Paused
   bool m_release_game{false};    // deferred destruction; see apply_transitions
-  bool m_quit_requested{false};
   bool m_caps_synced{false};
   int m_detail_index{-1};  // the index the detail pane was last built for
   std::string m_notice;    // most recent ErrorEvent, shown in the footer
