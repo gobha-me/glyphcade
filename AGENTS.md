@@ -299,6 +299,26 @@ ceiling of ~60 on the same window. **Counting a glyph is the measurement** — d
 not try to read a frame rate out of the capture directly, and remember the
 renderer diffs, so only cells that changed are rewritten.
 
+⚠ **Pick a glyph that belongs to ONE thing.** Snake's `@@` is only ever the head,
+so the count is steps. Tetris' `##` is the whole active piece, so its count is
+steps x cells-repainted and only its ORDER OF MAGNITUDE means anything — 28
+repaints over 8 s at a 1000 ms gravity is about seven steps of a four-cell piece,
+which is right, and a per-step number would need a glyph only one cell uses.
+
+**Checking that a game got the keyboard tier it asked for.** Since gitea #32 a
+game declares a `KeyboardMode` in its `kMeta` and the Shell sets it per entry, so
+the request is visible in the byte stream:
+
+```bash
+grep -c $'\033\[>27u' /tmp/pty.raw    # 1 == Enhanced pushed on game entry
+grep -aoc $'\033\[=0;1u' /tmp/pty.raw # 1 == restored to Legacy on the way out
+grep -c $'\033\[<u' /tmp/pty.raw      # 1 == popped by leave_screen
+```
+
+⚠ **A run with no game that asks for a tier is the control**, and it is not
+optional: all three counts must be **zero** there, or the evidence says nothing
+about the game you entered.
+
 ⚠ To reconstruct a whole screen from a capture, replay the CUP sequences AND
 handle `\r`/`\n`. A replay that ignores them silently drops rows and looks
 exactly like a game that failed to draw.
