@@ -73,7 +73,7 @@ struct Fingerprint {
 
 // Generated from the implementation and committed as text. Regenerate by
 // rendering each spec at kRate and recomputing the four quantities below.
-constexpr std::array<Fingerprint, 10> kFingerprints{{
+constexpr std::array<Fingerprint, 11> kFingerprints{{
     {.name = "Click", .frames = 1152, .peak = 0.078125F, .rms = 0.038033F,
      .zero_crossings = 31},
     {.name = "Reveal", .frames = 1536, .peak = 0.067755F, .rms = 0.017765F,
@@ -98,6 +98,12 @@ constexpr std::array<Fingerprint, 10> kFingerprints{{
      .zero_crossings = 805},
     {.name = "Merge", .frames = 3360, .peak = 0.083696F, .rms = 0.028580F,
      .zero_crossings = 90},
+    // Added with Snake. A narrow-duty square sweeping 880 -> 1320 Hz over 50 ms,
+    // so ~108 crossings. Measured, not guessed: the same render-and-measure pass
+    // that produced this row reproduced Slide's and Merge's committed values
+    // exactly, which is the only reason to trust it.
+    {.name = "Eat", .frames = 2400, .peak = 0.078125F, .rms = 0.042784F,
+     .zero_crossings = 108},
 }};
 
 static_assert(kFingerprints.size() == kSfxIds.size(),
