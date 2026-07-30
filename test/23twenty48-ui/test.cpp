@@ -304,10 +304,27 @@ TEST_CASE("the status counters never overwrite the outcome word",
 
     const std::string status = row_text(app, 0);
     REQUIRE(status.find("PLAYING") != std::string::npos);
-    // Whole fields are dropped rather than truncated, so a partial number never
-    // appears: if "score" is present its digits are too.
-    if (status.find("score") != std::string::npos) {
-      REQUIRE(status.find("score 999999") != std::string::npos);
+
+    // ⚠ EVERY field that appears must appear in full, not just the first one.
+    //
+    // An earlier version checked only "score", and mutation testing showed that
+    // was not enough: with the reserved gap removed, the counters ran into the
+    // word and — because the word is drawn last and wins — "moves 0" was left
+    // rendered as "moves" with its digits eaten, while "score 999999" and
+    // "PLAYING" both survived intact. The case passed on a visibly broken row.
+    //
+    // A half-written counter is worse than a missing one: a missing field reads
+    // as a narrow terminal, a truncated number reads as a wrong score. So the
+    // contract is whole-fields-or-nothing, and this is what holds the budget
+    // arithmetic to it.
+    for (const auto& [label, full] :
+         std::vector<std::pair<std::string, std::string>>{
+             {"score", "score 999999"},
+             {"best", "best 131072"},
+             {"moves", "moves 0"}}) {
+      if (status.find(label) != std::string::npos) {
+        REQUIRE(status.find(full) != std::string::npos);
+      }
     }
   }
 }

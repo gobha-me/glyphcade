@@ -277,17 +277,23 @@ auto Twenty48::draw_status(termforge::Screen& screen) -> void {
   }
   const int word_x = std::max(0, screen.cols() - static_cast<int>(word.size()));
 
-  // ⚠ The state word is placed FIRST and the counters are then fitted into what
-  // is left, rather than the other way round. Screen::write_text clips at the
-  // screen edge but not against text already on the row, so drawing the counters
-  // first produced `movesPLAYING` at 40 columns — observed in a headless render,
-  // not theorised. The word is the one thing on this row that must never be
-  // damaged: at the bottom tier it is the ONLY carrier of win and loss.
+  // ⚠ THE BUDGET is what stops the two halves of this row colliding, and it is
+  // the load-bearing part. Screen::write_text clips at the screen edge but NOT
+  // against text already on the row, so an unbounded left-hand string produced
+  // `movesPLAYING` at 40 columns — observed in a headless render, not theorised.
   //
-  // Fields are appended only while they still fit, widest-useful-first, so the
-  // row degrades by dropping whole fields instead of truncating a number — a
-  // half-written score reads as a rendering bug, and a wrong one reads as a
-  // scoring bug.
+  // Fields are appended only while they still fit inside word_x, so the row
+  // degrades by dropping WHOLE fields rather than truncating a number. That
+  // distinction matters: a missing field reads as a narrow terminal, while a
+  // half-written one reads as a wrong score.
+  //
+  // ⚠ Drawing the word AFTER the counters is deliberate but is NOT the fix, and
+  // mutation testing is what established the difference — swapping the two draws
+  // changes nothing, because the budget already guarantees they cannot overlap.
+  // The order only decides which text loses if the budget arithmetic is ever
+  // wrong, and the word must win: at the bottom tier it is the ONLY carrier of
+  // win and loss, whereas a clipped counter is merely ugly. So this is a chosen
+  // failure mode, not a second guard — do not read it as one.
   std::string left;
   const int budget = word_x - 2;  // one blank column between the two
   for (const std::string& field :
