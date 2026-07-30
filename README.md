@@ -46,7 +46,7 @@ graphics from a stdlib-only C++23 API.
 | 2 | Minesweeper ✓ | mouse routing, grid rendering |
 | 3 | 2048 ✓ | tween animation |
 | 4 | Snake ✓ | real-time tick |
-| 5 | Tetris | held-key feel |
+| 5 | Tetris ✓ | held-key feel, the kitty keyboard protocol |
 | 6 | Sokoban | tile maps |
 | 7 | Solitaire | Kitty sprites, mouse drag-and-drop |
 

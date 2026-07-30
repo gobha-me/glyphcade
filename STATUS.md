@@ -2,7 +2,7 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-07-30** (gitea #32 — the keyboard seam)
+**Last updated: 2026-07-30** (gitea #7 — Epic 6, Tetris)
 
 ---
 
@@ -96,22 +96,27 @@ roster asks for anything but `Legacy`, so all three games behave identically.
 See "What the keyboard seam is" below — including the three mutations that went
 green, two of which were claims written into a comment.
 
-**Next move: Epic 6 (Tetris)** — and it is the roster's fourth entry, which is
-the condition two deferrals below have been waiting on.
+**Epic 6 has landed. There are four games, and one of them wants a keyboard
+tier.** Tetris is registered, with full SRS rotation and both wall-kick tables,
+a seven-bag randomiser, hold, a three-piece preview, a ghost, lock delay with
+move resets, T-spins and combos. gitea
+[#7](https://git.gobha.me/xcaliber/term-game/issues/7) is closed. See "What Epic
+6 built" below.
 
-⚠ **Three registered games is not four.** The selector's deferred scrollbar
-assertion (see "What the v0.2.2 bump brought") still cannot run: at 58x20 the
-list pane holds three entries without overflowing. Epic 6 is the one that turns
-it on.
+⚠ What is verified is rules, geometry, rendering, five clocks and sound-intent.
+**Feel is not**, and this game has more of it than any other: whether 170 ms DAS
+and 50 ms ARR are right, whether a 40 ms soft drop is right (the reference has
+no rate at all, so that number is ours and unheard-of), whether two-column cells
+play well, and whether `Lock`, `Tetris` and `LevelUp` sound like anything.
 
-⚠ **And a fourth game is not sufficient either** — this was measured while
-planning Epic 6 and corrects the paragraph above. The selector's interior list
-rows are `h - 5`, and `test/11selector`'s `Probe::step()` hardcodes **60x20**,
-i.e. 15 rows. Four entries overflow only when `h - 5 < 4`, that is at
-**`rows == 8`** — the Shell's floor exactly. So Epic 6 must *also* give
-`Probe::step()` a size parameter, as `test/15minesweeper-ui` and
-`test/26snake-ui` already have, and render at 20x8. Registering the game alone
-turns nothing on.
+⚠ **And the arm that matters most is the one nothing here can reach.** Tetris is
+the first game to declare `KeyboardMode::Enhanced`, and this container's terminal
+has no kitty keyboard protocol — so every headless case, every pty capture and
+every CI run exercises the **degraded** path. The held path is covered on the
+model, where `HoldSupport` is a parameter, and nowhere else.
+
+**Next move: Epic 7 (Sokoban) or Epic 8 (Solitaire)** — both ready, neither
+blocked, pick by appetite. #64 and #63 shipped and are taken.
 
 Since Epic 3, two housekeeping issues have landed.
 gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16) moved the pin to
@@ -141,7 +146,7 @@ together, so it is worth stating once rather than leaving implied.
 | 3 — Minesweeper | **done** | — |
 | 4 — 2048 | **done** | — |
 | 5 — Snake | **ready** | — |
-| 6 — Tetris | **ready, and the seam is built** | ~~termforge #60~~ — shipped in **v0.1.19…v0.2.2** and taken. `KeyboardMode::Enhanced` gives real `KeyAction::Repeat`/`Release`; DAS is now expressible rather than inferred from OS auto-repeat. gitea **#32** built the seam that reaches it: declare `Enhanced` in `kMeta` and the Shell does the rest. ⚠ Still degradable: a terminal without the kitty protocol never delivers `Release` — and note the notice is **ours**, not upstream's, because `App::setup()` has already run by the time a game entry sets the mode. Tetris must fall back to discrete steps **knowingly** |
+| 6 — Tetris | **done** | ~~termforge #60~~ — shipped in **v0.1.19…v0.2.2** and taken. `KeyboardMode::Enhanced` gives real `KeyAction::Repeat`/`Release`; DAS is now expressible rather than inferred from OS auto-repeat. gitea **#32** built the seam that reaches it: declare `Enhanced` in `kMeta` and the Shell does the rest. ⚠ Still degradable: a terminal without the kitty protocol never delivers `Release` — and note the notice is **ours**, not upstream's, because `App::setup()` has already run by the time a game entry sets the mode. Tetris must fall back to discrete steps **knowingly** |
 | 7 — Sokoban | **ready** | ~~termforge #64 → #63~~ — both shipped, and **taken**: `MapWidget` v1 at v0.1.19, `Image` sub-rect blit at v0.1.18 |
 | 8 — Solitaire | **ready** | ~~termforge #63~~ — shipped, and **taken** at v0.1.18 |
 
@@ -160,6 +165,169 @@ exception path), [#72](https://github.com/gobha-me/termforge/issues/72)
 `8f62930`; the build-tree `export(EXPORT ...)` block no longer exists, so there
 was nothing for us to delete. See
 [docs/cpp-template-audit.md](docs/cpp-template-audit.md) for what those cost us.
+
+---
+
+## What Epic 6 built (gitea #7)
+
+Tetris, in five headers and two TUs — Snake's shape, plus one:
+
+- **[`pieces.hpp`](include/termgame/games/tetris/pieces.hpp)** — the seven
+  tetrominoes' four rotations and both SRS kick tables. **Its own header because
+  it is the one part of the reference taken verbatim**, and that boundary is
+  worth seeing in a file list. Two `static_assert`s: every state has exactly
+  four cells, and nothing is set outside a piece's own bounding box (kick
+  offsets are relative to that box, so a stray cell moves every kick).
+- **[`board.hpp`](include/termgame/games/tetris/board.hpp)** — the rules and all
+  five clocks. No termforge header, so `test/27tetris` *cannot* reach a Screen.
+- **[`layout.hpp`](include/termgame/games/tetris/layout.hpp)** — 10x20 cells at
+  two columns each, plus a 12-column panel. **35x24 needed.**
+- **[`glyphs.hpp`](include/termgame/games/tetris/glyphs.hpp)** — two tiers, three
+  `static_assert`s.
+- **[`tetris.hpp`](include/termgame/games/tetris/tetris.hpp)** — the `Game`, and
+  the only file that knows `Screen`, `Event` or `GameContext` exist.
+
+### 24 rows: the first game that does not fit in twenty
+
+Minesweeper Hard is 63x20, 2048 is 29x19, Snake is 58x20. A Tetris well is
+twenty cells tall *before* any chrome, so this one needs **24** — the classic
+80x24 exactly, with nothing to spare, which is also the UI probes' default size.
+Any chrome beyond the status and hint rows and it stops fitting the terminal
+most people still have.
+
+gitea [#15](https://git.gobha.me/xcaliber/term-game/issues/15) (a minimum size
+in `GameMeta`) is deferred a **fourth** time, and the answer is the same as the
+other three games': a game-owned "does not fit" screen.
+
+### Five accumulators, and none of them is the one AGENTS.md bans
+
+Gravity, lock delay, shift auto-repeat, soft-drop repeat and the line-clear
+freeze all turn a fixed 1/60 s `dt` into events at rates 60 Hz cannot express —
+gravity alone runs 1000 ms down to 50 ms. Snake established the distinction for
+one; this game has five and a `Repeater` type to hold them. The table in "What
+Epic 5 built" is still the reference.
+
+⚠ **The lock clock is credited only time from ticks that BEGAN with the piece
+grounded.** Otherwise one coarse tick both lands a piece and expires its 500 ms
+delay, and the player gets no slide window. In production `dt` is 1/60 s so the
+difference is one frame — but a rule that is only true at one `dt` will surprise
+someone, and a mutation proved no case could see it until one drove coarsely.
+
+### DAS, and the arm this container cannot reach
+
+`HoldSupport` is a **parameter of the model**, not a guess inside the view.
+Without the kitty keyboard protocol no `Release` ever arrives, so "held" and
+"pressed again" are the same event and DAS is not reconstructible — auto-
+repeating anyway would slide the piece on a key the player let go of.
+
+The degraded arm is **visible in the hint row**, not merely raised as an
+`ErrorEvent`: that notice lands on the selector's footer, which nobody is
+looking at while playing.
+
+⚠ **Every check in this repo runs on the degraded arm.** `test_run_frames`
+installs a `FallbackDriver` whose capabilities are all false, and no terminal
+here implements the protocol. The held arm is covered on the model and nowhere
+else.
+
+### Nine reference defects, fixed rather than ported
+
+The rotation data is good; the control flow is not.
+
+| Reference | Ours |
+|---|---|
+| `game.js:66` — `lockPiece` ends with `canHold = false`, nothing ever sets it true, so **hold works once per game** and the box is greyed out afterwards | re-armed on lock |
+| `game.js:347` — gravity **assigns** the frame timestamp instead of subtracting the interval. Byte for byte Snake's `game.js:78` | accumulate and subtract |
+| `game.js:420-422` — soft drop runs **every frame**: ~60 cells/s and a point per cell per frame | a real repeat rate (40 ms, ours — the reference has none) |
+| `game.js:103-123` — **T-spin has no rotation gate**, is evaluated after the piece is written and before rows clear, and its mini branch is dead code | a rotation flag, evaluated before the clear, mini by front corners and kick index |
+| `renderer.js:101` — the line-clear animation's progress is written twice, read once, **incremented nowhere**: a 300 ms freeze that draws nothing. The 2048 slide, again | a dt-driven flash over rows still on the board |
+| `game.js:18-21` — no spawn buffer, and the lock loop `return`s **mid-write**, leaving the board half-updated | two hidden rows; a lock always completes |
+| `state.js` — spawn never resets the drop clock, so a fresh piece can fall on its first frame | reset on spawn |
+| `game.js:308-311` — **hold does not validate** the swapped-in piece | the whole swap is refused if it does not fit |
+| `README.md` — the speed table is **off by one level** from its own `getDropInterval` (it says level 10 is 196 ms; the code gives 231) | the table was generated from the CODE |
+
+**Stripped**, on the 2048 power-tile and Snake multiplayer precedent: the
+particle system and the neon canvas presentation. Both are rendering flourishes
+with no glyph analogue, and neither participates in a rule.
+
+### Seven pieces, five glyphs
+
+The reference tells its seven tetrominoes apart **by colour alone**, and
+`FallbackDriver` discards colour — the trap Snake recorded one epic earlier for
+three cells. But the answer is not seven glyphs: once a piece is locked, *which*
+piece left a block carries no information a player can act on. What must be
+distinguishable is empty / stack / active / ghost / clearing, and that is what
+the tier provides. Colour still varies per piece where it is free.
+
+### One key or two
+
+**Two**: `best_score_start{1,5,10}` and `best_lines_start{1,5,10}`. Snake refused
+`best_length` because length and score were affine restatements of each other.
+Here a tetris scores four times a single for the same four rows and both drops
+pay points, so a patient endurance run and a short high-scoring one genuinely
+disagree — 2048's `best_score` + `best_tile` argument. **Level is not
+persisted**: it is `lines/10`, which *is* the restatement.
+
+⚠ The key carries the **start level**, for Snake's wrap reason: beginning at 10
+hands the player the multiplier immediately.
+
+### Audio: three new ids, not the seven the issue lists
+
+Move and rotate are `Click`, a hard drop is `Slide`, a one-to-three line clear is
+`Merge`, a top-out is `Lose`. Only `Lock`, `Tetris` and `LevelUp` had nothing in
+the bank that already meant them.
+
+⚠ **Gravity and auto-shift are silent.** A piece falls several times a second
+with no input, and DAS fires every 50 ms while a key is held — a sound on either
+is a metronome. The argument that kept `Spawn` out of 2048 and `Step` out of
+Snake, applying twice over in one game.
+
+⚠ `Tetris` is a **separate spec**, not a pitched-up `Merge`: transposing by a
+ratio needs `exp`, the portability trap the synth exists to avoid. All three
+fingerprints were **generated by measurement**, and the same pass reproduced all
+eleven committed rows byte for byte before these were read off it.
+
+### Four of seventeen mutations went green
+
+| Mutation | Finding |
+|---|---|
+| Kick **y-sign flipped** | ⚠ green. The case covering it asserted an *x* displacement, and every kick it could reach had `y == 0` — while its own comment claimed only a real kick could see the sign. There is now a case whose successful kick is I's `{1, 2}`, lifting the piece two rows out of a one-wide well |
+| **Gravity clock not reset on spawn** | ⚠ green. The case banked 900 ms of a 1000 ms interval and ticked 50 — which does not step *either way*. It banks 990 now |
+| **Lock clock credited the landing tick** | ⚠ green. Every lock case drove at 60 Hz, where the difference is one frame. The new case drives 1600 ms in one go |
+| **`score_key()` returning `start1` for start level five** | ⚠ green. The keying case used 1 and 10 and never evaluated the middle branch — **exactly Snake's finding one epic ago**. All three keys now |
+
+Two were compile errors by design: making the ghost glyph equal the active one
+trips the distinctness `static_assert`, and deleting the status row's width
+budget leaves it unused under `-Werror`.
+
+⚠ **The status-row budget mutation was RED on the first try**, after going green
+in two consecutive epics. The fix that memory carried forward — sweep widths
+*narrower than the game's own minimum*, because the status row is drawn whether
+or not the board fits — was applied from the first draft. 24, 28, 30 and 34 are
+all below `kNeedCols`.
+
+⚠ The harness itself gained a fix: it **rebuilds after restoring** the mutated
+file. It had been leaving `build/` holding the mutated binary, so the next
+ordinary `ctest` reported the mutation's failures as though they were the tree's.
+
+### What a fourth game actually turned on
+
+Two deferrals shared one written condition — "revisit at four roster entries" —
+and **only one of them was really waiting on it**.
+
+- **The wheel's positive half** and **the list's scrollbar glyphs** genuinely
+  needed a roster longer than the pane. They also needed something the condition
+  did not mention: interior list rows are `h - 5`, so four entries overflow only
+  at **`rows == 8`**, and `test/11selector`'s probe hardcoded 60x20. The fourth
+  game *and* a size parameter on that probe are what made them reachable.
+- **The detail pane's scrollbar was never 7-bit at all**, and needed no fourth
+  game — only a window short enough for a description to overflow. termforge
+  v0.2.1 gave the shared scrollbar to `ListWidget`, `TableWidget` **and**
+  `TextBox`; `draw_selector` set the style on the list, with a comment about the
+  scrollbar, and never set it on the pane. It painted U+2502 and U+2588 onto
+  terminals that had just reported no colour, for two releases.
+
+A deferral's stated condition is a hypothesis about *why* something is
+untestable. It can be right about the mechanism and wrong about the trigger.
 
 ---
 
