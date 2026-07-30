@@ -22,11 +22,20 @@ constexpr termforge::Rgb kAccent{0x00, 0xFF, 0x80};
 //   Press   — the key went down. Also what OS auto-repeat looks like without
 //             the kitty keyboard protocol.
 //   Repeat  — the key is being held. termforge sends this INSTEAD OF a second
-//             Press, and documents that a widget treating it like a press keeps
-//             hold-to-scroll and hold-to-type. Gate Repeat out and holding Down
-//             in the selector stops scrolling the menu the moment any game asks
-//             for Enhanced — a regression with no error message.
+//             Press, so a consumer that treats it like a press keeps
+//             hold-to-scroll and hold-to-type.
 //   Release — the key came up. Never delivered under KeyboardMode::Legacy.
+//
+// ⚠ HONEST SCOPE, because mutation testing corrected an earlier claim here.
+// For the three keys this gate actually protects — Ctrl+C, Escape and 'p' —
+// Press and Repeat are behaviourally identical, so `== Press` would pass every
+// case in the suite. Hold-to-scroll in the menu is NOT protected by this
+// function: arrows reach ListWidget through m_ring.handle_key, which upstream
+// already makes Release-proof itself (focus_ring.cpp:50). What breaks the menu
+// is `== Press` TOGETHER WITH hoisting this call above the ring — each half is
+// invisible, the pair is not, and test/11selector's repeated-arrow case is
+// there for the pair. Keep the narrower predicate: it drops exactly the event
+// class that is new and wrong, and claims nothing about held keys.
 //
 // ⚠ It reads as dead code and is not. No game on the roster asks for anything
 // but Legacy today, so no Release can reach this function yet; the moment one
