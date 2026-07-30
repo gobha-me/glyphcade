@@ -41,6 +41,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
+#include <string_view>
 
 #include <termforge/core/types.hpp>
 
@@ -58,8 +59,15 @@ class Probe final : public Shell {
 
   Probe() { set_frame_ms(0); }  // see the comment in test/10render
 
-  auto step(int frames = 1) -> void {
-    test_run_frames(frames, 60, 20, &m_sink);
+  // ⚠ THE SIZE IS A PARAMETER, and that is what turned two deferrals on.
+  // Interior list rows are h - 5, so a roster overflows its pane only when
+  // h - 5 < entries — at four games that is rows == 8, the Shell's own floor
+  // and nowhere else. Hardcoded at 60x20 this probe could never reach it, so
+  // "revisit at four roster entries" was necessary but not sufficient: the
+  // fourth game AND this parameter are what make the wheel's positive half and
+  // the scrollbar's 7-bit sweep reachable. See STATUS.md.
+  auto step(int frames = 1, int cols = 60, int rows = 20) -> void {
+    test_run_frames(frames, cols, rows, &m_sink);
   }
 
  private:
@@ -169,12 +177,16 @@ class Probe final : public Shell {
 
 // Looked up rather than hardcoded — the roster will grow, and menu order is
 // registry order.
-[[nodiscard]] auto minesweeper_index() -> int {
+[[nodiscard]] auto game_index(std::string_view slug) -> int {
   const auto games = termgame::all_games();
   for (std::size_t i = 0; i < games.size(); ++i) {
-    if (games[i].meta.slug == "minesweeper") return static_cast<int>(i);
+    if (games[i].meta.slug == slug) return static_cast<int>(i);
   }
   return -1;
+}
+
+[[nodiscard]] auto minesweeper_index() -> int {
+  return game_index("minesweeper");
 }
 
 [[nodiscard]] auto game_of(const Shell& shell) -> const termgame::Minesweeper* {
@@ -857,24 +869,184 @@ TEST_CASE("a released key still reaches the running game",
 
 TEST_CASE("the keyboard tier is the game's, and is given back on the way out",
           "[selector][keyboard]") {
-  // Every entry in the roster today declares Legacy, so this asserts the
-  // identity case: entering and leaving a game must not move the tier. It is
-  // the regression guard for the OTHER direction of gitea #32 — a Shell that
-  // set Enhanced globally, or that forgot to restore, would fail here the
-  // moment the first game asks for a tier, which is exactly when nobody would
-  // be looking at this file.
-  for (const auto& entry : termgame::all_games()) {
-    REQUIRE(entry.meta.keyboard == termforge::KeyboardMode::Legacy);
-  }
-
+  // ⚠ THIS CASE CHANGED SHAPE WHEN TETRIS LANDED, and the way it changed is the
+  // point. gitea #32 shipped the mode-switching branch with NO consumer: every
+  // roster entry declared Legacy, deleting either set_keyboard_mode left the
+  // whole suite green, and the branch had to be red-verified in a pty by
+  // flipping a game to Enhanced in a scratch tree. This is that flip, made
+  // permanent and legitimate by a game that genuinely wants the tier.
+  //
+  // So: a game that asks gets it, a game that does not is unaffected, and the
+  // selector is back on Legacy either way. Minesweeper is the control — without
+  // it, "entering a game sets Enhanced" would also pass if the Shell simply set
+  // Enhanced on every entry, which is the bug the per-game field exists to
+  // prevent.
   Probe app;
   REQUIRE(app.keyboard_mode() == termforge::KeyboardMode::Legacy);
 
+  // The control: a Legacy game must not move the tier.
   enter_game(app);
   REQUIRE(app.keyboard_mode() == termforge::KeyboardMode::Legacy);
-
   app.dispatch_event(key(termforge::Key::Escape));
   app.step();
   REQUIRE(app.state() == Shell::State::Selector);
   REQUIRE(app.keyboard_mode() == termforge::KeyboardMode::Legacy);
+
+  // And the consumer.
+  const int index = game_index("tetris");
+  REQUIRE(index >= 0);
+  REQUIRE(termgame::all_games()[static_cast<std::size_t>(index)].meta.keyboard ==
+          termforge::KeyboardMode::Enhanced);
+
+  while (app.selector_index() < index) {
+    app.dispatch_event(key(termforge::Key::Down));
+  }
+  app.dispatch_event(key(termforge::Key::Enter));
+  REQUIRE(app.state() == Shell::State::InGame);
+  REQUIRE(app.keyboard_mode() == termforge::KeyboardMode::Enhanced);
+
+  app.dispatch_event(key(termforge::Key::Escape));
+  app.step();
+  REQUIRE(app.state() == Shell::State::Selector);
+  // ⚠ The half that is easy to omit. A Shell that set the tier and never
+  // restored it would pass every assertion above and leave the selector — and
+  // then every Legacy game entered after it — reading CSI-u.
+  REQUIRE(app.keyboard_mode() == termforge::KeyboardMode::Legacy);
 }
+
+TEST_CASE("a terminal without the protocol is told, once, on entry",
+          "[selector][keyboard]") {
+  // The other half of gitea #32 that only a consumer can reach: upstream emits
+  // its fallback ErrorEvent from App::setup(), which has long returned by the
+  // time a game entry sets a mode, so the Shell has to raise its own.
+  //
+  // ⚠ This asserts the DEGRADED arm, and it is the only arm anything here can
+  // reach: test_run_frames installs a FallbackDriver whose capabilities() are
+  // all false, so kitty_keyboard is false and the notice must fire. A terminal
+  // that HAS the protocol is not testable from this container at all.
+  const int index = game_index("tetris");
+  REQUIRE(index >= 0);
+
+  Probe app;
+  app.step();
+  while (app.selector_index() < index) {
+    app.dispatch_event(key(termforge::Key::Down));
+  }
+  app.dispatch_event(key(termforge::Key::Enter));
+  REQUIRE(app.state() == Shell::State::InGame);
+
+  // The notice reaches the selector's notice row, which is h - 2 — the LAST row
+  // is the key hints. Reading rows() - 1 finds the hints and an empty search,
+  // which is indistinguishable from "the notice never fired".
+  app.dispatch_event(key(termforge::Key::Escape));
+  app.step();
+  const std::string notice = row_text(app, app.screen().rows() - 2);
+  REQUIRE(notice.find("kitty keyboard protocol") != std::string::npos);
+
+  // ⚠ The control. Without it this case would still pass if the Shell raised
+  // the notice on EVERY game entry rather than only for one that asked for a
+  // tier it could not have — which is the more likely mistake, since the
+  // capability is false for every game here.
+  const int mines = minesweeper_index();
+  REQUIRE(mines >= 0);
+  Probe other;
+  other.step();
+  while (other.selector_index() < mines) {
+    other.dispatch_event(key(termforge::Key::Down));
+  }
+  other.dispatch_event(key(termforge::Key::Enter));
+  other.dispatch_event(key(termforge::Key::Escape));
+  other.step();
+  const std::string quiet = row_text(other, other.screen().rows() - 2);
+  REQUIRE(quiet.find("kitty keyboard protocol") == std::string::npos);
+}
+
+// ── What the fourth game turned on ──────────────────────────────────────────
+//
+// Both cases below were deferred with a condition, in this file and in
+// STATUS.md, from the v0.2.2 pin bump onward: "revisit when the roster reaches
+// four entries". Tetris is the fourth.
+//
+// ⚠ The condition as written was necessary but NOT sufficient, and that was
+// measured rather than noticed. The selector's interior list rows are h - 5, so
+// four entries overflow only when h - 5 < 4, i.e. at rows == 8 — the Shell's
+// floor exactly, and a size the probe could not reach until step() took one.
+// Registering a fourth game and stopping there would have left both assertions
+// as unreachable as they were before.
+
+TEST_CASE("a wheel notch scrolls the view without moving the selection",
+          "[selector][wheel]") {
+  // ⚠ THE POSITIVE HALF of termforge v0.2.0's wheel change (#35), which this
+  // file has only ever been able to assert the negative of. Before #35 a notch
+  // was set_selected(selected ± 3); now it is a view offset, and the selection
+  // stays put and may scroll out of sight. The negative half — that the
+  // selection does NOT move and no MenuMove sounds — has been asserted since
+  // the bump. This is the half that needs a roster longer than the pane.
+  if (termgame::all_games().size() < 4) return;
+
+  using termgame::audio::SfxId;
+  Probe app;
+  app.step(1, 60, 8);  // three interior rows, four entries: it overflows
+
+  REQUIRE(app.selector_index() == 0);
+  const auto moves = app.audio().play_count(SfxId::MenuMove);
+
+  // ⚠ Coordinates inside the list, and after a frame — traps 2 and 5. A wheel
+  // event outside the list's rect never reaches the list at all.
+  app.dispatch_event(wheel(kMarkX, kRow0, false));
+
+  REQUIRE(app.selector_index() == 0);
+  REQUIRE(app.audio().play_count(SfxId::MenuMove) == moves);
+}
+
+TEST_CASE("the scrollbar is 7-bit when the roster overflows the pane",
+          "[selector][render]") {
+  // ⚠ THE SECOND, PREVIOUSLY INVISIBLE REASON m_list.set_style(style) is
+  // load-bearing in draw_selector. termforge v0.2.1 gave ListWidget a
+  // one-column scrollbar that reads its track and thumb from
+  // scrollbar_glyphs(style) — keyed off the SAME BorderStyle enum as the
+  // selection marker, so it is '|' and '#' under Ascii and '│' and '█' under
+  // every other family.
+  //
+  // Until a roster overflowed its pane no scrollbar was ever drawn at any size
+  // the 7-bit sweep could reach, so "the bottom-tier case passes without that
+  // line" was not evidence of anything. It is now.
+  if (termgame::all_games().size() < 4) return;
+
+  Probe app;
+  app.step(1, 60, 8);
+  REQUIRE(all_seven_bit(app));
+
+  // And the strip is actually there to have been checked — otherwise this is
+  // the same vacuous pass it has been for three epics. The ASCII thumb is '#',
+  // which appears nowhere else on this screen: the Ascii frame family draws
+  // '+', '-' and '|'.
+  bool thumb = false;
+  for (int y = 0; y < app.screen().rows(); ++y) {
+    if (row_text(app, y).find('#') != std::string::npos) thumb = true;
+  }
+  REQUIRE(thumb);
+}
+
+TEST_CASE("the detail pane's scrollbar is 7-bit too", "[selector][render]") {
+  // ⚠ A REAL BUG, found by the case above rather than by reading. termforge
+  // v0.2.1 gave the shared scrollbar to ListWidget, Table AND TextBox;
+  // draw_selector set the style on the list and not on the detail pane, so the
+  // pane painted '│' and '█' onto a terminal that had just reported no colour.
+  //
+  // ⚠ It had been in the tree since the v0.2.2 bump and needed no fourth game
+  // to be reachable — only a window short enough for a description to overflow,
+  // which is a thing a real player has and a hardcoded 60x20 probe does not.
+  // Two deferrals shared one condition and only one of them was actually
+  // waiting on it.
+  //
+  // Short and WIDE: the detail pane only exists at >= 48 columns, so a case
+  // that narrowed the window instead would remove the pane and assert nothing.
+  for (const int rows : {8, 9, 10, 12}) {
+    Probe app;
+    app.step(1, 60, rows);
+    INFO("rows = " << rows);
+    REQUIRE(all_seven_bit(app));
+  }
+}
+

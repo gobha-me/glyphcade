@@ -24,6 +24,7 @@
 
 #include <termgame/games/minesweeper/minesweeper.hpp>
 #include <termgame/games/snake/snake.hpp>
+#include <termgame/games/tetris/tetris.hpp>
 #include <termgame/games/twenty48/twenty48.hpp>
 
 namespace termgame {
@@ -40,6 +41,7 @@ constexpr GameEntry kGames[] = {
     {Minesweeper::kMeta, &make_game<Minesweeper>},
     {Twenty48::kMeta, &make_game<Twenty48>},
     {Snake::kMeta, &make_game<Snake>},
+    {Tetris::kMeta, &make_game<Tetris>},
 };
 
 // ── The table checks itself ─────────────────────────────────────────────────

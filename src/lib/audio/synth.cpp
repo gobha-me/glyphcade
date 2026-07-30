@@ -20,7 +20,7 @@ namespace {
 // tuned bank — expect the maintainer to move them after listening, and treat
 // the fingerprints in test/18audio-synth as recording what IS, not what should
 // be.
-constexpr std::array<SfxSpec, 11> kBank{{
+constexpr std::array<SfxSpec, 14> kBank{{
     // Click — the generic acknowledgement. Short, dry, unobtrusive.
     {.wave = Wave::Square,
      .freq_start_hz = 660,
@@ -157,6 +157,48 @@ constexpr std::array<SfxSpec, 11> kBank{{
              .release_ms = 28},
      .gain_q8 = 20,
      .duty_q8 = 96},
+
+    // Lock (Tetris) — a piece settling. FALLING, where every other positive
+    // event in the bank rises, because a lock is a thing coming to rest rather
+    // than a thing achieved. Low and very short: it fires once per piece, which
+    // at level 10 is every couple of seconds, so anything longer or brighter
+    // would dominate a game whose other sounds are rarer than it.
+    {.wave = Wave::Triangle,
+     .freq_start_hz = 220,
+     .freq_end_hz = 165,
+     .duration_ms = 45,
+     .env = {.attack_ms = 1, .decay_ms = 8, .sustain_q8 = 140,
+             .release_ms = 30},
+     .gain_q8 = 16,
+     .duty_q8 = 128},
+
+    // Tetris (Tetris) — four rows at once, the one moment the game celebrates.
+    // The longest and highest thing in the bank after Win, and allowed to be:
+    // clearing four is rare enough that it can afford to interrupt.
+    //
+    // ⚠ NOT a pitched-up Merge. Same interval, freshly specified, because
+    // transposing a spec by a ratio is what needs exp().
+    {.wave = Wave::Square,
+     .freq_start_hz = 659,
+     .freq_end_hz = 1319,
+     .duration_ms = 180,
+     .env = {.attack_ms = 2, .decay_ms = 30, .sustain_q8 = 190,
+             .release_ms = 90},
+     .gain_q8 = 26,
+     .duty_q8 = 112},
+
+    // LevelUp (Tetris) — every ten lines, so several times a run. Deliberately
+    // NOT Win, which is 320 ms and is the only sound in the bank allowed to be
+    // long and pretty: a Win-length fanfare firing every ten lines would be the
+    // thing a player turns the sound off to escape.
+    {.wave = Wave::Triangle,
+     .freq_start_hz = 440,
+     .freq_end_hz = 880,
+     .duration_ms = 90,
+     .env = {.attack_ms = 2, .decay_ms = 20, .sustain_q8 = 175,
+             .release_ms = 50},
+     .gain_q8 = 22,
+     .duty_q8 = 128},
 }};
 
 static_assert(kBank.size() == kSfxIds.size(),
