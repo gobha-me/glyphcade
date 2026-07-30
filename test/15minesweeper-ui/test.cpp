@@ -1055,6 +1055,54 @@ TEST_CASE("a best time outlives the game that set it", "[minesweeper][scores]") 
   REQUIRE(screen_contains(app, "BEST 003"));
 }
 
+TEST_CASE("a slower win does not replace a faster one", "[minesweeper][scores]") {
+  // ⚠ THE CASE THAT MAKES Better::Lower LOAD-BEARING AT THIS LAYER. Every other
+  // minesweeper case here records exactly one win per level, so the direction
+  // never gets to matter — record with Better::Higher instead and they all stay
+  // green. This is the one that notices, and it is the direction a naive design
+  // gets backwards: for a TIME, smaller wins.
+  Probe app;
+  Minesweeper* g = enter_game(app);
+
+  arm_win(g);
+  for (int i = 0; i < 7 * Shell::kTickHz / 2; ++i) {
+    g->tick(std::chrono::duration<double>{1.0 / Shell::kTickHz});
+  }
+  finish_win(app);
+  app.step();
+  REQUIRE(app.scores().get("minesweeper", "best_time_easy") == 3);
+
+  // A second, slower game on the same level.
+  app.dispatch_event(ch(U'n'));  // new game, same difficulty
+  app.step();
+  Minesweeper* again = game_of(app);
+  REQUIRE(again != nullptr);
+  arm_win(again);
+  for (int i = 0; i < 20 * Shell::kTickHz; ++i) {
+    again->tick(std::chrono::duration<double>{1.0 / Shell::kTickHz});
+  }
+  REQUIRE(again->board().seconds() >= 20);
+  finish_win(app);
+  app.step();
+
+  REQUIRE(app.scores().get("minesweeper", "best_time_easy") == 3);
+  REQUIRE(screen_contains(app, "BEST 003"));
+
+  // ...and a faster one does replace it, so the case is not passing merely
+  // because nothing is ever written twice.
+  app.dispatch_event(ch(U'n'));
+  app.step();
+  Minesweeper* third = game_of(app);
+  REQUIRE(third != nullptr);
+  arm_win(third);
+  third->tick(std::chrono::duration<double>{1.0 / Shell::kTickHz});
+  finish_win(app);
+  app.step();
+
+  REQUIRE(app.scores().get("minesweeper", "best_time_easy") == 0);
+  REQUIRE(screen_contains(app, "BEST 000"));
+}
+
 TEST_CASE("each difficulty keeps its own best time", "[minesweeper][scores]") {
   // ⚠ What proves the key is per-LEVEL rather than per-game. Collapse time_key()
   // to a single constant and this is the case that notices: Medium would inherit
@@ -1107,8 +1155,17 @@ TEST_CASE("the outcome word survives a fourth status field on a narrow board",
   // ⚠ THE REGRESSION THIS ROW'S REWRITE EXISTS FOR. draw_status() used to build
   // its left half unconditionally and drop the WORD when the two collided — the
   // opposite priority from 2048's, and the reason a fourth field could not simply
-  // be appended. Restore the old `if (x > left.size())` guard and "YOU WIN"
-  // disappears here while every wide-terminal case stays green.
+  // be appended. Restore that whole shape (unconditional left, word skipped on
+  // collision) and "YOU WIN" disappears here while every wide-terminal case
+  // stays green. Verified by mutation, not assumed.
+  //
+  // ⚠ It is THE BUDGET that is load-bearing, not the unconditional final
+  // write_text of the word. Putting the old `if (word_x > left.size())` guard
+  // back on top of the budget changes nothing and no test notices — correctly,
+  // because the budget already caps left at word_x - 2, so the guard can never
+  // fire. That is the same finding twenty48.cpp records about its draw ORDER:
+  // once the arithmetic is right, the second mechanism is decoration, and two
+  // mechanisms for one property is how a test comes to pass on a broken row.
   //
   // At the no-colour tier the word is the only thing that says the game is over;
   // a dropped counter is merely a narrow terminal.
