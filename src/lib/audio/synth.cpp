@@ -20,7 +20,7 @@ namespace {
 // tuned bank — expect the maintainer to move them after listening, and treat
 // the fingerprints in test/18audio-synth as recording what IS, not what should
 // be.
-constexpr std::array<SfxSpec, 14> kBank{{
+constexpr std::array<SfxSpec, 15> kBank{{
     // Click — the generic acknowledgement. Short, dry, unobtrusive.
     {.wave = Wave::Square,
      .freq_start_hz = 660,
@@ -198,6 +198,25 @@ constexpr std::array<SfxSpec, 14> kBank{{
      .env = {.attack_ms = 2, .decay_ms = 20, .sustain_q8 = 175,
              .release_ms = 50},
      .gain_q8 = 22,
+     .duty_q8 = 128},
+
+    // Seat (Sokoban) — a crate landing on its goal. A short rising triangle
+    // pair's worth of motion in one note: it has to feel like something
+    // clicking into place, and it fires up to six times a level rather than
+    // once, so it is nearer Reveal's weight than Win's.
+    //
+    // ⚠ Not the same spec as LevelUp with a different duration. LevelUp rises
+    // an octave over 90 ms and is the sound of a threshold; this rises a fifth
+    // over 55 ms and is the sound of a fit. They are adjacent in the bank and
+    // must not be confusable, which is exactly what the fingerprint test in
+    // test/18audio-synth pins.
+    {.wave = Wave::Triangle,
+     .freq_start_hz = 520,
+     .freq_end_hz = 784,
+     .duration_ms = 55,
+     .env = {.attack_ms = 2, .decay_ms = 14, .sustain_q8 = 165,
+             .release_ms = 28},
+     .gain_q8 = 21,
      .duty_q8 = 128},
 }};
 

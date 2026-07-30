@@ -2,7 +2,7 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-07-30** (gitea #7 — Epic 6, Tetris)
+**Last updated: 2026-07-30** (gitea #8 — Epic 7, Sokoban)
 
 ---
 
@@ -96,6 +96,36 @@ roster asks for anything but `Legacy`, so all three games behave identically.
 See "What the keyboard seam is" below — including the three mutations that went
 green, two of which were claims written into a comment.
 
+**Epic 7 has landed. There are five games, and one of them draws its board with
+a widget instead of writing cells.** Sokoban is registered — twenty levels in
+the standard Sokoban charset, push rules, unlimited undo, a move and a push
+counter, per-level best scores, and deadlock detection the reference does not
+have at all. gitea
+[#8](https://git.gobha.me/xcaliber/term-game/issues/8) is closed. See "What Epic
+7 built" below.
+
+Every game already uses `Frame` for its chrome, but this is the first whose
+PLAYFIELD is a termforge widget — `MapWidget` — rather than a loop writing cells
+into the `Screen` itself. That was the point: gitea #8 made feedback into
+termforge [#64](https://github.com/gobha-me/termforge/issues/64) a deliverable of
+this epic, and hand-drawing tiles would have validated nothing. `MapWidget`'s
+glyph tier is now **spent**. Four pieces of API friction came out of it, each
+commented at the site that pays for it in
+[sokoban.cpp](src/lib/games/sokoban/sokoban.cpp).
+
+⚠ What is verified is rules, geometry, rendering at both tiers, the parser, the
+deadlock detector and sound-intent. **Feel is not**: whether pushing crates is
+pleasant, whether two-column tiles read square, whether the camera lurch on a
+level larger than the window is comfortable, and whether `Seat` sounds like
+anything. Nothing in this container can judge any of them.
+
+⚠ **And the camera — the thing this epic exists to validate — is not exercised
+by the level pack.** The largest bundled level is 12x11 tiles, which fits any
+normal terminal with room to spare, so in ordinary play the camera pins to 0,0
+and never moves. It is reached only by a window smaller than the level, which is
+what `test/32sokoban-ui` drives. Saying "we validated the coordinate model" on
+the strength of twenty levels that never scroll would be untrue.
+
 **Epic 6 has landed. There are four games, and one of them wants a keyboard
 tier.** Tetris is registered, with full SRS rotation and both wall-kick tables,
 a seven-bag randomiser, hold, a three-piece preview, a ghost, lock delay with
@@ -115,8 +145,13 @@ has no kitty keyboard protocol — so every headless case, every pty capture and
 every CI run exercises the **degraded** path. The held path is covered on the
 model, where `HoldSupport` is a parameter, and nowhere else.
 
-**Next move: Epic 7 (Sokoban) or Epic 8 (Solitaire)** — both ready, neither
-blocked, pick by appetite. #64 and #63 shipped and are taken.
+**Next move: Epic 8 (Solitaire)**, the flagship and the last of the roster — but
+read the upstream note below before starting it. ⚠ termforge is now at **v0.5.1**,
+four tags past our pin, and `MapWidget`'s **sprite tier still does not exist at
+any tag**. Its two gates (#83/#84) lifted and the design doc was updated to say
+so, but no code followed. Epic 8's premise — cards as pixel sprites — needs that
+tier or an `Image`-and-`draw_image` path written by hand. The pin bump itself is
+its own issue, not part of an epic; see "Upstream has moved four tags" below.
 
 Since Epic 3, two housekeeping issues have landed.
 gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16) moved the pin to
@@ -126,13 +161,55 @@ exception-boundary section below for what survived it and why. gitea
 **v0.1.15**, and retired **both remaining workarounds**: the selector's gutter
 marker and `Shell::quit_requested()`.
 
-**There are now no workarounds left in this repo.** Three termforge issues were
-filed from building it — [#71](https://github.com/gobha-me/termforge/issues/71),
+That left **no workarounds in this repo** for three releases. Three termforge
+issues were filed from building it —
+[#71](https://github.com/gobha-me/termforge/issues/71),
 [#72](https://github.com/gobha-me/termforge/issues/72) and
 [#73](https://github.com/gobha-me/termforge/issues/73) — all three were fixed
-upstream, and all three of our stopgaps are gone, each on the deletion condition
-it was written with. That loop closing is the thesis of running the two projects
+upstream, and all three of our stopgaps went, each on the deletion condition it
+was written with. That loop closing is the thesis of running the two projects
 together, so it is worth stating once rather than leaving implied.
+
+⚠ **Epic 7 adds one back, and it is counted rather than quietly absorbed.**
+`Sokoban::handle_mouse` re-derives `MapWidget`'s camera, tile size and floored
+viewport extent in app code, because the widget has no `tile_at(cell_x, cell_y)`
+and its `viewport_tiles()` is private. There is no way to hit-test a tile map
+without it. **Deletion condition: termforge grows a tile-picking accessor** — it
+is listed under "Future work" in `docs/map-widget.md`, so upstream already
+intends to. Commented at the site, and item 2 of the feedback below. Saying "we
+have no workarounds" while carrying one would be the kind of claim this file
+exists to prevent.
+
+---
+
+## Upstream has moved four tags past our pin, and it changes nothing here
+
+Checked at the start of Epic 7, because this project has now found the blocking
+picture staler than the issue describing it four times. termforge is at
+**v0.5.1**; we pin **v0.2.2**.
+
+Reading the tags rather than their titles:
+
+| tag | what it is | reaches us? |
+|---|---|---|
+| v0.3.0 | #83/#84 — `draw_image(Rect cells, …)`, `preferred_pixel_extent`, `draw_pixels` returns a borrowed `const Image*` | **no.** Breaking only for a `TerminalDriver` implementor or a `draw_pixels` override; we have neither |
+| v0.4.0 | #69 — `Widget::on_tick(dt)`, and `ProgressBar`/`Button` animation became **wall-clock** | ⚠ **silently, if we ever hold either.** `App` keeps no widget registry, so a widget nobody ticks stops animating: a press flash sticks on, a pulse stands still. No compile error |
+| v0.5.0 | #122 — `Widget::reset_transient()` at a Dialog showing boundary | no |
+| v0.5.1 | #123 — container overloads for `route_mouse`/`tick_widgets`, and `route_mouse` now skips nulls | no |
+
+**`MapWidget` and `Image` are byte-identical from v0.2.2 to v0.5.1** — `git diff`
+over `map_widget.*`, `image.cpp`, `image_loader.*` and their suites is empty. So
+the bump buys Epic 7 nothing, and it was deliberately not bundled into it: the
+whole signal of a pin bump is "nothing else moved", and burying it in an epic
+destroys that. Same reasoning that made gitea #24 its own issue.
+
+⚠ **The `MapWidget` sprite tier still does not exist at any tag.** Its gates
+(#83/#84) landed and `docs/map-widget.md` was updated to record that they had —
+but no implementation followed. **Epic 8 (Solitaire) is written against cards as
+pixel sprites**, so the first thing that epic must do is decide between waiting
+on upstream, driving `Image`/`draw_image` directly from game code, or shipping
+the glyph tier first. That is a real planning input and it is not visible from
+the issue.
 
 ---
 
@@ -145,13 +222,12 @@ together, so it is worth stating once rather than leaving implied.
 | 2 — Audio engine | **done** | — |
 | 3 — Minesweeper | **done** | — |
 | 4 — 2048 | **done** | — |
-| 5 — Snake | **ready** | — |
+| 5 — Snake | **done** | — |
 | 6 — Tetris | **done** | ~~termforge #60~~ — shipped in **v0.1.19…v0.2.2** and taken. `KeyboardMode::Enhanced` gives real `KeyAction::Repeat`/`Release`; DAS is now expressible rather than inferred from OS auto-repeat. gitea **#32** built the seam that reaches it: declare `Enhanced` in `kMeta` and the Shell does the rest. ⚠ Still degradable: a terminal without the kitty protocol never delivers `Release` — and note the notice is **ours**, not upstream's, because `App::setup()` has already run by the time a game entry sets the mode. Tetris must fall back to discrete steps **knowingly** |
-| 7 — Sokoban | **ready** | ~~termforge #64 → #63~~ — both shipped, and **taken**: `MapWidget` v1 at v0.1.19, `Image` sub-rect blit at v0.1.18 |
-| 8 — Solitaire | **ready** | ~~termforge #63~~ — shipped, and **taken** at v0.1.18 |
+| 7 — Sokoban | **done** | ~~termforge #64 → #63~~ — both shipped and **taken**. `MapWidget` v1 (glyph tier) is now SPENT: Sokoban is its first consumer, and the four pieces of API friction it found are listed in "What Epic 7 built" |
+| 8 — Solitaire | **ready, with a caveat** | ~~termforge #63~~ — `Image` sub-rect blit and alpha shipped at v0.1.18 and are taken. ⚠ But `MapWidget`'s **sprite tier does not exist at any tag through v0.5.1**, and the cards-as-sprites premise wants it. Not a block — `Image` plus `draw_image` is reachable from game code — but it is a design decision this epic must make first, not inherit |
 
-**Nothing upstream blocks any epic.** That is true for the first time since the
-project started, and it is what gitea
+**Nothing upstream blocks any epic.** That has been true since gitea #24, and it is what gitea
 [#24](https://git.gobha.me/xcaliber/term-game/issues/24) bought. termforge
 [#27](https://github.com/gobha-me/termforge/issues/27) (install/export),
 [#58](https://github.com/gobha-me/termforge/issues/58) (frame pacing),
@@ -167,6 +243,271 @@ was nothing for us to delete. See
 [docs/cpp-template-audit.md](docs/cpp-template-audit.md) for what those cost us.
 
 ---
+
+## What Epic 7 built (gitea #8)
+
+Sokoban, in six headers and three TUs — Tetris' five-header shape plus a
+level-pack header, and one more TU than any other game:
+
+- **[`level.hpp`](include/termgame/games/sokoban/level.hpp)** + **`level.cpp`** —
+  the standard Sokoban charset (`#` `@` `$` `.` `*` `+` and space) and a `parse()`
+  that is total: it returns a `ParseError`, never throws, and refuses seven kinds
+  of malformed level. **Its own header and its own TU** because the format is
+  separable from the rules — a level is validated once, at load, and nothing
+  looks at a character again — and because it is the only part of this game a
+  future level-FILE loader would reuse unchanged.
+- **[`levels.hpp`](include/termgame/games/sokoban/levels.hpp)** — the twenty maps,
+  verbatim from the reference. Its own header for the same reason
+  `tetris/pieces.hpp` is: it is the part taken verbatim, and that boundary is
+  worth seeing in a file list. **The pars are not verbatim** — see below.
+- **[`board.hpp`](include/termgame/games/sokoban/board.hpp)** + **`board.cpp`** —
+  push rules, undo, counters, win detection, deadlock detection. No termforge
+  header, so `test/31sokoban` *cannot* reach a `Screen`.
+- **[`layout.hpp`](include/termgame/games/sokoban/layout.hpp)** — a viewport rect
+  for a camera, not a coordinate per cell. **34x12 needed.**
+- **[`glyphs.hpp`](include/termgame/games/sokoban/glyphs.hpp)** — two tiers, three
+  `static_assert`s.
+- **[`sokoban.hpp`](include/termgame/games/sokoban/sokoban.hpp)** — the `Game`,
+  and the only file that knows `Screen`, `Event`, `MapWidget` or `GameContext`
+  exist.
+
+### The first game with no clock, and the first with no fixed board size
+
+Snake has one accumulator, 2048 one tween, Tetris five — and every one of them
+shipped a bug a test found. Sokoban advances only when a key is pressed, so
+there is no `tick()` override at all. What takes the clock's place as the thing
+most likely to be wrong is **undo**, and it is a `{Dir, bool pushed}` record
+rather than the reference's full board copy per move (`game.js:216-224`): a push
+is reversible by construction, so three bytes invert a move exactly. That is the
+difference between "unlimited undo" as a promise and as a leak.
+
+It is also the first game whose board size is not a compile-time constant. There
+are twenty of them, and a camera covers the difference.
+
+### Nine reference defects, and the pars are the interesting one
+
+The push rules in `sokoban/js/game.js` are correct; the value of this port is
+everywhere around them.
+
+| # | Reference | Here |
+|---|---|---|
+| 1 | **Ragged rows walk the player out of the level.** `isValid` bounds columns with `board[0].length` (`:213`) while `render` walks `board[r].length` (`:124`) — and the published corpus has trailing spaces trimmed, so rows *are* ragged. A short row yields `undefined`, and `undefined !== WALL` passes | padded to a rectangle at parse time, **and** off-grid reads answer `Wall` |
+| 2 | **No deadlock detection whatsoever.** Push a crate into a corner and it lets you keep playing a level that cannot be won | a frozen-crate detector, announced in the hint row |
+| 3 | **`levelComplete` is set on one path and cleared on another.** Dismissing the celebration overlay by clicking its backdrop (`:304-306`) leaves a frozen board with undo AND reset greyed out — and on level 20 there is no Next to escape with | no such flag; undo and reset stay live after a win |
+| 4 | **A pre-solved level can never be won.** `checkWin()` is reachable only from `move()` (`:209`) | evaluated in the constructor too |
+| 5 | **The persisted level index is never range-checked.** `loadLevel` returns before its first `render()` for an out-of-range index (`:88`), leaving a blank board and no message — and that level set has been replaced wholesale twice in its own git history | the resume point is **derived** from the score store, so it cannot go stale; `load()` clamps |
+| 6 | **Boxes and goals are never counted against each other.** `checkWin` scans only for a remaining `$` (`:251-256`), so more goals than boxes wins with empty goals showing | a parse error |
+| 7 | **Two players is a silent choice** — the scan keeps the last match (`:97-104`) | a parse error |
+| 8 | **Player-on-goal is invisible.** `.cell.target::after` and `.cell.player::after` decorate the same pseudo-element with equal specificity (`style.css:248`, `:311`), so standing on a goal erases its marker | its own glyph in both tiers, enforced by the distinctness `static_assert` |
+| 9 | **"New Best!" fires on a tie** (`:280`), because the record is only overwritten on a strict improvement | monotone `Better::Lower`, and no banner claims otherwise |
+
+### The pars: dead data, and wrong
+
+The reference ships a `par` on every level and its README says they are "derived
+from the optimal solution length". Neither half survives contact. `par` is never
+read anywhere in `game.js` — twenty numbers ship as dead data — and every one of
+the twenty was BFS-solved for the true minimum move count before `levels.hpp` was
+written:
+
+| lvl | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| ref | 5 | 8 | 8 | 9 | 12 | 12 | **16** | **14** | **14** | **18** |
+| true | 3 | 5 | 5 | 6 | 8 | 11 | **17** | **16** | **15** | **19** |
+
+| lvl | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| ref | **14** | **26** | **26** | 26 | **28** | 30 | 36 | 36 | 36 | 40 |
+| true | **16** | **41** | **34** | 26 | **37** | 28 | 35 | 36 | 36 | 38 |
+
+**Three are right** (14, 18, 19), nine are loose, and **eight are below the
+mathematical minimum for their own level** — targets no sequence of moves can
+reach, in a game where par is the only thing telling a player how they did. The
+reference cites its verifier as `/tmp/sokoban_design.py`, a path outside its own
+repository, so the claim was never reproducible either.
+
+We ship the measured numbers, and `test/31sokoban` re-derives the tutorial five
+with a BFS at test time so the method is checkable rather than asserted. The
+four-crate levels take minutes to solve and are deliberately left out of that
+case, which is said out loud rather than papered over.
+
+⚠ Second epic running where the reference's **documentation** was the wrong half
+— Tetris' README speed table was off by one level from its own code. **Generate
+from code, not from prose.**
+
+### What MapWidget's first consumer found
+
+Four pieces of friction, each commented at the site that pays for it. None was a
+blocker; all four are worth having before the API freezes, which is what gitea #8
+volunteered us for.
+
+1. **`set_map_size()` wipes every layer** while its own comment says it preserves
+   the overlapping corner "like `Screen::resize` does". Loading a level must
+   therefore size first and populate second, and a second call with identical
+   dimensions still throws the map away.
+2. **There is no `tile_at(cell_x, cell_y)`.** Turning a click into a tile means
+   re-deriving `camera()`, the tile size and the floored viewport extent out in
+   app code — the widget's own private `viewport_tiles()`. That is precisely the
+   arithmetic the design doc says an app should not do, in the paragraph
+   explaining why the widget owns the camera.
+3. **Tile id 0 means transparent and `kEmptyId` is private**, so the convention
+   is one a consumer must know rather than name. Our `Tile` enum starts at 1.
+4. **`TileDef::glyph` is documented as one grapheme**, but tile size is declared
+   in CELLS and the doc calls non-square the expected case. A `{2,1}` tile with a
+   one-grapheme glyph is half glyph and half background fill. Two-column strings
+   work — `write_text` lays out text — but the contract does not say so.
+
+⚠ And the sprite tier **still does not exist at any tag**, v0.2.2 through v0.5.1.
+Its gates lifted and the doc was updated to say so; no code followed. That is
+Epic 8's problem, not this one's.
+
+### A control run corrected AGENTS.md
+
+Sokoban declares `KeyboardMode::Legacy`, which makes it the natural **control**
+for the pty recipe Epic 6 added — a real game that asks for nothing. Running that
+control is what showed the recipe itself was wrong.
+
+Three captures, side by side:
+
+| run | `ESC[>27u` push | `ESC[=0;1u` restore | `ESC[<u` pop |
+|---|---|---|---|
+| selector only, no game | 0 | 0 | **1** |
+| Sokoban only | 0 | 0 | **1** |
+| Tetris only | 1 | 1 | 1 |
+
+AGENTS.md said all **three** counts must be zero in the control. The third never
+can be: `ESC[<u` comes from `detail::kLeaveSequence`, a fixed string literal that
+`Terminal::leave_screen()` emits unconditionally, so it is 1 in every run
+including one that never enters a game. A control that fails by construction is
+worse than no control — it invites someone to go "fix" a game that is behaving
+correctly. Corrected in AGENTS.md, with the measurement beside it.
+
+⚠ The first two counts are exactly the evidence they were meant to be: Sokoban
+is byte-identical to the no-game control, and Tetris is the positive control
+proving the measurement can see a push at all.
+
+### 34x12: a floor that is an opinion, not arithmetic
+
+Minesweeper needs 63x20 because Hard is 30 cells wide. Snake needs 58x20, Tetris
+35x24. Every one of those is a consequence: the board has one size and the
+terminal either has room or does not.
+
+Sokoban has a camera, so **there is no size at which a level cannot be drawn** —
+a level larger than the window scrolls. What is left is a floor on being
+*playable*: below about sixteen tiles across you cannot see enough of a room to
+plan a push. That is a judgement.
+
+gitea [#15](https://git.gobha.me/xcaliber/term-game/issues/15) is therefore
+deferred a **fifth** time, and for a new reason rather than the same one. A
+`GameMeta::min_cols` would sit Minesweeper's 63 — derivable — next to Sokoban's
+34 — an opinion — and invite the selector to treat them as the same kind of fact.
+The four earlier deferrals said "not yet"; this one says the field is the wrong
+shape.
+
+### Audio: one new id, the fewest of any game
+
+gitea #8 asks for "step, push, crate-on-goal, level complete" and gets **one**
+new `SfxId`. A step is `Click` (the most generic gesture in the suite), a push is
+`Slide` (already 2048's slide and Tetris' hard drop), and finishing is `Win`.
+Only seating a crate on its goal had nothing that meant it — and it is not
+`Merge`, because nothing combines and nothing vanishes.
+
+⚠ There is deliberately no sound for a **blocked** move. A player walking into a
+wall is holding a direction, so a rejection tone fires as fast as the key
+repeats. That is the metronome argument for the fourth game running.
+
+### Scores: one key family, and a count that is derived
+
+Twenty keys, `best_moves_01` … `best_moves_20`, `Better::Lower`, as a **table**
+rather than the twenty-arm switch the other games' three-way enums would suggest.
+The property the switch was protecting is kept: the key is the level's ordinal,
+never its display name, so renaming "Two Texts" cannot orphan a record.
+
+There is no `solved_count` key. It is **derived** by counting levels that have a
+record, which is also what makes "resume at the first unsolved level" impossible
+to desynchronise from the records themselves.
+
+### Six of twenty-six mutations went green, and the harness itself was two of the findings
+
+Every epic since v0.6.0 has run a mutation pass; this is the first where the
+**harness** produced as much as the code did.
+
+Six survivors on the first pass, every one a real gap, and five of them share a
+shape: **a fixture that could only fail one way**.
+
+- **`seated` / `unseated` losing their guard** (`now_on_goal && !was_on_goal` →
+  `now_on_goal`). Every push in the suite went between a goal and plain floor, so
+  the two spellings agreed everywhere. **Goal-to-goal** is the only arrangement
+  that separates them — and it is audible, because `seated` is what plays the
+  Seat effect.
+- **`blocked_on_axis` losing its far side** (`is_wall(a) || is_wall(b)` →
+  `is_wall(a)`). Every corner fixture in the file was the **top-left** corner, so
+  each axis was only ever blocked by its negative neighbour and half the
+  condition was never evaluated. Needed a bottom-right corner.
+- **The freeze recursion's assumption stack returning `false`.** The case named
+  "two crates bracing each other" did not exercise it: its left crate was in a
+  genuine corner, so the answer resolved by walls alone and the stack was never
+  consulted. A true mutual dependency needs **neither crate cornered** — open
+  floor at both ends of the pair, where each one's immovability is derived only
+  from the other's.
+- **Ragged width taken from the first row** — i.e. the reference's own
+  `board[0].length` bug, reintroduced. The ragged fixture had its **widest row
+  first**, so `max` and `first` agreed.
+- **The overlay marking a crate frozen ON its goal.** No case had ever rendered a
+  crate that was both frozen and finished. Level 18 ("Four Corners") puts all
+  four goals in corners, so it is exactly the level where a player is meant to
+  end up there.
+- **The click direction test relaxed** (`dy == -1` → `dy <= -1`). Every
+  "too far away" click in the suite was **horizontal**, so the vertical
+  comparison was never bounded. Each of the four directions needs its own
+  out-of-range click.
+
+After closing all six, a second pass ran **26 of 26 red**.
+
+#### The harness found two things about itself
+
+⚠ **`grep -F -c` cannot count a multi-line pattern.** It counts LINES CONTAINING
+a pattern, so the "refuse an ambiguous pattern" guard — carried forward from Epic
+5, where a `sed` spanning two lines silently never applied — reported six
+multi-line mutations as "9 matches" and skipped every one. The guard fired
+instead of the edit. That is the safe direction and it is still six mutations
+that did not run. Counted in python now.
+
+⚠ **A killed harness leaves the mutation in the working tree.** Epic 6's lesson
+was "rebuild after restoring"; this is the half it missed. The restore ran at the
+end of a function, so when a mutation **hung** the run and the harness was
+killed, `++m_moves` stayed deleted from `board.cpp` — and the next ordinary
+`ctest` would have reported it as the tree's. Now a `trap ... EXIT INT TERM`
+makes the restore unconditional, and `ctest` runs under a `timeout`.
+
+⚠ **And what hung it was a defect in a test.** `test/32sokoban-ui` bounded a
+solve loop with `b->moves() > 200` — the model's own counter, which is exactly
+what the mutation deletes. Frozen at zero, the loop ran forever. **A test whose
+termination depends on the code under test is not a test**; the bound is a local
+counter now. Worth generalising: any loop in a test that reads state from the
+system under test to decide when to stop has this failure mode, and a mutation
+pass is how you find out.
+
+### What Epic 7 deliberately did not build
+
+- **Loading levels from a file.** The parser takes the standard charset, which is
+  what gitea #8's "the corpus loads directly" actually asks for, and `parse()` is
+  the one piece a future file loader would reuse unchanged — that is why it is
+  its own header and its own TU. But no I/O was added: `scores.cpp` is the only
+  file in the library allowed to name a real path, and it earned that with a
+  whole issue's worth of design. A level loader is its own change.
+- **Levels of our own, large enough to scroll.** Twenty BFS-verified levels
+  already exist; authoring good big ones is a design job, not a porting one, and
+  a level we could not verify is worse than no level. The consequence is stated
+  rather than hidden: **the camera is exercised by the tests and not by play.**
+- **Pathfinding on a mouse click.** A click on an adjacent tile is a direction; a
+  click across the room would be a mechanic the reference does not have, and
+  `snake/layout.hpp` already drew that line for clicks.
+- **Smooth scrolling.** `docs/map-widget.md` puts sub-tile scrolling permanently
+  out of scope for the glyph tier — a cell grid cannot express half a tile — and
+  half-supporting it on one tier is what that doc explicitly refuses.
+- **A sprite tier.** It does not exist upstream at any tag. See above.
+- **A hint or auto-solve.** The deadlock detector says *you cannot win from
+  here*; it deliberately does not say *do this next*. Solving is the game.
 
 ## What Epic 6 built (gitea #7)
 
@@ -445,7 +786,10 @@ We **adopted upstream's convention** rather than rebuilding the old one. Doing
 otherwise would have meant intercepting `MouseEvent` before `route_mouse` and
 diverging from the framework deliberately — the exact workaround shape gitea #16
 and #17 spent two issues deleting, and "there are no workarounds left in this
-repo" is a property worth more than a wheel gesture on a two-item menu.
+repo" is a property worth more than a wheel gesture on a two-item menu. (Epic 7
+has since added one back, deliberately and with a deletion condition — see the
+top of this file. The bar is that each one is counted, not that there are never
+any.)
 
 The consequence is that **MenuMove no longer fires on the wheel**, which is
 honest: nothing moved. `test/11selector` holds both halves — the selection does
@@ -1215,7 +1559,7 @@ shipping.
 | [#61](https://github.com/gobha-me/termforge/issues/61) | `Key` enum stops at F4 | **closed — shipped in v0.1.9** |
 | [#62](https://github.com/gobha-me/termforge/issues/62) | `Cell` has no text attributes | **closed — shipped as `Attr` in v0.1.16, and we are pinned to it — but nothing uses it.** Still costs Minesweeper a column per cell (63 vs 33 for Hard). Spending it is its own issue; see "the payoff we did not spend" above, including the correction that `FallbackDriver` **does** emit `Reverse` |
 | [#63](https://github.com/gobha-me/termforge/issues/63) | `Image` has no blit/alpha compositing | **closed — shipped in v0.1.18, and we are pinned to it.** Unblocks Epic 8 |
-| [#64](https://github.com/gobha-me/termforge/issues/64) | MapWidget (Epic 3.6) | **closed for our purposes — `MapWidget` v1 (glyph tier) shipped in v0.1.19, and we are pinned to it.** Unblocks Epic 7. ⚠ The upstream issue is still open against the sprite tier, which we do not need |
+| [#64](https://github.com/gobha-me/termforge/issues/64) | MapWidget (Epic 3.6) | **shipped as `MapWidget` v1 (glyph tier) in v0.1.19, and SPENT by Epic 7** — Sokoban is its first consumer and produced four pieces of API feedback (see "What MapWidget's first consumer found"). ⚠ Still open upstream against the sprite tier, which **does not exist at any tag through v0.5.1** even though both its gates landed. We did not need it; **Epic 8 might** |
 | [#75](https://github.com/gobha-me/termforge/issues/75) | Mouse tracking mode hardcoded to `?1002h`; no `?1003h`, no way to disable | **closed — shipped as `Terminal::set_mouse_mode` in v0.1.15, and the pin has been past it since — but nothing calls it.** The default, `MouseMode::Drag`, is byte-for-byte what we already emitted, so taking the tag changed nothing. `MouseMode::Motion` is what Minesweeper wants for buttonless hover; deferred to gitea [#18](https://git.gobha.me/xcaliber/term-game/issues/18) because it is a *feel* change and the dev container cannot verify feel |
 | [#71](https://github.com/gobha-me/termforge/issues/71) | `App::run()` skips `teardown()` on a throw | **closed — shipped in v0.1.10, and we are on it** (gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16)). The terminal-restore workaround is gone; our boundary survives as a diagnostic. `test/21exception` asserts the upstream guarantee via `test_winch_hooked()`, `pty-restore` asserts the escape bytes. |
 | [#72](https://github.com/gobha-me/termforge/issues/72) | `ListWidget` selection invisible at the fallback tier | **closed — shipped in v0.1.11, and we are on it** (gitea [#17](https://git.gobha.me/xcaliber/term-game/issues/17)). Our gutter marker is gone and the two columns went back to the list. The marker is `ListWidget`'s now, on by default and **inside `rect()`**, so a click on it selects — which the workaround could not do. `test/11selector` asserts the glyph in cell text at the ASCII tier, coverage the workaround never had. |

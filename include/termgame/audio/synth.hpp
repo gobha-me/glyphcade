@@ -118,6 +118,23 @@ enum class SfxId : std::uint8_t {
   Lock,
   Tetris,
   LevelUp,
+  // Added for Sokoban (gitea #8), which asks for "step, push, crate-on-goal,
+  // level complete" — and gets ONE new id, the fewest of any game so far.
+  //
+  // Reused instead: a step is Click (a generic acknowledged gesture, and a
+  // Sokoban step is the most generic gesture in the suite), a push is Slide
+  // (a decisive movement — already 2048's slide and Tetris' hard drop), and
+  // finishing a level is Win.
+  //
+  // Only seating a crate on its goal had nothing that meant it. It is not
+  // Merge: nothing combines and nothing vanishes, one thing arrives where it
+  // belongs and stays there. It is the one moment of progress in a game with no
+  // score, so it is the one sound worth adding.
+  //
+  // ⚠ There is deliberately no sound for a BLOCKED move. A player walking into
+  // a wall is holding a direction, so a rejection tone fires as fast as the key
+  // repeats — the metronome argument again, for the fourth game running.
+  Seat,
 };
 
 // Every id, in order, so a test can loop the whole bank and a new effect cannot
@@ -131,11 +148,12 @@ enum class SfxId : std::uint8_t {
 // ⚠ ENUM order, not thematic order. Slide and Merge are appended at the end
 // rather than grouped with the other in-game effects, because appending cannot
 // renumber an existing id — and kBank is indexed by that number.
-inline constexpr std::array<SfxId, 14> kSfxIds{
+inline constexpr std::array<SfxId, 15> kSfxIds{
     SfxId::Click,    SfxId::Reveal,     SfxId::Flag,  SfxId::Explode,
     SfxId::Win,      SfxId::Lose,       SfxId::MenuMove, SfxId::MenuSelect,
     SfxId::Slide,    SfxId::Merge,      SfxId::Eat,
     SfxId::Lock,     SfxId::Tetris,     SfxId::LevelUp,
+    SfxId::Seat,
 };
 
 // Every id appears exactly once: each entry equals its own index, which is only

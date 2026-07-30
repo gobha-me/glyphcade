@@ -312,12 +312,22 @@ the request is visible in the byte stream:
 ```bash
 grep -c $'\033\[>27u' /tmp/pty.raw    # 1 == Enhanced pushed on game entry
 grep -aoc $'\033\[=0;1u' /tmp/pty.raw # 1 == restored to Legacy on the way out
-grep -c $'\033\[<u' /tmp/pty.raw      # 1 == popped by leave_screen
+grep -c $'\033\[<u' /tmp/pty.raw      # 1 == popped by leave_screen — ALWAYS 1
 ```
 
 ⚠ **A run with no game that asks for a tier is the control**, and it is not
-optional: all three counts must be **zero** there, or the evidence says nothing
-about the game you entered.
+optional: the first two counts must be **zero** there, or the evidence says
+nothing about the game you entered.
+
+⚠ **The third count is NOT part of the control, and this file used to say it
+was.** `\033[<u` comes from `detail::kLeaveSequence`, a fixed string literal
+that `Terminal::leave_screen()` emits unconditionally — so it is **1 in every
+run**, including one that never enters a game. Measured with three captures side
+by side during Epic 7: selector-only and Sokoban-only both give `push=0
+restore=0 pop=1`, and Tetris gives `1 1 1`. Demanding zero from all three makes
+the control fail forever and invites someone to "fix" a game that is behaving
+correctly. Sokoban is the natural control here, because it is a real game that
+declares `Legacy`.
 
 ⚠ To reconstruct a whole screen from a capture, replay the CUP sequences AND
 handle `\r`/`\n`. A replay that ignores them silently drops rows and looks
@@ -350,6 +360,19 @@ first-click mine safety).
 
 Its `SPEC.md` also documents the self-contained-game-per-directory convention
 this repo inherits.
+
+⚠ **Read the reference's CODE, never its README or its comments.** Two epics
+running, the prose was the wrong half while the logic was fine:
+
+- Tetris' README speed table was off by one level from its own code.
+- Sokoban's README says its twenty pars are "derived from the optimal solution
+  length". They are not read by the game at all, only three of twenty are
+  correct, and **eight are below the mathematical minimum for their own level**.
+  Its cited verifier is a path in `/tmp`, outside the repository.
+
+If a reference states a number, **re-derive it** before porting it. A BFS over
+`(player, boxes)` settled Sokoban's twenty in minutes and is the kind of thing
+worth writing rather than trusting.
 
 ## Attribution
 
