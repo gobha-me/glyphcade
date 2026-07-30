@@ -19,7 +19,12 @@ constexpr termforge::Rgb kAccent{0x00, 0xFF, 0x80};
 Shell::Shell() : Shell(std::make_unique<audio::NullSink>()) {}
 
 Shell::Shell(std::unique_ptr<audio::AudioSink> sink)
-    : m_title("term-game " + std::string(version_string())) {
+    : Shell(std::move(sink), std::filesystem::path{}) {}
+
+Shell::Shell(std::unique_ptr<audio::AudioSink> sink,
+             std::filesystem::path scores)
+    : m_scores_store(std::move(scores)),
+      m_title("term-game " + std::string(version_string())) {
   // ⚠ Nothing here may touch driver(), terminal() or screen(). App::m_driver is
   // a null unique_ptr until setup() (or test_run_frames) builds one, and
   // driver() dereferences it — a capability query in this constructor is a null
@@ -46,10 +51,29 @@ Shell::Shell(std::unique_ptr<audio::AudioSink> sink)
   // this class of "cannot be done in the constructor" problem.
   //
   // Filed upstream; see STATUS.md.
+  // ⚠ The dash here is ASCII '-', and it must stay ASCII. This string reaches
+  // m_notice and m_notice is painted on the selector's footer row, which
+  // test/11selector sweeps cell by cell for any byte >= 0x80. It used to be an
+  // em dash (U+2014), which meant a headless run that failed to open a device
+  // would have turned that case red — a latent, machine-dependent failure that
+  // only never fired because nothing in this container reaches a real device.
+  // opened.error() is the sink's own text and is held to the same rule.
   if (auto opened = m_audio.open(std::move(sink)); !opened) {
-    m_audio_notice = "audio: " + opened.error() + " — running silent";
+    m_audio_notice = "audio: " + opened.error() + " - running silent";
   }
   m_ctx.set_audio(&m_audio);
+
+  // The store's constructor already read the file (a read is not a terminal
+  // touch, so it is allowed here); this only picks up what it found. Same stash
+  // as the audio notice above and for the same reason — there is no screen yet.
+  //
+  // ⚠ A failure to LOAD is knowable now; a failure to WRITE is not, without a
+  // probe write this constructor deliberately does not make. That is why there
+  // are two report sites: here for load, apply_transitions() for flush.
+  if (!m_scores_store.load_error().empty()) {
+    m_scores_notice = m_scores_store.load_error();
+  }
+  m_ctx.set_scores(&m_scores_store);
 
   m_title.set_align(termforge::Label::Align::Center);
   m_title.set_colors(kAccent, termforge::theme::kBg);
@@ -343,6 +367,23 @@ auto Shell::apply_transitions() -> void {
   m_ctx.clear_quit_to_menu();
   m_state = State::Selector;
   refresh_detail();
+
+  // ⚠ THE ONLY REPORTABLE FLUSH, and this is the frame to do it on: exactly one
+  // per game exit whichever of the three callers got us here, and we are on our
+  // way back to the selector, which is the one screen with a footer to print a
+  // failure in. A failure reported here lands on the very next frame drawn.
+  //
+  // ⚠ Once per game exit, NOT once per improvement. A flush per record would be
+  // a write syscall on every 2048 move, which is precisely what "no syscalls on
+  // the frame path" exists to prevent — and apply_transitions() is itself
+  // reachable from on_tick(), so this write can land inside a tick. One write on
+  // a frame already doing clear_overlays() and refresh_detail() is affordable;
+  // sixty a second is not. The trade is that a SIGKILL loses the current run's
+  // records, which is written down in STATUS.md rather than hidden here.
+  if (auto written = m_scores_store.flush(); !written) {
+    on_event(termforge::Event{termforge::ErrorEvent{
+        termforge::Severity::Warning, "scores", written.error()}});
+  }
 }
 
 // One line, and it stays a named function anyway: this is the single place
@@ -358,14 +399,32 @@ auto Shell::sync_capabilities() -> void {
   const termforge::Capabilities caps = driver().capabilities();
   m_ctx.set_capabilities(caps);
 
+  // ⚠ THE ORDER OF THE THREE DRAINS BELOW IS LOAD-BEARING, because m_notice
+  // keeps only the most recent message (see on_event) — so the LAST one to fire
+  // is the one a player sees. The rule is least-urgent first, and the only part
+  // of it that is a contract is that the COLOUR notice goes last: it is what the
+  // AGENTS.md pty recipe checks for, and it is the one that describes what the
+  // whole screen will look like for the rest of the session.
+  //
+  // ⚠ It is NOT test/11selector that pins the colour string — that test has no
+  // notice-text assertion at all. What it does have is a sweep of every cell for
+  // any byte >= 0x80, which the footer row is inside, so what it pins is that
+  // whatever survives here is 7-bit. The automated check on the ordering itself
+  // is test/24scores, which is only possible because a bad-version scores file
+  // is a deterministic way to make a second notice fire.
+  //
+  // scores before audio is a judgement call rather than a contract: silence is
+  // more immediately noticeable to a player than a score file that will not
+  // save, so audio gets to outrank it.
+  if (!m_scores_notice.empty()) {
+    on_event(termforge::Event{termforge::ErrorEvent{
+        termforge::Severity::Warning, "scores", m_scores_notice}});
+    m_scores_notice.clear();
+  }
+
   // Degradation is an event, never a silent downgrade (AGENTS.md) — so a device
   // we asked for and could not get is reported, drained here because the
   // constructor had no terminal to report it on.
-  //
-  // ⚠ Emitted BEFORE the ASCII-tier notice below, and the order is load-bearing
-  // because m_notice keeps only the most recent message. The colour notice is
-  // the one test/11selector and the AGENTS.md pty recipe assert on, so it must
-  // be the one that survives when both fire.
   //
   // ⚠ Nothing is reported when the build simply has no RtAudio backend. There
   // was never an audio path to fall back FROM, build_has_audio() already says

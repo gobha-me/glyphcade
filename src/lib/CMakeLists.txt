@@ -99,8 +99,14 @@ option(${PROJECT_NAME}_BUILD_LIB "Build the compiled library targets" ON)
 
 if (${PROJECT_NAME}_BUILD_LIB)
   # ── core: the shared services, and the bottom of the link chain ───────────
+  # ⚠ arcade/scores.cpp is in CORE, not in ${PROJECT_NAME}_lib, and the arcade/
+  # prefix is not what decides that — the rule above at "The rule for a new file"
+  # is. Both games call ctx.scores().record(), so scores has to sit below the
+  # games exactly as audio does. Its two siblings in arcade/ land in two other
+  # targets: all_games.cpp in _roster, shell.cpp in _lib.
   add_library(${PROJECT_NAME}_core STATIC
     build_info.cpp
+    arcade/scores.cpp
     audio/engine.cpp
     audio/sink.cpp
     audio/synth.cpp
