@@ -69,20 +69,28 @@ endif ()
 # an external link to any of them adds a line here — and if it is rtaudio,
 # cmake/check_export.cmake goes red first.
 #
-# ⚠ 0.1.15, at patch granularity, and it must track the floor in
+# ⚠ 0.2.2, at patch granularity, and it must track the floor in
 # cmake/deps/termforge.cmake exactly. This line used to say 0.1 while that file
 # said 0.1.10 — with a comment claiming the two matched, which they did not.
 #
 # The reason to align them is stronger than symmetry, because termforge's
-# version file is SameMinorVersion and "0.1" therefore accepts any 0.1.x. The
+# version file is SameMinorVersion and "0.2" therefore accepts any 0.2.x. The
 # Shell holds a termforge::ListWidget BY VALUE, in a header we install; v0.1.11
-# added members to that class. So a consumer resolving an older 0.1.x compiles
-# our public header against one object layout while term-game_lib was built
-# against another. Nothing fails to find, nothing fails to link — the sizes just
+# added members to that class, and v0.2.1 did it AGAIN (the scrollbar's track
+# and thumb colours, #21). So a consumer resolving an older 0.2.x compiles our
+# public header against one object layout while term-game_lib was built against
+# another. Nothing fails to find, nothing fails to link — the sizes just
 # disagree. Anything we hold by value in an installed header makes the build
 # floor an ABI floor too, and this is the line that enforces it consumer-side.
+# Two size changes in two minor versions is the base rate, not bad luck.
+#
+# ⚠ The 0.1 → 0.2 move is a one-way door for consumers: SameMinorVersion means
+# 0.2.2 no longer accepts any 0.1.x (intended — the wheel semantics differ), and
+# equally that a stale 0.1.15 request stops matching a 0.2.x install. That is
+# why this line and cmake/deps/termforge.cmake move in the same commit; a
+# half-done bump produces a package that resolves in our tree and nowhere else.
 include(CMakeFindDependencyMacro)
-find_dependency(termforge 0.1.15)
+find_dependency(termforge 0.2.2)
 
 include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
 

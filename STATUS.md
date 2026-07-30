@@ -2,7 +2,7 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-07-30** (gitea #14 — high-score persistence)
+**Last updated: 2026-07-30** (gitea #24 — the termforge pin, v0.1.15 → v0.2.2)
 
 ---
 
@@ -59,9 +59,15 @@ record across quit-to-menu and across restarts — 2048 a best score, Minesweepe
 a best time per difficulty — in a versioned text file under `$XDG_DATA_HOME`.
 See "What the score store is" below.
 
-**Next move: Epic 5 (Snake)**, or gitea
-[#24](https://git.gobha.me/xcaliber/term-game/issues/24) (the termforge pin is
-five tags behind).
+**The termforge pin is now v0.2.2** (gitea
+[#24](https://git.gobha.me/xcaliber/term-game/issues/24)) — seven tags, not the
+five the issue was written against. **Nothing upstream blocks any epic any
+more**: #63 and #64 shipped and are taken, so Epics 7 and 8 are unblocked, and
+#60 shipped in v0.2.2, so Epic 6's hold-to-move stops being OS auto-repeat
+guesswork. One upstream behaviour change reached us and was decided rather than
+inherited — the wheel. See "What the v0.2.2 bump brought" below.
+
+**Next move: Epic 5 (Snake).**
 
 Since Epic 3, two housekeeping issues have landed.
 gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16) moved the pin to
@@ -91,16 +97,18 @@ together, so it is worth stating once rather than leaving implied.
 | 3 — Minesweeper | **done** | — |
 | 4 — 2048 | **done** | — |
 | 5 — Snake | **ready** | — |
-| 6 — Tetris | **ready** | termforge #60 (degradable — feel only) |
-| 7 — Sokoban | not started | ~~termforge #64 → #63~~ — both shipped upstream; blocked on the pin bump, gitea [#24](https://git.gobha.me/xcaliber/term-game/issues/24) |
-| 8 — Solitaire | not started | ~~termforge #63~~ — shipped upstream; blocked on the pin bump, gitea [#24](https://git.gobha.me/xcaliber/term-game/issues/24) |
+| 6 — Tetris | **ready** | ~~termforge #60~~ — shipped in **v0.1.19…v0.2.2** and taken. `KeyboardMode::Enhanced` gives real `KeyAction::Repeat`/`Release`; DAS is now expressible rather than inferred from OS auto-repeat. ⚠ Still degradable: a terminal without the kitty protocol never delivers `Release`, and says so with one `ErrorEvent{Info}` on the first frame — so Tetris must fall back to discrete steps **knowingly** |
+| 7 — Sokoban | **ready** | ~~termforge #64 → #63~~ — both shipped, and **taken**: `MapWidget` v1 at v0.1.19, `Image` sub-rect blit at v0.1.18 |
+| 8 — Solitaire | **ready** | ~~termforge #63~~ — shipped, and **taken** at v0.1.18 |
 
-**Nothing that ever blocked Epics 0–5 is still open.** termforge
+**Nothing upstream blocks any epic.** That is true for the first time since the
+project started, and it is what gitea
+[#24](https://git.gobha.me/xcaliber/term-game/issues/24) bought. termforge
 [#27](https://github.com/gobha-me/termforge/issues/27) (install/export),
 [#58](https://github.com/gobha-me/termforge/issues/58) (frame pacing),
 [#59](https://github.com/gobha-me/termforge/issues/59) (`on_tick`) and
 [#61](https://github.com/gobha-me/termforge/issues/61) (F5–F12) are all closed,
-and we pin **v0.1.15** to get them, plus
+and we pin **v0.2.2** to get them, plus
 [#71](https://github.com/gobha-me/termforge/issues/71) (terminal restore on the
 exception path), [#72](https://github.com/gobha-me/termforge/issues/72)
 (`ListWidget` marks its own selection) and
@@ -111,13 +119,122 @@ was nothing for us to delete. See
 
 ---
 
+## What the v0.2.2 bump brought
+
+gitea [#24](https://git.gobha.me/xcaliber/term-game/issues/24). Landed on its own,
+before Epic 5, for the reason gitea #22 landed before Epic 4: a dependency bump
+carrying a breaking change, bundled with a new game, makes a red CI run ambiguous
+between the two.
+
+The issue was written when upstream was at v0.2.0. It was at **v0.2.2** by the
+time this was implemented, and the two extra tags were not filler — v0.2.2 is
+termforge #60, which this file listed as Epic 6's blocker. That is the third time
+this project has found the blocking picture staler than the issue describing it,
+after Epic 1's already-shipped tick accumulator and gitea #16's "delete the file"
+that turned out to rethrow. **Re-read upstream before implementing an issue about
+upstream** is now a rule with three citations.
+
+| tag | what it means here |
+|---|---|
+| v0.1.16 | `Cell::attrs` (#62). The payoff we have **not** spent — see the follow-up below |
+| v0.1.17 | dropdown scroll. We use neither `Select` nor `MenuBar`. Inert |
+| v0.1.18 | `Image` sub-rect blit, alpha, sprite slicing (#63). Unblocks Epic 8 |
+| v0.1.19 | `MapWidget` v1 (#64). Unblocks Epic 7 |
+| v0.2.0 | ⚠ wheel vs arrow-key semantics unified (#35). **The only one that changed our behaviour** |
+| v0.2.1 | shared scrollbar for List/Table/TextBox (#21) |
+| v0.2.2 | kitty keyboard protocol, `KeyAction::Repeat`/`Release` (#60). Unblocks Epic 6's feel |
+
+### The wheel: a decision, not an inheritance
+
+Before v0.2.0, `ListWidget::on_event` answered a wheel notch with
+`set_selected(selected ± 3)`. The selector inherited that and never asked for it —
+the comment in `Shell::on_event`'s mouse branch cited it as a reason the MenuMove
+edge detection existed. #35 unified the wheel onto a view offset: **the wheel now
+scrolls the view, the selection stays put and may scroll out of sight, and arrows
+still move the selection.**
+
+We **adopted upstream's convention** rather than rebuilding the old one. Doing
+otherwise would have meant intercepting `MouseEvent` before `route_mouse` and
+diverging from the framework deliberately — the exact workaround shape gitea #16
+and #17 spent two issues deleting, and "there are no workarounds left in this
+repo" is a property worth more than a wheel gesture on a two-item menu.
+
+The consequence is that **MenuMove no longer fires on the wheel**, which is
+honest: nothing moved. `test/11selector` holds both halves — the selection does
+not move, and no sound plays.
+
+⚠ **This is the change that would have landed silently.** All 23 tests passed on
+the new pin before either wheel case existed; nothing in the suite could see the
+difference. The two cases were **red-verified** against the old pin, and the seam
+for doing that is worth remembering:
+
+```bash
+cmake -B build-oldpin -DTERMFORGE_TAG=v0.1.15 -DCMAKE_CXX_FLAGS=-Werror
+```
+
+`find_package(termforge 0.2.2)` misses and FetchContent takes the override, so
+the suite builds against the previous pin. On v0.1.15: 22 of 24 cases pass and
+**exactly the two new ones fail** — `selector_index()` comes back 1 instead of 0,
+and `MenuMove` fires twice. That isolation is the evidence, not the failure.
+
+⚠ **Deferred, with a condition.** The wheel's positive half — that a notch moves
+`ListWidget::scroll_offset()` — is *not* asserted, and cannot be faked. It needs a
+roster longer than the list pane, and no legal size produces one: the Shell's
+floor is 20x8, which leaves three interior rows for two entries. `all_games()` is
+a file-local `constexpr` table with no injection seam. **Revisit at four roster
+entries (Epic 6)**, or when a test-only substitute for the `term-game_roster`
+target earns its keep — `src/lib/CMakeLists.txt` already makes the roster its own
+archive, so the seam exists at the link level.
+
+### The scrollbar, and a second reason `set_style` is load-bearing
+
+v0.2.1 gives `ListWidget` a one-column scrollbar when its content overflows. The
+selector will paint one the moment the roster outgrows its pane — not yet, at two
+entries.
+
+What matters now is the tier. The strip reads its track and thumb from
+`scrollbar_glyphs(style)`, keyed off the **same** `BorderStyle` enum as the
+selection marker: `|`/`#` under `Ascii`, `│`/`█` under every other family. So
+`m_list.set_style(style)` in `draw_selector` now guards the 7-bit floor by two
+independent routes, and the second one is **invisible to the test suite** — two
+entries never overflow, so no scrollbar is drawn at any size the 7-bit case can
+reach. Do not read "the 7-bit test passes without that line" as evidence. Whoever
+registers the fourth game inherits the coverage.
+
+Geometry did **not** move, which is the risk that turned out not to be one: the
+right-hand column the scrollbar claims was already reserved at v0.1.15
+(`max_w = r.w - gutter - 1`). Item text still starts at x=3 with 19 columns at
+60x20.
+
+### The payoff we did not spend
+
+v0.1.16's `Cell::attrs` is the one tag with a concrete win: Minesweeper's cursor
+is a **pair of brackets** costing a column per cell, so Hard needs 63 columns
+where reverse video would need ~33. It is deliberately **not** in this bump — it
+rewrites `layout.hpp`'s `kCellCols`, six geometry cases in `test/14minesweeper`
+and two cursor cases in `test/15minesweeper-ui`, and it interacts with gitea
+[#15](https://git.gobha.me/xcaliber/term-game/issues/15) (`GameMeta` minimum
+size). Its own issue.
+
+⚠ One correction for whoever picks it up, because #24 states the opposite:
+attributes are **not** colour-tier-only. v0.2.2's `FallbackDriver` emits
+`Reverse` and `Bold` and drops only the other four, surfacing that as an
+`ErrorEvent{Info}`. So reverse video may be a legitimate *replacement* for the
+brackets at both tiers rather than an addition at one — but that is a question to
+answer with a pty, not to assume in either direction. The rule the brackets exist
+for ("the cursor is a pair of characters, not a colour") was written against a
+driver that dropped *colour*; an attribute that survives the floor is a different
+argument.
+
+---
+
 ## What Epic 0 built
 
 - **CMake scaffold** from cpp-template, project name `term-game` (follows the
   directory name, as does the gitea repo).
 - **termforge consumed** via [cmake/deps/termforge.cmake](cmake/deps/termforge.cmake)
   — `find_package(termforge ... CONFIG)` first, FetchContent as the fallback.
-  Epic 0 pinned v0.1.7; the pin is now **v0.1.15** — see below.
+  Epic 0 pinned v0.1.7; the pin is now **v0.2.2** — see below.
 - **`TERMGAME_WITH_AUDIO`** auto-detection in [cmake/audio.cmake](cmake/audio.cmake).
   Epic 2 answered the export question (gitea #13): rtaudio is linked by
   `src/audio_backend/` alone, which is never installed and never exported.
@@ -669,23 +786,26 @@ shipping.
 | [#27](https://github.com/gobha-me/termforge/issues/27) | CMake consumption (install/export, `PROJECT_IS_TOP_LEVEL` gating) | **closed — shipped in v0.1.7** |
 | [#58](https://github.com/gobha-me/termforge/issues/58) | Frame pacing: idle loop capped ~7.5fps | **closed — fixed** |
 | [#59](https://github.com/gobha-me/termforge/issues/59) | No `on_tick(dt)` hook | **closed — shipped in v0.1.8** |
-| [#60](https://github.com/gobha-me/termforge/issues/60) | No key release (Kitty keyboard protocol) | open |
+| [#60](https://github.com/gobha-me/termforge/issues/60) | No key release (Kitty keyboard protocol) | **closed — shipped in v0.2.2, and we are pinned to it.** `KeyEvent` gained `action` (`Press`/`Repeat`/`Release`) and `App::set_keyboard_mode` picks the tier. Additive and opt-in: the default, `KeyboardMode::Legacy`, is byte-for-byte what every earlier tag emitted, so nothing calls it yet. **Epic 6 (Tetris) is what wants `Enhanced`** — and must still degrade knowingly, because a terminal without the protocol never delivers `Release` and says so with one `ErrorEvent{Info}` |
 | [#61](https://github.com/gobha-me/termforge/issues/61) | `Key` enum stops at F4 | **closed — shipped in v0.1.9** |
-| [#62](https://github.com/gobha-me/termforge/issues/62) | `Cell` has no text attributes | open — costs Minesweeper a column per cell (63 vs 33 for Hard); commented with that number |
-| [#63](https://github.com/gobha-me/termforge/issues/63) | `Image` has no blit/alpha compositing | open |
-| [#64](https://github.com/gobha-me/termforge/issues/64) | MapWidget (Epic 3.6) | open |
-| [#75](https://github.com/gobha-me/termforge/issues/75) | Mouse tracking mode hardcoded to `?1002h`; no `?1003h`, no way to disable | **closed — shipped as `Terminal::set_mouse_mode` in v0.1.15, and we are pinned to it — but nothing calls it.** The default, `MouseMode::Drag`, is byte-for-byte what we already emitted, so taking the tag changed nothing. `MouseMode::Motion` is what Minesweeper wants for buttonless hover; deferred to gitea [#18](https://git.gobha.me/xcaliber/term-game/issues/18) because it is a *feel* change and the dev container cannot verify feel |
+| [#62](https://github.com/gobha-me/termforge/issues/62) | `Cell` has no text attributes | **closed — shipped as `Attr` in v0.1.16, and we are pinned to it — but nothing uses it.** Still costs Minesweeper a column per cell (63 vs 33 for Hard). Spending it is its own issue; see "the payoff we did not spend" above, including the correction that `FallbackDriver` **does** emit `Reverse` |
+| [#63](https://github.com/gobha-me/termforge/issues/63) | `Image` has no blit/alpha compositing | **closed — shipped in v0.1.18, and we are pinned to it.** Unblocks Epic 8 |
+| [#64](https://github.com/gobha-me/termforge/issues/64) | MapWidget (Epic 3.6) | **closed for our purposes — `MapWidget` v1 (glyph tier) shipped in v0.1.19, and we are pinned to it.** Unblocks Epic 7. ⚠ The upstream issue is still open against the sprite tier, which we do not need |
+| [#75](https://github.com/gobha-me/termforge/issues/75) | Mouse tracking mode hardcoded to `?1002h`; no `?1003h`, no way to disable | **closed — shipped as `Terminal::set_mouse_mode` in v0.1.15, and the pin has been past it since — but nothing calls it.** The default, `MouseMode::Drag`, is byte-for-byte what we already emitted, so taking the tag changed nothing. `MouseMode::Motion` is what Minesweeper wants for buttonless hover; deferred to gitea [#18](https://git.gobha.me/xcaliber/term-game/issues/18) because it is a *feel* change and the dev container cannot verify feel |
 | [#71](https://github.com/gobha-me/termforge/issues/71) | `App::run()` skips `teardown()` on a throw | **closed — shipped in v0.1.10, and we are on it** (gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16)). The terminal-restore workaround is gone; our boundary survives as a diagnostic. `test/21exception` asserts the upstream guarantee via `test_winch_hooked()`, `pty-restore` asserts the escape bytes. |
 | [#72](https://github.com/gobha-me/termforge/issues/72) | `ListWidget` selection invisible at the fallback tier | **closed — shipped in v0.1.11, and we are on it** (gitea [#17](https://git.gobha.me/xcaliber/term-game/issues/17)). Our gutter marker is gone and the two columns went back to the list. The marker is `ListWidget`'s now, on by default and **inside `rect()`**, so a click on it selects — which the workaround could not do. `test/11selector` asserts the glyph in cell text at the ASCII tier, coverage the workaround never had. |
 | [#73](https://github.com/gobha-me/termforge/issues/73) | No way to observe `quit()`; `test_run_frames` re-arms `m_running` | **closed — shipped in v0.1.14, and we are on it** (gitea [#17](https://git.gobha.me/xcaliber/term-game/issues/17)). ⚠ `App::running()` is **not** a drop-in for the accessor it replaced: it is not sticky, and `test_run_frames` still re-arms `m_running` on entry. Assert it *before* the `step()` you needed for a state transition, or it is vacuous. |
 
 Check state with `gh` rather than trusting this table if it looks stale.
 
-### The pin is v0.1.15, and the version request is patch-level
+### The pin is v0.2.2, and the version request is patch-level
 
-`cmake/deps/termforge.cmake` asks `find_package(termforge 0.1.15 …)`, not `0.1`.
-termforge's package version file is `SameMinorVersion`, so `0.1` accepts *any*
-installed 0.1.x, and that bites in three ways:
+`cmake/deps/termforge.cmake` asks `find_package(termforge 0.2.2 …)`, not `0.2`.
+termforge's package version file is `SameMinorVersion`, so `0.2` accepts *any*
+installed 0.2.x. The worked examples below are all 0.1.x because that is where
+the lesson was learned; every one of them survives the move, because the
+dependency still ships load-bearing API in patch releases — v0.2.1 and v0.2.2
+both did. Three ways minor granularity bit:
 
 - **0.1.7** has no `set_tick_hz`, so accepting it turns "your copy is too old,
   falling back to FetchContent" into a wall of compiler errors in `shell.cpp`,
@@ -705,10 +825,19 @@ depended on API introduced in a *patch* release, and twice missing it is
 
 ⚠ From 0.1.11 this is also an **ABI** floor. That release added members to
 `ListWidget`, and `Shell` holds one *by value* in `arcade/shell.hpp`, which we
-install. A consumer resolving an older 0.1.x compiles our public header against
+install. A consumer resolving an older 0.2.x compiles our public header against
 a different object layout than `term-game_lib` was built with — no link error,
 just disagreement about a size. Anything held by value in an installed header
 turns the build floor into an ABI floor.
+
+**v0.2.1 did it again**, adding the scrollbar's track and thumb colours to the
+same class. Two size changes in two minor versions: treat "`ListWidget` grew a
+member" as the base rate, not as bad luck.
+
+⚠ **Crossing 0.1 → 0.2 makes `SameMinorVersion` cut the other way.** Asking for
+`0.2.2` no longer accepts *any* 0.1.x — which is what we want, since the wheel
+semantics differ — but by the same rule a request still saying `0.1.15` silently
+stops matching a 0.2.x install. That is why the floor moved in one commit.
 
 The same argument is in the comment at the top of `cmake/deps/termforge.cmake`,
 and the floor is repeated in `cmake/project-config.cmake.in` for the consumer
