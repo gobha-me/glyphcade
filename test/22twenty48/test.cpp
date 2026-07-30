@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <vector>
 
 #include <termgame/games/twenty48/anim.hpp>
@@ -514,29 +515,64 @@ TEST_CASE("a finished animation holds exactly the resting board",
 
 TEST_CASE("the tween lands identically however dt is chopped up",
           "[2048][anim][framerate]") {
-  // ⚠ Issue #5's acceptance criterion, stated directly: tween state driven by N
-  // fixed ticks must assert final positions INDEPENDENT of frame rate. The
-  // mechanism is the clamp at 1 in anim.cpp's phase() — not any assumption about
-  // dt's size or regularity.
+  // ⚠ Issue #5's acceptance criterion: tween state driven by N fixed ticks must
+  // be INDEPENDENT of frame rate. Position must be a function of accumulated
+  // elapsed time and nothing else — not of how many advance() calls delivered it.
+  //
+  // ⚠ An earlier version of this case compared only the FINAL state across
+  // chunkings, and mutation testing showed that proved almost nothing: the final
+  // state is set by finish(), so every chunking agreed no matter what the
+  // interpolation did. It never exercised a mid-slide frame at all. The load-
+  // bearing comparison is at MATCHED ELAPSED TIME, part-way through, which is
+  // what the first block below does.
   Board b(11);
   b.load(row_board({2, 2, 4, 4}));
   const auto r = b.move(Dir::Left);
 
-  const auto run = [&](int chunks) {
+  // Reach the same instant — 40% of the way through the slide — by one big step
+  // and by many small ones. Anything that advances by a fixed amount per call,
+  // or accumulates position instead of interpolating from the source cell,
+  // diverges here.
+  const auto at_same_instant = [&](int calls) {
+    Anim a;
+    a.begin(r, b.cells());
+    const auto target = kSlide * 0.4;
+    for (int i = 0; i < calls; ++i) {
+      a.advance(target / calls);
+    }
+    return std::vector<DrawTile>(a.tiles().begin(), a.tiles().end());
+  };
+
+  const auto one_step = at_same_instant(1);
+  const auto many_steps = at_same_instant(37);  // deliberately not a round number
+
+  REQUIRE_FALSE(one_step.empty());
+  REQUIRE(one_step.size() == many_steps.size());
+  for (std::size_t i = 0; i < one_step.size(); ++i) {
+    REQUIRE(one_step[i].value == many_steps[i].value);
+    // Floating-point accumulation over 37 additions is not bit-identical to one
+    // addition, so this is the one place a tolerance is honest. It is far tighter
+    // than a single cell — the property is "same position", not "same bits".
+    REQUIRE(std::fabs(one_step[i].col - many_steps[i].col) < 1e-9);
+    REQUIRE(std::fabs(one_step[i].row - many_steps[i].row) < 1e-9);
+  }
+
+  // And the final state still agrees, which is the weaker half of the claim but
+  // the one a player would notice: tiles must come to rest on the grid.
+  const auto run_to_end = [&](int chunks) {
     Anim a;
     a.begin(r, b.cells());
     const auto total = kSlide + kPop;
-    const auto dt = total / chunks;
     for (int i = 0; i < chunks + 2; ++i) {
-      a.advance(dt);
+      a.advance(total / chunks);
     }
     std::vector<DrawTile> out(a.tiles().begin(), a.tiles().end());
     return std::pair{a.done(), out};
   };
 
-  const auto [done_fine, fine] = run(60);    // ~1000 fps
-  const auto [done_coarse, coarse] = run(3);  // ~19 fps
-  const auto [done_one, one] = run(1);        // one giant frame
+  const auto [done_fine, fine] = run_to_end(60);   // ~1000 fps
+  const auto [done_coarse, coarse] = run_to_end(3);  // ~19 fps
+  const auto [done_one, one] = run_to_end(1);        // one giant frame
 
   REQUIRE(done_fine);
   REQUIRE(done_coarse);

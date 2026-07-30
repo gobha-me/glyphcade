@@ -14,19 +14,31 @@ namespace {
   return a + (b - a) * t;
 }
 
-// Phase fraction, clamped at both ends.
+// Phase fraction: how far through a span the animation is.
 //
-// ⚠ The clamp at 1 is what makes the tween frame-rate independent, and it is the
-// whole of the mechanism. Elapsed time accumulates from whatever dt arrives; the
-// fraction saturates. So the same total elapsed time delivered as one big dt or
-// twenty small ones lands on exactly the same final positions, which is issue
-// #5's acceptance criterion.
+// Frame-rate independence comes from this being a function of ACCUMULATED ELAPSED
+// TIME and nothing else — not of how many advance() calls delivered it. That is
+// the property, and it is what issue #5's acceptance criterion asks for.
+//
+// ⚠ This used to clamp the result into [0, 1], and mutation testing showed the
+// clamp was UNREACHABLE: no test could tell it from a plain division, because both
+// call sites are already bounded. rebuild()'s slide branch runs only while
+// m_elapsed < kSlide, and its pop branch only while m_elapsed >= kSlide, with
+// advance() having already called finish() past kSlide + kPop. So both fractions
+// are in [0, 1) by construction.
+//
+// Removed rather than kept-with-a-comment, on the precedent of announce()'s bool
+// parameter in minesweeper.cpp: a guard that restates what the surrounding code
+// already guarantees is a second, weaker statement of the same fact, and it later
+// reads as load-bearing to whoever tries to simplify around it. If a future caller
+// needs an unbounded input bounded, the bound belongs at that caller, where a test
+// can see it.
 [[nodiscard]] auto phase(std::chrono::duration<double> elapsed,
                          std::chrono::duration<double> span) -> double {
   if (span.count() <= 0.0) {
     return 1.0;
   }
-  return std::clamp(elapsed / span, 0.0, 1.0);
+  return elapsed / span;
 }
 
 // A triangle: 0 at the start, 1 at the midpoint, 0 at the end. The reference's
