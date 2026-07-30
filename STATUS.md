@@ -2,7 +2,7 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-07-30** (gitea #6 — Epic 5, Snake)
+**Last updated: 2026-07-30** (gitea #32 — the keyboard seam)
 
 ---
 
@@ -86,6 +86,16 @@ second, against the ~7.5 fps ceiling #58 imposed on an idle loop. Recipe below.
 pleasant to play on, and whether `Eat` sounds like anything all still need a
 human.
 
+**The keyboard seam has landed.** gitea
+[#32](https://git.gobha.me/xcaliber/term-game/issues/32) — `GameMeta` declares a
+`termforge::KeyboardMode`, the Shell sets it per game entry and gives it back on
+exit, and the Shell stopped acting on key *releases* it will start receiving the
+moment any game asks for `Enhanced`. Landed on its own, before Tetris, for the
+reason gitea #22 landed before Epic 4 and #24 before Epic 5. Nothing on the
+roster asks for anything but `Legacy`, so all three games behave identically.
+See "What the keyboard seam is" below — including the three mutations that went
+green, two of which were claims written into a comment.
+
 **Next move: Epic 6 (Tetris)** — and it is the roster's fourth entry, which is
 the condition two deferrals below have been waiting on.
 
@@ -93,6 +103,15 @@ the condition two deferrals below have been waiting on.
 assertion (see "What the v0.2.2 bump brought") still cannot run: at 58x20 the
 list pane holds three entries without overflowing. Epic 6 is the one that turns
 it on.
+
+⚠ **And a fourth game is not sufficient either** — this was measured while
+planning Epic 6 and corrects the paragraph above. The selector's interior list
+rows are `h - 5`, and `test/11selector`'s `Probe::step()` hardcodes **60x20**,
+i.e. 15 rows. Four entries overflow only when `h - 5 < 4`, that is at
+**`rows == 8`** — the Shell's floor exactly. So Epic 6 must *also* give
+`Probe::step()` a size parameter, as `test/15minesweeper-ui` and
+`test/26snake-ui` already have, and render at 20x8. Registering the game alone
+turns nothing on.
 
 Since Epic 3, two housekeeping issues have landed.
 gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16) moved the pin to
@@ -122,7 +141,7 @@ together, so it is worth stating once rather than leaving implied.
 | 3 — Minesweeper | **done** | — |
 | 4 — 2048 | **done** | — |
 | 5 — Snake | **ready** | — |
-| 6 — Tetris | **ready** | ~~termforge #60~~ — shipped in **v0.1.19…v0.2.2** and taken. `KeyboardMode::Enhanced` gives real `KeyAction::Repeat`/`Release`; DAS is now expressible rather than inferred from OS auto-repeat. ⚠ Still degradable: a terminal without the kitty protocol never delivers `Release`, and says so with one `ErrorEvent{Info}` on the first frame — so Tetris must fall back to discrete steps **knowingly** |
+| 6 — Tetris | **ready, and the seam is built** | ~~termforge #60~~ — shipped in **v0.1.19…v0.2.2** and taken. `KeyboardMode::Enhanced` gives real `KeyAction::Repeat`/`Release`; DAS is now expressible rather than inferred from OS auto-repeat. gitea **#32** built the seam that reaches it: declare `Enhanced` in `kMeta` and the Shell does the rest. ⚠ Still degradable: a terminal without the kitty protocol never delivers `Release` — and note the notice is **ours**, not upstream's, because `App::setup()` has already run by the time a game entry sets the mode. Tetris must fall back to discrete steps **knowingly** |
 | 7 — Sokoban | **ready** | ~~termforge #64 → #63~~ — both shipped, and **taken**: `MapWidget` v1 at v0.1.19, `Image` sub-rect blit at v0.1.18 |
 | 8 — Solitaire | **ready** | ~~termforge #63~~ — shipped, and **taken** at v0.1.18 |
 
@@ -141,6 +160,82 @@ exception path), [#72](https://github.com/gobha-me/termforge/issues/72)
 `8f62930`; the build-tree `export(EXPORT ...)` block no longer exists, so there
 was nothing for us to delete. See
 [docs/cpp-template-audit.md](docs/cpp-template-audit.md) for what those cost us.
+
+---
+
+## What the keyboard seam is (gitea #32)
+
+Epic 6 wants `KeyboardMode::Enhanced`. Turning it on is not one line, and the
+three reasons why are the whole change.
+
+**It cannot be global.** `Enhanced` is not a superset of `Legacy`, it is a
+different contract: every key arrives as CSI-u, so `Shift+a` becomes `ch=='A'`
+**with `shift` set** where a plain byte carried no modifier, and every key gains
+a `Release`. Set once at startup, Snake would turn twice per keypress and the
+selector's bindings would double-fire. So `GameMeta` gains a `keyboard` field
+defaulting to `Legacy`, and the Shell sets it in `enter_selected_game()` and
+restores it in `apply_transitions()` — the single point every game exit already
+funnels through, next to the score flush and for the same reason.
+
+⚠ **`GameMeta`, not a `Game` method and not a fifth `GameContext` service.**
+`set_keyboard_mode` is on `termforge::App` and the Shell is the only App, so a
+game cannot ask directly; the Shell needs the answer *before* the game's first
+frame and already holds the meta from the registry table. Keeping it there also
+keeps it `constexpr`. `arcade/context.hpp` says a fifth service would be a new
+design question — this is not one, because **a game never reads this field**.
+What a game reads to learn which arm it got is `ctx.capabilities().kitty_keyboard`;
+`App::keyboard_mode()` is a mirror of our own setter and is true everywhere.
+
+**The Shell's own keys had no `KeyAction` check.** Ctrl+C, the selector's Escape,
+and `handle_in_game_key`'s Escape and `p` all branched on `key`/`ch` alone. Under
+`Legacy` no `Release` is ever delivered, so nothing could fire; the moment a game
+asks for `Enhanced`, one press of Escape leaves the game on the way down and
+quits the program on the way up.
+
+⚠ **The gate is `!= Release`, not `== Press`, and it sits BELOW the game's
+refusal.** A game that asked for `Enhanced` asked to see releases — that is the
+only reason to ask — so the Shell must stop acting on them without stopping them
+arriving.
+
+**termforge's own degradation event cannot fire for us.** Upstream calls
+`detail::keyboard_fallback_event` exactly once, from `App::setup()`
+(`src/lib/core/app.cpp:51-54`), against whatever mode it holds *then*. We set the
+mode at game entry, long after `setup()` returned and answered about `Legacy`. So
+the Shell raises its own `ErrorEvent{Info, "keyboard"}`. Without it, a player on
+a terminal with no kitty protocol gets a Tetris whose DAS silently is not DAS.
+
+### Three of ten mutations went green, and two were claims in a comment
+
+| Mutation | Result |
+|---|---|
+| Gate written `action == Press` | ⚠ **green.** The comment justified the wider predicate by claiming a Press-only gate kills hold-to-scroll. **Wrong** — arrows reach `ListWidget` through `m_ring.handle_key`, and upstream already drops releases there itself (`focus_ring.cpp:50`). For the only keys this gate owns, Press and Repeat are the same. What breaks the menu is `== Press` **together with** hoisting the call above the ring; neither half is visible alone, and the case now asserts the pair |
+| Gate hoisted above `m_game->on_event` | ⚠ **green.** The placement is the entire point and nothing asserted it. Now pinned through Minesweeper's cursor, which moves on an arrow whatever the `KeyAction` |
+| A *released* arrow moving the selection | ⚠ **unasserted.** Added beside its positive half. It pins **upstream's** contract, so a future pin bump that stopped dropping releases in the ring surfaces here |
+| Either `set_keyboard_mode` call deleted; the notice keyed on `keyboard_mode()` | **green, and not a finding** — see below |
+
+⚠ **The mode-switching branch has no consumer, and no test can give it one.**
+Every roster entry declares `Legacy` and `all_games()` is a file-local
+`constexpr` table with no injection seam, so deleting either `set_keyboard_mode`
+call leaves the suite green. It was **red-verified in a pty** instead, by
+flipping Snake to `Enhanced` in a scratch tree — with a **control** run proving
+the evidence came from the flip:
+
+| | flipped | control |
+|---|---|---|
+| `ESC[>27u` (push, on entry) | 1 | 0 |
+| `ESC[=0;1u` (restore on exit) | 1 | 0 |
+| `ESC[<u` (pop, on `leave_screen`) | 1 | 0 |
+| fallback notice on the footer | present | absent |
+| alternate screen in / out | 1 / 1 | 1 / 1 |
+
+The restore is an **overwrite, not a second push**, exactly as termforge's
+`terminal.hpp` claims — so the terminal's keyboard stack stays at most one deep
+however many games are entered and left. The flip was not committed. **Epic 6 is
+what makes this testable for real.**
+
+⚠ **Nothing here shows that `Enhanced` works.** This container's terminal has no
+kitty keyboard protocol and `test_run_frames` installs a `FallbackDriver` whose
+capabilities are all false, so every arm exercised anywhere is the degraded one.
 
 ---
 
@@ -948,7 +1043,7 @@ shipping.
 | [#27](https://github.com/gobha-me/termforge/issues/27) | CMake consumption (install/export, `PROJECT_IS_TOP_LEVEL` gating) | **closed — shipped in v0.1.7** |
 | [#58](https://github.com/gobha-me/termforge/issues/58) | Frame pacing: idle loop capped ~7.5fps | **closed — fixed** |
 | [#59](https://github.com/gobha-me/termforge/issues/59) | No `on_tick(dt)` hook | **closed — shipped in v0.1.8** |
-| [#60](https://github.com/gobha-me/termforge/issues/60) | No key release (Kitty keyboard protocol) | **closed — shipped in v0.2.2, and we are pinned to it.** `KeyEvent` gained `action` (`Press`/`Repeat`/`Release`) and `App::set_keyboard_mode` picks the tier. Additive and opt-in: the default, `KeyboardMode::Legacy`, is byte-for-byte what every earlier tag emitted, so nothing calls it yet. **Epic 6 (Tetris) is what wants `Enhanced`** — and must still degrade knowingly, because a terminal without the protocol never delivers `Release` and says so with one `ErrorEvent{Info}` |
+| [#60](https://github.com/gobha-me/termforge/issues/60) | No key release (Kitty keyboard protocol) | **closed — shipped in v0.2.2, and we are pinned to it.** `KeyEvent` gained `action` (`Press`/`Repeat`/`Release`) and `App::set_keyboard_mode` picks the tier. Additive and opt-in: the default, `KeyboardMode::Legacy`, is byte-for-byte what every earlier tag emitted, so nothing calls it yet. **Epic 6 (Tetris) is what wants `Enhanced`**, and gitea #32 built the seam that gets there — and it must still degrade knowingly, because a terminal without the protocol never delivers `Release`. ⚠ The `ErrorEvent{Info}` upstream emits from `setup()` does **not** cover us: the mode is set at game entry, long after that call answered about `Legacy`, so the Shell raises its own |
 | [#61](https://github.com/gobha-me/termforge/issues/61) | `Key` enum stops at F4 | **closed — shipped in v0.1.9** |
 | [#62](https://github.com/gobha-me/termforge/issues/62) | `Cell` has no text attributes | **closed — shipped as `Attr` in v0.1.16, and we are pinned to it — but nothing uses it.** Still costs Minesweeper a column per cell (63 vs 33 for Hard). Spending it is its own issue; see "the payoff we did not spend" above, including the correction that `FallbackDriver` **does** emit `Reverse` |
 | [#63](https://github.com/gobha-me/termforge/issues/63) | `Image` has no blit/alpha compositing | **closed — shipped in v0.1.18, and we are pinned to it.** Unblocks Epic 8 |
