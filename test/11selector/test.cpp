@@ -80,6 +80,44 @@ class Probe final : public Shell {
       .key = termforge::Key::Char, .ch = U'c', .ctrl = true}};
 }
 
+// The same three keys again, carrying a KeyAction (termforge #60, v0.2.2).
+//
+// ⚠ These construct an event NO TERMINAL CAN SEND US TODAY, and that is the
+// point rather than a flaw. KeyAction::Release is only ever delivered under a
+// KeyboardMode above Legacy, no game on the roster asks for one yet, and the
+// first that does will be Tetris (gitea #7). The Shell's gate against them
+// therefore has to be pinned by synthesis or not at all — and "not at all"
+// means the gate lands together with the game that makes it reachable, which
+// is the bundling gitea #32 exists to avoid.
+//
+// ⚠ .action is the LAST member of KeyEvent, appended deliberately because the
+// upstream parser aggregate-initializes positionally. Designated initializers
+// here mean a future field cannot silently shift what we are setting.
+[[nodiscard]] auto key_released(termforge::Key k) -> termforge::Event {
+  return termforge::Event{termforge::KeyEvent{
+      .key = k, .action = termforge::KeyAction::Release}};
+}
+
+[[nodiscard]] auto key_repeated(termforge::Key k) -> termforge::Event {
+  return termforge::Event{termforge::KeyEvent{
+      .key = k, .action = termforge::KeyAction::Repeat}};
+}
+
+[[nodiscard]] auto ch_released(char32_t c) -> termforge::Event {
+  return termforge::Event{
+      termforge::KeyEvent{.key = termforge::Key::Char,
+                          .ch = c,
+                          .action = termforge::KeyAction::Release}};
+}
+
+[[nodiscard]] auto ctrl_c_released() -> termforge::Event {
+  return termforge::Event{
+      termforge::KeyEvent{.key = termforge::Key::Char,
+                          .ch = U'c',
+                          .ctrl = true,
+                          .action = termforge::KeyAction::Release}};
+}
+
 [[nodiscard]] auto click(int x, int y, int button = 0, bool pressed = true)
     -> termforge::Event {
   return termforge::Event{termforge::MouseEvent{
@@ -684,4 +722,118 @@ TEST_CASE("a silent build still records what was asked for",
   REQUIRE(stats.pushed == 0);
   REQUIRE(stats.dropped == 0);
   REQUIRE(stats.silenced >= 1);
+}
+
+// ── The keyboard tier, and the Shell's gate on KeyAction (gitea #32) ─────────
+//
+// Everything below is about a contract that has no consumer yet: no game on
+// this roster asks for a KeyboardMode above Legacy, so no terminal will ever
+// hand this Shell a Release. That is precisely why the cases exist here and
+// now — the gate has to be correct BEFORE the first game turns the tier on,
+// because after that a bug in it is indistinguishable from a bug in the game.
+//
+// ⚠ What these cases CANNOT show is that Enhanced works. This container's
+// terminal has no kitty keyboard protocol, and test_run_frames installs a
+// FallbackDriver whose capabilities() are all false — so every arm exercised
+// anywhere in this suite is the degraded one. See STATUS.md.
+
+TEST_CASE("a released Escape does not quit to the menu a second time",
+          "[selector][keyboard]") {
+  // ⚠ THE BUG THIS CHANGE EXISTS TO PREVENT. Under Enhanced, one press of
+  // Escape delivers two events: the press, which means "back to the menu", and
+  // the release. Ungated, the release finds the Shell already in the selector
+  // and quit_app()s — so a player leaving Tetris would leave the program.
+  Probe app;
+  enter_game(app);
+
+  app.dispatch_event(key_released(termforge::Key::Escape));
+  REQUIRE(app.state() == Shell::State::InGame);
+  REQUIRE(app.current_game() != nullptr);
+
+  // The press still does what it always did. Asserted in the same case rather
+  // than a sibling: "the release is ignored" is worthless without a control
+  // proving the key is otherwise live on this path.
+  app.dispatch_event(key(termforge::Key::Escape));
+  app.step();
+  REQUIRE(app.state() == Shell::State::Selector);
+}
+
+TEST_CASE("a released Escape in the selector does not quit the app",
+          "[selector][keyboard]") {
+  Probe app;
+  app.step();
+
+  app.dispatch_event(key_released(termforge::Key::Escape));
+  // ⚠ Asserted BEFORE the next step() — trap 4. running() is re-armed on entry
+  // to test_run_frames, so after a step it is true whatever the key did.
+  REQUIRE(app.running());
+  REQUIRE(app.state() == Shell::State::Selector);
+}
+
+TEST_CASE("a released Ctrl+C does not quit the app", "[selector][keyboard]") {
+  // The break-glass is the worst one to double-fire: it is routed past the
+  // overlay stack on purpose, so it is reachable from every state including a
+  // modal, and it takes the whole program with it.
+  Probe app;
+  app.step();
+
+  app.dispatch_event(ctrl_c_released());
+  REQUIRE(app.running());
+
+  app.dispatch_event(ctrl_c());
+  REQUIRE_FALSE(app.running());
+}
+
+TEST_CASE("a released p does not open the pause dialog",
+          "[selector][keyboard]") {
+  Probe app;
+  enter_game(app);
+
+  app.dispatch_event(ch_released(U'p'));
+  REQUIRE(app.state() == Shell::State::InGame);
+
+  app.dispatch_event(ch(U'p'));
+  REQUIRE(app.state() == Shell::State::Paused);
+}
+
+TEST_CASE("a repeated arrow still moves the selection",
+          "[selector][keyboard]") {
+  // ⚠ THE HALF THAT IS EASY TO GET WRONG IN THE OTHER DIRECTION. The gate is
+  // "drop Release", not "keep only Press". Under Enhanced the terminal sends
+  // Repeat INSTEAD OF a second Press while a key is held, so a gate written as
+  // `action == Press` would silently kill hold-to-scroll in the menu the day
+  // any game turns the tier on — with no error and nothing in the suite to say
+  // so, since a plain press would keep working.
+  if (termgame::all_games().size() < 2) return;
+
+  Probe app;
+  app.step();
+  REQUIRE(app.selector_index() == 0);
+
+  app.dispatch_event(key_repeated(termforge::Key::Down));
+  REQUIRE(app.selector_index() == 1);
+}
+
+TEST_CASE("the keyboard tier is the game's, and is given back on the way out",
+          "[selector][keyboard]") {
+  // Every entry in the roster today declares Legacy, so this asserts the
+  // identity case: entering and leaving a game must not move the tier. It is
+  // the regression guard for the OTHER direction of gitea #32 — a Shell that
+  // set Enhanced globally, or that forgot to restore, would fail here the
+  // moment the first game asks for a tier, which is exactly when nobody would
+  // be looking at this file.
+  for (const auto& entry : termgame::all_games()) {
+    REQUIRE(entry.meta.keyboard == termforge::KeyboardMode::Legacy);
+  }
+
+  Probe app;
+  REQUIRE(app.keyboard_mode() == termforge::KeyboardMode::Legacy);
+
+  enter_game(app);
+  REQUIRE(app.keyboard_mode() == termforge::KeyboardMode::Legacy);
+
+  app.dispatch_event(key(termforge::Key::Escape));
+  app.step();
+  REQUIRE(app.state() == Shell::State::Selector);
+  REQUIRE(app.keyboard_mode() == termforge::KeyboardMode::Legacy);
 }
