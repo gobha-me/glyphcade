@@ -2,7 +2,7 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-07-29** (Epic 2 — audio)
+**Last updated: 2026-07-30** (Epic 4 — 2048)
 
 ---
 
@@ -38,9 +38,25 @@ is verified is that it builds in six arms, that the offline path renders what it
 claims to, and that the no-device path degrades correctly — not that the bank
 sounds good, or indeed that a real device works at all.
 
-**Next move: Epic 4 (2048) or Epic 5 (Snake)** — both unblocked, and 2048 is
-worth slightly more because a second registered game turns four currently-inert
-selector assertions live (see the deferral table below).
+**Epic 4 has landed. There are two games.** 2048 is registered, playable with
+arrows/hjkl/wasd, one level of undo, and it is the first game with **motion** — a
+designed tween rather than a ported one, because the HTML reference has no
+working slide animation to port. See "What Epic 4 built" below.
+
+That second registered game also turned on what it promised: four `size() > 1`
+assertions in `test/11selector` went live for free, and the case they could never
+cover — a click on a **non**-selected row, the only gesture that discriminates the
+`State::Selector` guard in the mouse path — is now written.
+
+⚠ What is verified is rules, geometry, rendering and sound-intent. **Feel is
+not**: whether 90 ms of slide and 70 ms of pop are right, whether the board is
+pleasant to play, and whether Slide and Merge sound like anything — all still
+need a human. Nothing in this container can judge any of them.
+
+**Next move: Epic 5 (Snake)**, or gitea
+[#14](https://git.gobha.me/xcaliber/term-game/issues/14) (high-score
+persistence), whose deferral condition — "the second scoring game" — Epic 4 has
+now met.
 
 Since Epic 3, two housekeeping issues have landed.
 gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16) moved the pin to
@@ -68,11 +84,11 @@ together, so it is worth stating once rather than leaving implied.
 | 1 — Arcade shell | **done** | — |
 | 2 — Audio engine | **done** | — |
 | 3 — Minesweeper | **done** | — |
-| 4 — 2048 | **ready** | — |
+| 4 — 2048 | **done** | — |
 | 5 — Snake | **ready** | — |
 | 6 — Tetris | **ready** | termforge #60 (degradable — feel only) |
-| 7 — Sokoban | not started | termforge #64 → #63 |
-| 8 — Solitaire | not started | termforge #63 |
+| 7 — Sokoban | not started | ~~termforge #64 → #63~~ — both shipped upstream; blocked on the pin bump, gitea [#24](https://git.gobha.me/xcaliber/term-game/issues/24) |
+| 8 — Solitaire | not started | ~~termforge #63~~ — shipped upstream; blocked on the pin bump, gitea [#24](https://git.gobha.me/xcaliber/term-game/issues/24) |
 
 **Nothing that ever blocked Epics 0–5 is still open.** termforge
 [#27](https://github.com/gobha-me/termforge/issues/27) (install/export),
@@ -247,6 +263,148 @@ the commit message for all five verbatim.
 
 ---
 
+## What Epic 4 built
+
+2048, in five pieces — minesweeper's four-file split plus the one it never needed:
+
+- **[`board.hpp`](include/termgame/games/twenty48/board.hpp)** — the rules.
+  Slide/merge per direction, 90/10 spawning, win as a latch, loss via
+  `can_move()`, one level of undo. It includes **no termforge header**, which is
+  what makes `test/22twenty48` *unable* to construct a `Screen`.
+- **[`anim.hpp`](include/termgame/games/twenty48/anim.hpp)** — the tween. Also no
+  termforge, and it does not know `Board` either: it takes a span of cell values,
+  so it is drivable by N fixed ticks with no terminal.
+- **[`layout.hpp`](include/termgame/games/twenty48/layout.hpp)** — 6×3 tiles, gap
+  1, **29×19 needed**. `tile_x`/`tile_y` have `double` overloads, which is the
+  tween's only entry into geometry.
+- **[`glyphs.hpp`](include/termgame/games/twenty48/glyphs.hpp)** — the colour ramp
+  ported from the reference's CSS, the ASCII lattice, and four `static_assert`s.
+- **[`twenty48.hpp`](include/termgame/games/twenty48/twenty48.hpp)** — the `Game`,
+  and the only file that knows `Screen`, `Event` or `GameContext` exist.
+
+### The tween was designed, not ported
+
+**The reference has no working slide animation.** `2048/css/style.css:161`
+declares `transition: transform 0.12s ease-out` and it never fires: `render()`
+does `tileLayer.innerHTML = ''` and rebuilds every element with its transform
+already set, and a freshly inserted element has no prior computed value to
+interpolate from. Tiles teleport. Worse, the two `@keyframes` that *do* fire
+animate `transform` — the same property carrying position, and a CSS animation
+outranks an inline declaration — so every new or merged tile drops its
+`translate()` and renders at the layer origin for 200 ms before snapping back.
+
+What made a real tween possible: `Board::move()` reports the **motion facts** the
+reference destroys inside `slideRow`. Its `filter(Boolean)` drops positions before
+anything decides what merges, and although it does issue tile ids, **nothing ever
+reads them** — identity dies at its view boundary. Ours is that discarded
+information made explicit: `from`, `to`, the pre-move value, and whether this tile
+is one of two merging into one cell.
+
+Two properties are structural rather than maintained by care:
+
+- **`draw()` renders from the `Anim`, always** — never from the `Board`, not even
+  at rest. A finished `Anim` holds exactly the resting board at integer positions,
+  so there is one path to the pixels and it cannot disagree with itself. Same
+  argument as one-`Layout`-per-frame.
+- **Input is never queued and never blocked.** A direction arriving mid-slide
+  snaps the animation and resolves immediately, so ten moves produce the same
+  board whether they arrive one per frame or all in one frame. That is AGENTS.md's
+  "animation is never a participant in game logic" as a test.
+
+### Divergences from the reference, each pinned by a case
+
+| Reference | Ours | Why |
+|---|---|---|
+| ⚡ power tiles interleaved through the move loop | **stripped**, classic 2048 | decided before the epic; the mechanic is not decoration |
+| the 2-vs-4 spawn odds live *inside* the power ternary (`game.js:57`) | 90/10 preserved | ⚠ **the biggest strip trap**: deleting the mechanic naively deletes every 4, producing a game that looks right and plays easier |
+| `saveState()` runs unconditionally at `move()` entry; an illegal move then nulls it | snapshot only on a move that changed something | in the reference, a good move followed by a no-op direction silently destroys your undo — while leaving the button enabled |
+| `undo()` force-sets `gameOver = false` | restores the recorded state | right for the same reason; the reference's version would be wrong after a win |
+| win on `value === 2048` | `>= kWinTile` | values only double so they agree in practice; `>=` does not depend on that staying true |
+| a win overlay that does not gate input | `Won` is a latch, play continues, `Lost` overrides it | a modal that fails to block input is a lie about state |
+| `Math.random()` | `arcade/rng.hpp` | `std::uniform_int_distribution` is not specified bit-for-bit — the argument `board.hpp` already made |
+
+`splitmix64` **moved** out of `minesweeper/board.hpp` into
+[`arcade/rng.hpp`](include/termgame/arcade/rng.hpp) rather than being copied,
+since being byte-identical across toolchains is the whole reason it is
+hand-rolled. `minesweeper::Rng` still resolves via a using-declaration, so no call
+site moved — and minesweeper's seed-pinned mine layouts are unchanged, which is
+how we know the move was code-identical.
+
+### Audio
+
+`SfxId` gains **Slide** and **Merge**. A move that merges plays Merge *instead of*
+Slide, so one gesture is still one sound.
+
+- **No Spawn effect**, despite gitea #5 listing one: a spawn happens on every
+  legal move, so a spawn sound is a second blip on every gesture.
+- **One Merge, not one per tile value.** Pitching by the result needs
+  `2^(cents/1200)`, i.e. `exp`, which is the portability trap the synth exists to
+  avoid.
+- Fingerprints in `test/18audio-synth` were **regenerated by measurement**, not
+  guessed. ⚠ Still unheard, like the rest of the bank.
+
+### Mutation-tested, and three findings changed the code
+
+Six mutations; every one now turns something red, but two did not at first:
+
+1. **Folding the merged value back** so a tile can merge twice → 2 tests red.
+2. **`advance()` assuming a fixed 60 Hz dt** → `22twenty48` red. ⚠ It did **not**
+   at first: the frame-rate case compared only the *final* state across
+   chunkings, which `finish()` sets, so every chunking agreed no matter what the
+   interpolation did — it never exercised a mid-slide frame. It now compares state
+   at a **matched elapsed instant**, reached in 1 step and in 37.
+3. **`phase()`'s clamp into [0,1] was unreachable** and is **gone**. Both call
+   sites are already bounded — the slide branch runs only below `kSlide`, the pop
+   branch only above it, and `advance()` finishes past `kSlide + kPop`. Removed on
+   the precedent of `announce()`'s bool: a guard restating what the surrounding
+   code guarantees reads as load-bearing to the next person simplifying around it.
+4. **Dropping 2048 from `kGames`** → `12registry` red, via its new own
+   `CMakeLists.txt` that passes CMake's game count. A by-name case cannot see a
+   game that was compiled and linked and then left out of the table — which since
+   the per-game split is a real shape of mistake, because adding a game touches a
+   CMakeLists *and* `all_games.cpp`.
+5. **Removing the status row's reserved gap** → `23twenty48-ui` red. ⚠ Also not at
+   first, and the reason is worth keeping: there were **two** independent
+   mechanisms for one property, and each alone protected the assertion being made.
+   The budget prevents overlap; drawing the word last makes the word win any
+   overlap. The case only checked the word and the *first* counter, so a run where
+   `moves 0` was rendered as `moves` with its digits eaten passed. It now requires
+   every field that appears to appear in full. **The budget is the fix; the draw
+   order is a chosen failure mode, not a second guard.**
+6. **Neutering `announce()`'s no-op guard** → `23twenty48-ui` red. A rejected key
+   must be *silent*: there is no deny blip in the bank and inventing one is a feel
+   decision nobody who cannot hear it should make.
+
+### ⚠ A 7-bit violation the existing tests could not see
+
+2048's `description` originally read `"Reach 2048 — then keep going"`. The em dash
+reached a **bare pty**, because the selector prints the description on the
+no-colour tier.
+
+`glyphs.hpp` asserts 7-bit for tiles and `icon_is_safe()` covers the one field
+that is deliberately not ASCII — but **nothing covered the prose**, which is the
+field most likely to be written by someone reaching for a nice dash. And
+`test/11selector`'s 7-bit sweep runs at 60×20, where the detail pane wraps the
+description and the offending byte fell outside the visible rows.
+
+That is the general hazard of asserting on rendered output: **the assertion covers
+only what the viewport happened to include.** Hence the new check is at compile
+time against the source string — `meta_text_is_ascii()` in `arcade/game_meta.hpp`,
+asserted over the whole table in `all_games.cpp`. Verified by building against the
+unfixed description first.
+
+### What Epic 4 deliberately did not build
+
+| Deferred | Condition to revisit |
+|---|---|
+| **High-score persistence** | gitea [#14](https://git.gobha.me/xcaliber/term-game/issues/14). Its condition — "the second scoring game" — is now **met**; this is the next thing to build, wired into *both* games so the record shape is proven not to be one integer |
+| A **mouse** gesture | 2048 is four directions and an undo. Nothing a click could mean that a key does not already say, and inventing one is a feel decision with no reference behind it |
+| A minimum terminal size in `GameMeta` | gitea [#15](https://git.gobha.me/xcaliber/term-game/issues/15), same answer as Epic 3: the game ships its own too-small screen (needs 29×19; the Shell's floor is 20×8) |
+| A **tuned** tween | 90 ms slide, 70 ms pop, linear. Named constants in `anim.hpp` rather than inline, precisely so whoever can play it has one place to change. An ease curve is a feel decision |
+| **In-game pop at the ASCII tier** | A character cell cannot scale a glyph, and a merge can produce a six-digit label in a six-column tile, so there is no room for decoration. The pop is colour-tier emphasis; at the bottom tier the number changed, which is the information |
+
+---
+
 ## What Epic 3 built
 
 Minesweeper, in four pieces, three of which name no termforge type at all:
@@ -320,8 +478,11 @@ quarantined outside the exported package.
   masked at use, so it holds exactly N with no sacrificial slot; acquire/release
   pairing between the slot write and the index publish; the two indices padded
   onto separate cache lines.
-- **`audio/synth.hpp`** — `Wave`, a linear `Adsr`, `SfxSpec`, and an eight-entry
-  bank: Click, Reveal, Flag, Explode, Win, Lose, MenuMove, MenuSelect.
+- **`audio/synth.hpp`** — `Wave`, a linear `Adsr`, `SfxSpec`, and a **ten**-entry
+  bank: Click, Reveal, Flag, Explode, Win, Lose, MenuMove, MenuSelect, and — added
+  by Epic 4 — Slide and Merge. ⚠ Appended at the END of the enum on purpose:
+  `kBank` is indexed by the enum's numeric value, so inserting rather than
+  appending renumbers existing effects.
 - **`audio/sink.hpp`** — `AudioSink` plus `NullSink` and `WavFileSink`. No
   rtaudio anywhere near it.
 - **`audio/engine.hpp`** — the mixer, the `Engine`, and the `Player` handle a
@@ -380,7 +541,7 @@ Not a formality — these all looked correct and were not:
 |---|---|
 | **A tuned bank** | Nothing here has been heard. Render a session with `TERMGAME_AUDIO_WAV=/tmp/session.wav ./build/src/bin/term-game` and listen; the fingerprints in `test/18audio-synth` record what the bank IS, not what it should sound like, and are expected to move when it is retuned. |
 | **In-game cursor-move SFX** | A blip per keystroke under a held arrow key needs a rate limit; a rate limit needs a clock; `dt` inside `Game::tick` is the only clock a game may read. A feel decision requiring an ear. |
-| **A positive `MenuMove` assertion** | `all_games()` has one entry and `ListWidget` clamps, so nothing moves the selection at runtime. The test exists behind a `size() > 1` guard and goes live with Epic 4. |
+| **A positive `MenuMove` assertion** | **done** — Epic 4 registered a second game, so the `size() > 1` guard now passes and the assertion runs. |
 | **Coverage of the `State::Selector` guard** in both selector handlers | Established by mutation: deleting it from the mouse path leaves the suite green, because with one game a click does not move the selection. Kept because the argument is sound; untested until a second game exists. |
 | **Detune / per-play gain** | Detune needs `2^(cents/1200)`, i.e. `exp`, i.e. the portability trap the synth was written to avoid. Nothing consumes either yet. |
 | **A limiter** | Would let the bank be louder than −18 dBFS. Must be heard to be trusted. |
