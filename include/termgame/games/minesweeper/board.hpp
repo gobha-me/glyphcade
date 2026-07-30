@@ -21,6 +21,11 @@
 #include <string_view>
 #include <vector>
 
+// The only termgame header this file includes, and still no termforge one — which
+// is what makes test/14minesweeper unable to construct a Screen rather than
+// merely not doing so.
+#include <termgame/arcade/rng.hpp>
+
 namespace termgame::minesweeper {
 
 struct Coord {
@@ -71,44 +76,16 @@ struct Cell {
   std::uint8_t adjacent{0};
 };
 
-// A fully specified PRNG, deliberately NOT <random>.
+// The PRNG moved to <termgame/arcade/rng.hpp> when 2048 needed the same
+// generator, and this alias is why nothing here had to change: `Rng`,
+// `minesweeper::Rng` and `termgame::Rng` are all the same type.
 //
-// std::mt19937 is specified bit-for-bit but std::uniform_int_distribution is
-// NOT — its mapping from engine output to range is implementation-defined. This
-// repo builds under both libstdc++ and libc++, so "same seed, same board" via
-// <random> would be a coin flip between toolchains, and the determinism test
-// would pass on GCC while being a lie on Clang.
-class Rng {
- public:
-  explicit constexpr Rng(std::uint64_t seed) noexcept : m_state(seed) {}
-
-  // splitmix64.
-  constexpr auto next() noexcept -> std::uint64_t {
-    m_state += 0x9E3779B97F4A7C15ULL;
-    std::uint64_t z = m_state;
-    z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
-    z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
-    return z ^ (z >> 31);
-  }
-
-  // Unbiased [0, n) by rejection on the low word (Lemire). Rejection here is
-  // bounded — it discards at most a 1/n fraction per draw — unlike the mine
-  // placement rejection loop this file replaces.
-  constexpr auto below(std::uint64_t n) noexcept -> std::uint64_t {
-    if (n <= 1) {
-      return 0;
-    }
-    const std::uint64_t limit = ~0ULL - (~0ULL % n);
-    std::uint64_t r = next();
-    while (r >= limit) {
-      r = next();
-    }
-    return r % n;
-  }
-
- private:
-  std::uint64_t m_state;
-};
+// Moved rather than copied — two hand-rolled splitmix64s would be two things to
+// keep byte-identical, and being byte-identical across toolchains is the entire
+// reason the class is hand-rolled instead of <random>. The reasoning lives with
+// the code now; see that header before touching it, because this file's mine
+// layouts are pinned against fixed seeds in test/14minesweeper.
+using termgame::Rng;
 
 // The 8-way neighbourhood, in-bounds only. Adjacency counting, chord's flag
 // count and flood fill all go through this, so the bounds check exists exactly

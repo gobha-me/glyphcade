@@ -23,13 +23,21 @@
 #include <iterator>
 
 #include <termgame/games/minesweeper/minesweeper.hpp>
+#include <termgame/games/twenty48/twenty48.hpp>
 
 namespace termgame {
 namespace {
 
 // Menu order is this order.
+//
+// ⚠ Each entry pairs a game's metadata with its factory, and no compiler can
+// check that the two belong together — bind Minesweeper's meta to 2048's factory
+// and the menu says "Minesweeper" while 2048 starts. test/12registry builds every
+// entry and compares the constructed game's meta against the table, which is the
+// only place that mistake is catchable.
 constexpr GameEntry kGames[] = {
     {Minesweeper::kMeta, &make_game<Minesweeper>},
+    {Twenty48::kMeta, &make_game<Twenty48>},
 };
 
 // ── The table checks itself ─────────────────────────────────────────────────

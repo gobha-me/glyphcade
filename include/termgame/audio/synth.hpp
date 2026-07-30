@@ -73,6 +73,19 @@ enum class SfxId : std::uint8_t {
   Lose,
   MenuMove,
   MenuSelect,
+  // Added for 2048. A move that merges nothing gets Slide; a move that merges
+  // anything gets Merge instead, so one gesture is still one sound.
+  //
+  // ⚠ There is deliberately no Spawn effect, which diverges from gitea #5's
+  // "SFX: slide, merge, spawn, game-over". A spawn happens on EVERY legal move,
+  // so a spawn sound is a second blip on every single gesture — that is not a
+  // sound, it is a stutter. Nothing is lost: the move already sounded.
+  //
+  // ⚠ And there is one Merge, not one per tile value. Pitching a merge by the
+  // resulting tile would need 2^(cents/1200), i.e. exp, which is the exact
+  // portability trap this synth exists to avoid (see the header note above).
+  Slide,
+  Merge,
 };
 
 // Every id, in order, so a test can loop the whole bank and a new effect cannot
@@ -83,9 +96,13 @@ enum class SfxId : std::uint8_t {
 // length, and would have quietly excluded one whole effect from every test that
 // loops the bank. A hand-written list parallel to an enum wants a machine to
 // check it.
-inline constexpr std::array<SfxId, 8> kSfxIds{
-    SfxId::Click, SfxId::Reveal,   SfxId::Flag,     SfxId::Explode,
-    SfxId::Win,   SfxId::Lose,     SfxId::MenuMove, SfxId::MenuSelect,
+// ⚠ ENUM order, not thematic order. Slide and Merge are appended at the end
+// rather than grouped with the other in-game effects, because appending cannot
+// renumber an existing id — and kBank is indexed by that number.
+inline constexpr std::array<SfxId, 10> kSfxIds{
+    SfxId::Click,    SfxId::Reveal,     SfxId::Flag,  SfxId::Explode,
+    SfxId::Win,      SfxId::Lose,       SfxId::MenuMove, SfxId::MenuSelect,
+    SfxId::Slide,    SfxId::Merge,
 };
 
 // Every id appears exactly once: each entry equals its own index, which is only
