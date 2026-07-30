@@ -300,6 +300,13 @@ TEST_CASE("the status counters never overwrite the outcome word",
     std::vector<int> cells(kCells, 0);
     cells[0] = 131072;  // the widest possible counters
     g->load(cells, 999999);
+    // ⚠ A move is needed to populate `record`, and it has to be a NO-OP one. The
+    // single tile sits at (0,0), so Left cannot slide or merge it: the board,
+    // the score and the move count all stay exactly as loaded — which the other
+    // three expectations below depend on — while apply() still runs
+    // record_best() and puts 999999 in the store. Any other direction spawns a
+    // tile and turns "moves 0" into "moves 1".
+    app.dispatch_event(key(termforge::Key::Left));
     app.step(1, cols, 24);
 
     const std::string status = row_text(app, 0);
@@ -317,11 +324,17 @@ TEST_CASE("the status counters never overwrite the outcome word",
     // as a narrow terminal, a truncated number reads as a wrong score. So the
     // contract is whole-fields-or-nothing, and this is what holds the budget
     // arithmetic to it.
+    //
+    // ⚠ "record" is in this list, not just the original three. A fourth field
+    // whose width nothing checks is a fourth field that can silently run into
+    // the word — and it is the one most likely to, being last in the priority
+    // order and therefore the one the budget cuts closest.
     for (const auto& [label, full] :
          std::vector<std::pair<std::string, std::string>>{
              {"score", "score 999999"},
              {"best", "best 131072"},
-             {"moves", "moves 0"}}) {
+             {"moves", "moves 0"},
+             {"record", "record 999999"}}) {
       if (status.find(label) != std::string::npos) {
         REQUIRE(status.find(full) != std::string::npos);
       }
@@ -511,4 +524,95 @@ TEST_CASE("winning plays Win once, and not the merge that caused it",
   // And the latch means it fires ONCE, not on every subsequent move.
   app.dispatch_event(key(termforge::Key::Down));
   REQUIRE(app.audio().play_count(SfxId::Win) == win_before + 1);
+}
+
+// ── Best score (gitea #14) ──────────────────────────────────────────────────
+//
+// The store's own format and merge live in test/24scores. What is asserted here
+// is the two properties that are 2048's rather than the store's: that the record
+// belongs to the SHELL and not to the Game, and that recording after every move
+// is safe in the presence of undo.
+
+TEST_CASE("a best score outlives the game that set it", "[2048][scores]") {
+  // ⚠ A fresh Twenty48 is built per menu entry, so a best score held in the Game
+  // would reset on every quit-to-menu — the reason gitea #14 exists at all.
+  // Move the store into the Game and this is the case that goes red.
+  Probe app;
+  enter_2048(app);
+  auto* g = game_of(app);
+  REQUIRE(g != nullptr);
+
+  std::vector<int> cells(kCells, 0);
+  cells[0] = 2;
+  cells[1] = 2;
+  g->load(cells, 0);
+  app.dispatch_event(key(termforge::Key::Left));  // merges: 2+2 -> 4, score 4
+  app.step();
+  REQUIRE(g->board().score() == 4);
+  REQUIRE(app.scores().get("2048", "best_score") == 4);
+  REQUIRE(row_text(app, 0).find("record 4") != std::string::npos);
+
+  app.dispatch_event(key(termforge::Key::Escape));
+  app.step();
+  REQUIRE(app.state() == Shell::State::Selector);
+
+  enter_2048(app);
+  auto* second = game_of(app);
+  REQUIRE(second != nullptr);
+  // Freshness through state rather than pointer identity: the allocator reuses
+  // the address of the game it just destroyed more often than not.
+  REQUIRE(second->board().score() == 0);
+  REQUIRE(row_text(app, 0).find("record 4") != std::string::npos);
+  // The live score is the new game's; only the record carries over.
+  REQUIRE(row_text(app, 0).find("score 0") != std::string::npos);
+}
+
+TEST_CASE("undo lowers the score and does not lower the record",
+          "[2048][scores]") {
+  // ⚠ THE CASE THAT LICENSES RECORDING ON EVERY MOVE. Twenty48::apply() calls
+  // record_best() unconditionally, with no end-of-run hook and no guard in the
+  // undo path — which is only correct because Store::record() is monotone. Make
+  // record() assign unconditionally instead of comparing and this goes red while
+  // every other 2048 case stays green.
+  Probe app;
+  enter_2048(app);
+  auto* g = game_of(app);
+  REQUIRE(g != nullptr);
+
+  std::vector<int> cells(kCells, 0);
+  cells[0] = 2;
+  cells[1] = 2;
+  g->load(cells, 0);
+  app.dispatch_event(key(termforge::Key::Left));
+  app.step();
+  const int high = g->board().score();
+  REQUIRE(high == 4);
+  REQUIRE(app.scores().get("2048", "best_score") == high);
+
+  app.dispatch_event(ch(U'u'));  // undo
+  app.step();
+  REQUIRE(g->board().score() == 0);  // the live score really did go down...
+  REQUIRE(app.scores().get("2048", "best_score") == high);  // ...the record did not
+  REQUIRE(row_text(app, 0).find("record 4") != std::string::npos);
+}
+
+TEST_CASE("2048 records the highest tile as well as the score", "[2048][scores]") {
+  // best_tile is persisted and deliberately NOT displayed — the row has no width
+  // for a fifth field and "best" there is already the LIVE maximum tile. It is
+  // kept because two keys under one slug is the concrete form of "a record is not
+  // one integer", which is the whole reason #14 waited for a second game.
+  Probe app;
+  enter_2048(app);
+  auto* g = game_of(app);
+  REQUIRE(g != nullptr);
+
+  std::vector<int> cells(kCells, 0);
+  cells[0] = 512;
+  cells[1] = 512;
+  g->load(cells, 0);
+  app.dispatch_event(key(termforge::Key::Left));
+  app.step();
+
+  REQUIRE(app.scores().get("2048", "best_tile") == 1024);
+  REQUIRE(app.scores().get("2048", "best_score") == 1024);
 }
