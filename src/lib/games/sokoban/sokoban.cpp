@@ -11,12 +11,15 @@
 //     the overlapping top-left corner "like Screen::resize does". It builds a
 //     fresh zero-filled grid and moves it in. Loading a level therefore has to
 //     size first and populate second, and a second set_map_size() with the same
-//     dimensions still throws the map away. See load().
+//     dimensions still throws the map away. See load(). Filed as termforge
+//     https://github.com/gobha-me/termforge/issues/127.
 //  2. There is NO tile_at(cell_x, cell_y). To turn a click into a tile the app
 //     must re-derive camera(), the tile size and the FLOORED viewport extent —
 //     which is the widget's own private viewport_tiles(). That is the exact
 //     arithmetic the design doc says the app should not be doing, in the
 //     paragraph explaining why the widget owns the camera. See handle_mouse().
+//     Filed as termforge https://github.com/gobha-me/termforge/issues/128, and
+//     it is this repo's ONE workaround.
 //  3. Tile id 0 is "transparent" and the constant (kEmptyId) is private, so the
 //     convention is one a consumer has to know rather than name. Our Tile enum
 //     starts at 1 for that reason; see glyphs.hpp.
@@ -310,10 +313,10 @@ auto Sokoban::handle_mouse(const termforge::MouseEvent& mouse) -> bool {
   // reproduce its arithmetic in order to hit-test.
   //
   // ⚠ THIS IS A WORKAROUND, and it is the only one in the repo (STATUS.md keeps
-  // the count). DELETION CONDITION: termforge grows a tile-picking accessor —
-  // `tile_at(cell_x, cell_y)` is already listed under Future work in
-  // docs/map-widget.md. When it lands, this block becomes one call and the
-  // duplicated arithmetic goes with it.
+  // the count). DELETION CONDITION: termforge
+  // https://github.com/gobha-me/termforge/issues/128 ships a tile-picking
+  // accessor. When it lands, this block becomes one `tile_at(x, y)` call and
+  // the duplicated viewport arithmetic goes with it.
   const auto [cam_x, cam_y] = m_map.camera();
   const int cx = mouse.x - m_layout.view_x;
   const int cy = mouse.y - m_layout.view_y;

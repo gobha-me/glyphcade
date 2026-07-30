@@ -174,9 +174,9 @@ together, so it is worth stating once rather than leaving implied.
 `Sokoban::handle_mouse` re-derives `MapWidget`'s camera, tile size and floored
 viewport extent in app code, because the widget has no `tile_at(cell_x, cell_y)`
 and its `viewport_tiles()` is private. There is no way to hit-test a tile map
-without it. **Deletion condition: termforge grows a tile-picking accessor** — it
-is listed under "Future work" in `docs/map-widget.md`, so upstream already
-intends to. Commented at the site, and item 2 of the feedback below. Saying "we
+without it. **Deletion condition: termforge
+[#128](https://github.com/gobha-me/termforge/issues/128)** ships a tile-picking
+accessor. Commented at the site, and item 2 of the feedback below. Saying "we
 have no workarounds" while carrying one would be the kind of claim this file
 exists to prevent.
 
@@ -201,7 +201,9 @@ Reading the tags rather than their titles:
 over `map_widget.*`, `image.cpp`, `image_loader.*` and their suites is empty. So
 the bump buys Epic 7 nothing, and it was deliberately not bundled into it: the
 whole signal of a pin bump is "nothing else moved", and burying it in an epic
-destroys that. Same reasoning that made gitea #24 its own issue.
+destroys that. Same reasoning that made gitea #24 its own issue — and it is now
+gitea [#36](https://git.gobha.me/xcaliber/term-game/issues/36), which also
+carries the `Widget::on_tick` audit the bump needs.
 
 ⚠ **The `MapWidget` sprite tier still does not exist at any tag.** Its gates
 (#83/#84) landed and `docs/map-widget.md` was updated to record that they had —
@@ -343,12 +345,15 @@ volunteered us for.
 1. **`set_map_size()` wipes every layer** while its own comment says it preserves
    the overlapping corner "like `Screen::resize` does". Loading a level must
    therefore size first and populate second, and a second call with identical
-   dimensions still throws the map away.
+   dimensions still throws the map away. Filed as termforge
+   [#127](https://github.com/gobha-me/termforge/issues/127).
 2. **There is no `tile_at(cell_x, cell_y)`.** Turning a click into a tile means
    re-deriving `camera()`, the tile size and the floored viewport extent out in
    app code — the widget's own private `viewport_tiles()`. That is precisely the
    arithmetic the design doc says an app should not do, in the paragraph
-   explaining why the widget owns the camera.
+   explaining why the widget owns the camera. Filed as termforge
+   [#128](https://github.com/gobha-me/termforge/issues/128), and it is the one
+   gap here that cost a workaround rather than a convention.
 3. **Tile id 0 means transparent and `kEmptyId` is private**, so the convention
    is one a consumer must know rather than name. Our `Tile` enum starts at 1.
 4. **`TileDef::glyph` is documented as one grapheme**, but tile size is declared
@@ -1559,7 +1564,9 @@ shipping.
 | [#61](https://github.com/gobha-me/termforge/issues/61) | `Key` enum stops at F4 | **closed — shipped in v0.1.9** |
 | [#62](https://github.com/gobha-me/termforge/issues/62) | `Cell` has no text attributes | **closed — shipped as `Attr` in v0.1.16, and we are pinned to it — but nothing uses it.** Still costs Minesweeper a column per cell (63 vs 33 for Hard). Spending it is its own issue; see "the payoff we did not spend" above, including the correction that `FallbackDriver` **does** emit `Reverse` |
 | [#63](https://github.com/gobha-me/termforge/issues/63) | `Image` has no blit/alpha compositing | **closed — shipped in v0.1.18, and we are pinned to it.** Unblocks Epic 8 |
-| [#64](https://github.com/gobha-me/termforge/issues/64) | MapWidget (Epic 3.6) | **shipped as `MapWidget` v1 (glyph tier) in v0.1.19, and SPENT by Epic 7** — Sokoban is its first consumer and produced four pieces of API feedback (see "What MapWidget's first consumer found"). ⚠ Still open upstream against the sprite tier, which **does not exist at any tag through v0.5.1** even though both its gates landed. We did not need it; **Epic 8 might** |
+| [#127](https://github.com/gobha-me/termforge/issues/127) | `MapWidget::set_map_size()` wipes every layer while claiming to preserve the corner | **open** — filed from Epic 7. Not a blocker: size first, populate second |
+| [#128](https://github.com/gobha-me/termforge/issues/128) | `MapWidget` has no `tile_at()`, so hit-testing re-derives the widget's private viewport arithmetic | **open** — filed from Epic 7, and the **deletion condition for this repo's one workaround** |
+| [#64](https://github.com/gobha-me/termforge/issues/64) | MapWidget (Epic 3.6) | **shipped as `MapWidget` v1 (glyph tier) in v0.1.19, and SPENT by Epic 7** — Sokoban is its first consumer and produced four pieces of API feedback (see "What MapWidget's first consumer found"), reported upstream as a comment on #64 plus #127 and #128. ⚠ Still open upstream against the sprite tier, which **does not exist at any tag through v0.5.1** even though both its gates landed. We did not need it; **Epic 8 might** |
 | [#75](https://github.com/gobha-me/termforge/issues/75) | Mouse tracking mode hardcoded to `?1002h`; no `?1003h`, no way to disable | **closed — shipped as `Terminal::set_mouse_mode` in v0.1.15, and the pin has been past it since — but nothing calls it.** The default, `MouseMode::Drag`, is byte-for-byte what we already emitted, so taking the tag changed nothing. `MouseMode::Motion` is what Minesweeper wants for buttonless hover; deferred to gitea [#18](https://git.gobha.me/xcaliber/term-game/issues/18) because it is a *feel* change and the dev container cannot verify feel |
 | [#71](https://github.com/gobha-me/termforge/issues/71) | `App::run()` skips `teardown()` on a throw | **closed — shipped in v0.1.10, and we are on it** (gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16)). The terminal-restore workaround is gone; our boundary survives as a diagnostic. `test/21exception` asserts the upstream guarantee via `test_winch_hooked()`, `pty-restore` asserts the escape bytes. |
 | [#72](https://github.com/gobha-me/termforge/issues/72) | `ListWidget` selection invisible at the fallback tier | **closed — shipped in v0.1.11, and we are on it** (gitea [#17](https://git.gobha.me/xcaliber/term-game/issues/17)). Our gutter marker is gone and the two columns went back to the list. The marker is `ListWidget`'s now, on by default and **inside `rect()`**, so a click on it selects — which the workaround could not do. `test/11selector` asserts the glyph in cell text at the ASCII tier, coverage the workaround never had. |
