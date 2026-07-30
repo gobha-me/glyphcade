@@ -20,7 +20,7 @@ namespace {
 // tuned bank — expect the maintainer to move them after listening, and treat
 // the fingerprints in test/18audio-synth as recording what IS, not what should
 // be.
-constexpr std::array<SfxSpec, 10> kBank{{
+constexpr std::array<SfxSpec, 11> kBank{{
     // Click — the generic acknowledgement. Short, dry, unobtrusive.
     {.wave = Wave::Square,
      .freq_start_hz = 660,
@@ -140,6 +140,23 @@ constexpr std::array<SfxSpec, 10> kBank{{
              .release_ms = 40},
      .gain_q8 = 22,
      .duty_q8 = 128},
+
+    // Eat (Snake) — a short rising blip. Deliberately NOT in Merge's register
+    // even though both mean "something good just happened": Snake's other two
+    // sounds are Click and Lose, so Eat only has to be distinct from a turn, and
+    // sitting an octave above Click is the cheapest way to be.
+    //
+    // Short (50 ms) because at the speed floor the snake steps every 30 ms, and
+    // a long eat sound would still be ringing when the next one starts on a
+    // board dense enough to eat twice in a row.
+    {.wave = Wave::Square,
+     .freq_start_hz = 880,
+     .freq_end_hz = 1320,
+     .duration_ms = 50,
+     .env = {.attack_ms = 1, .decay_ms = 10, .sustain_q8 = 160,
+             .release_ms = 28},
+     .gain_q8 = 20,
+     .duty_q8 = 96},
 }};
 
 static_assert(kBank.size() == kSfxIds.size(),
