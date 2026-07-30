@@ -165,6 +165,36 @@ TEST_CASE("a rotation against the left wall kicks right",
   REQUIRE(b.active().x == 0);
 }
 
+TEST_CASE("a kick that lifts the piece proves the y-sign conversion",
+          "[tetris][rotation]") {
+  // ⚠ THE CASE THE PREVIOUS ONE ONLY CLAIMED TO BE. "a rotation against the
+  // left wall kicks right" asserts an x displacement, and every kick it can
+  // reach has y == 0 — so flipping the sign in board.cpp's `a.y -= kick.y`
+  // left the whole suite green. Found by mutation, not by reading, and the
+  // comment there had confidently said otherwise.
+  //
+  // The tables are y-up and the board is y-down, exactly as game.js:293 states.
+  // Only a kick with a NON-ZERO y can see the difference.
+  //
+  // Setup: a deep one-wide well with a horizontal I lying across its mouth. The
+  // identity kick and the next three are all blocked by the well's shoulders,
+  // so the transition resolves on {1, 2} — the LAST candidate in I's 0>1 set,
+  // which lifts the piece two rows as it stands it up. With the sign flipped
+  // that offset pushes it down into the floor instead, no candidate fits, and
+  // the rotation is refused outright.
+  auto rows = empty_rows();
+  for (int r = 15; r < kVisibleRows; ++r) {
+    rows[static_cast<std::size_t>(r)] = "####.#####";
+  }
+  Board b = fixture(rows, Piece::I, 0, 0, 12 + kHiddenRows);
+
+  REQUIRE(b.rotate(1));
+  REQUIRE(b.active().rot == 1);
+  REQUIRE(b.active().x == 1);
+  // UP two rows. The sign is the whole assertion.
+  REQUIRE(b.active().y == 10 + kHiddenRows);
+}
+
 TEST_CASE("a piece that fits no kick does not rotate at all",
           "[tetris][rotation]") {
   // A T boxed in on both sides in a one-cell-wide slot.
@@ -363,6 +393,32 @@ TEST_CASE("the lock clock starts when the piece lands, not at the next gravity "
   // what is being pinned is that the delay HAPPENS, not its exact rounding.
   REQUIRE(elapsed > 1400);
   REQUIRE(elapsed < 1700);
+  REQUIRE(occupied_cells(b) == 14);
+}
+
+TEST_CASE("one coarse tick cannot both land a piece and expire its lock delay",
+          "[tetris][lock]") {
+  // ⚠ THE CASE THE 60 Hz ONES CANNOT BE. At a 1/60 s dt the difference between
+  // crediting the landing tick and not crediting it is one frame, which no
+  // reasonable bound can see — so the rule was unpinned until a mutation said
+  // so. Driven coarsely it is stark: 1600 ms contains a 1000 ms gravity step
+  // AND three lock delays, and a piece that landed inside it must still get its
+  // full slide window afterwards.
+  //
+  // This is the fixed-timestep contract paying off. dt is never actually 1600 ms
+  // in production — the Shell runs at 60 Hz and clamps — but a rule that is only
+  // true at one dt is a rule that will surprise someone.
+  auto rows = empty_rows();
+  rows[19] = "##########";
+  Board b = fixture(rows, Piece::T, 0, 4, 16 + kHiddenRows);
+
+  const auto landed = b.tick(ms(1600));
+  REQUIRE(landed.steps == 1);
+  REQUIRE_FALSE(landed.locked);
+  REQUIRE(occupied_cells(b) == 10);
+
+  // The very next tick begins with the piece already resting, so the clock runs.
+  REQUIRE(b.tick(ms(kLockDelayMs + 10)).locked);
   REQUIRE(occupied_cells(b) == 14);
 }
 
@@ -691,11 +747,16 @@ TEST_CASE("a spawned piece does not fall on its first tick", "[tetris][spawn]") 
   rows[19] = "##########";
   Board b = fixture(rows, Piece::T, 0, 4, 16 + kHiddenRows);
 
-  // Bank almost a full interval, then lock — the next piece must start clean.
-  b.tick(ms(900));
+  // ⚠ 990 of the 1000 ms interval, not 900. The margin is the whole case: with
+  // 900 banked, a 50 ms tick reaches 950 and does not step EITHER WAY, so the
+  // case passes against a spawn that never resets the clock. Mutation caught
+  // that — the assertion was true and vacuous.
+  REQUIRE(b.tick(ms(990)).steps == 0);
   b.hard_drop();
   const int spawn_y = b.active().y;
 
-  REQUIRE(b.tick(ms(50)).steps == 0);
+  // 990 + 20 would be a step if the new piece had inherited the old one's
+  // banked time; 20 on its own is nowhere near.
+  REQUIRE(b.tick(ms(20)).steps == 0);
   REQUIRE(b.active().y == spawn_y);
 }

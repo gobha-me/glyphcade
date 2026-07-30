@@ -486,8 +486,21 @@ TEST_CASE("the record key carries the start level", "[tetris][scores]") {
   REQUIRE(one.has_value());
   REQUIRE(*one > 0);
 
-  // Start level 10 scores the same clear ten times higher, so the two records
-  // cannot be confused for each other.
+  // ⚠ ALL THREE keys, not two. Recording under 1 and 10 leaves the middle
+  // branch of score_key() unevaluated, and a mutation that returned start1
+  // from it stayed green — the same shape as Snake's, where the wrap branch of
+  // its key was never reached because every case recorded in one mode.
+  app.dispatch_event(ch(U'2'));
+  REQUIRE(game_of(app)->board().load(ready, Piece::I, 1, -2, kHiddenRows));
+  app.dispatch_event(ch(U' '));
+  app.step(30);
+
+  const auto five = app.scores().get("tetris", "best_score_start5");
+  REQUIRE(five.has_value());
+  REQUIRE(*five > *one);
+
+  // Start level 10 scores the same clear higher again, so no two records can be
+  // confused for each other.
   app.dispatch_event(ch(U'3'));
   REQUIRE(game_of(app)->board().load(ready, Piece::I, 1, -2, kHiddenRows));
   app.dispatch_event(ch(U' '));
@@ -495,11 +508,12 @@ TEST_CASE("the record key carries the start level", "[tetris][scores]") {
 
   const auto ten = app.scores().get("tetris", "best_score_start10");
   REQUIRE(ten.has_value());
-  REQUIRE(*ten > *one);
+  REQUIRE(*ten > *five);
 
-  // And the level-1 record did NOT follow it up, which is the whole point of
-  // keying: a shared key would have let the level-10 run overwrite it.
+  // ⚠ And the earlier records did NOT follow them up, which is the whole point
+  // of keying: one shared key would have let the level-10 run walk them both up.
   REQUIRE(app.scores().get("tetris", "best_score_start1") == one);
+  REQUIRE(app.scores().get("tetris", "best_score_start5") == five);
 }
 
 TEST_CASE("lines are recorded separately from score", "[tetris][scores]") {
