@@ -140,10 +140,25 @@ auto Shell::on_event(const termforge::Event& ev) -> void {
 
   if (const auto* mouse = std::get_if<termforge::MouseEvent>(&ev)) {
     if (m_state == State::Selector) {
-      // Same edge detection as the key path, for the same reason — the wheel
-      // moves the selection through ListWidget without firing on_select, and a
-      // click moves it and then fires on_select. The State guard is what makes
-      // the click case emit only MenuSelect.
+      // Same edge detection as the key path, and since termforge v0.2.0 the
+      // CLICK is the only gesture it can fire on.
+      //
+      // ⚠ The wheel used to reach here too: ListWidget answered a wheel event
+      // with set_selected(selected ± 3) — moving the selection without firing
+      // on_select, which is exactly the shape edge detection exists for. #35
+      // unified that away. The wheel now scrolls a view offset and leaves the
+      // selection alone, so `before` cannot change on a wheel event and
+      // MenuMove no longer sounds for one. That is the honest outcome, not a
+      // regression to patch: nothing moved, so nothing should say it did.
+      //
+      // We adopted upstream's convention rather than rebuilding the old one
+      // here, which would have meant intercepting the wheel before route_mouse
+      // and diverging from the framework on purpose — the workaround shape
+      // gitea #16 and #17 spent two issues deleting. test/11selector holds both
+      // halves: the selection does not move, and no sound plays.
+      //
+      // A click still moves the selection and then fires on_select, and the
+      // State guard is what makes that case emit only MenuSelect.
       const int before = m_list.selected();
       if (mouse->pressed) m_ring.focus_at(mouse->x, mouse->y);
       route_mouse(*mouse, {&m_list});
@@ -530,7 +545,8 @@ auto Shell::draw_selector(termforge::Screen& screen) -> void {
 
   const termforge::Rect inner = m_list_frame.content_rect();
   if (inner.w > 0 && inner.h > 0) {
-    // ⚠ set_style, and it is load-bearing — not symmetry with the frame above.
+    // ⚠ set_style, and it is load-bearing TWICE over — not symmetry with the
+    // frame above.
     //
     // ListWidget picks its marker from mark_glyphs(style), and ONLY
     // BorderStyle::Ascii yields '>'; every other family yields '▸' (U+25B8).
@@ -539,6 +555,15 @@ auto Shell::draw_selector(termforge::Screen& screen) -> void {
     // — the bottom tier this repo promises always works. It is silent: the
     // widget renders, the layout is identical, and only the glyph is wrong.
     // test/11selector asserts the whole selector screen is 7-bit for this.
+    //
+    // The second reason arrived with termforge v0.2.1 (#21): ListWidget now
+    // paints a one-column scrollbar when its content overflows, and the strip
+    // reads its track and thumb from scrollbar_glyphs(style) off this SAME
+    // enum — '|'/'#' under Ascii, '│'/'█' under every other family. So the
+    // exact failure above has a second entrance, and the 7-bit case cannot see
+    // it yet: two roster entries never overflow the pane, so no scrollbar is
+    // drawn at any legal size. Whoever adds the fourth game inherits the
+    // coverage. Do not read "the test passes without this line" as evidence.
     m_list.set_style(style);
 
     // The FULL content rect, gutter included. Until termforge v0.1.11 this
