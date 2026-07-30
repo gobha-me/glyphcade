@@ -43,9 +43,9 @@ graphics from a stdlib-only C++23 API.
 | # | Game | Dogfoods |
 |---|------|----------|
 | 1 | Shell + selector ✓ | ListWidget, Frame, dialogs, FocusRing, `on_tick` |
-| 2 | Minesweeper | mouse routing, grid rendering |
-| 3 | 2048 | tween animation |
-| 4 | Snake | real-time tick |
+| 2 | Minesweeper ✓ | mouse routing, grid rendering |
+| 3 | 2048 ✓ | tween animation |
+| 4 | Snake ✓ | real-time tick |
 | 5 | Tetris | held-key feel |
 | 6 | Sokoban | tile maps |
 | 7 | Solitaire | Kitty sprites, mouse drag-and-drop |
