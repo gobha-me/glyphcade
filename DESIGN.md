@@ -111,12 +111,50 @@ proven out: one directory, one static library target, no cross-game includes. A
 game may use the shared services in `include/termgame/`, but never another
 game's headers.
 
-*Deferred as of Epic 1:* the directory-per-game part holds — that is what
-actually buys self-containment — but there is still only **one** CMake target,
-`term-game_lib`. A per-game static library with exactly one game in it isolates
-nothing. The split happens when the second real game lands, at which point
-`src/lib/games/<slug>/` and `include/termgame/games/<slug>/` collapse into
-`games/<slug>/` with its own `CMakeLists.txt`.
+**Shipped** — deferred through Epic 1–3, landed ahead of Epic 4 as its own
+change, because a build restructure bundled with a new game makes a red CI run
+ambiguous between the two. `src/lib` is four static libraries:
+
+```
+term-game_lib      arcade/shell.cpp, arcade/exception_boundary.cpp
+  ↓                the ALIAS, the export, the only spelling outside src/lib
+term-game_roster   arcade/all_games.cpp — the registry table
+  ↓
+term-game_game_<name>   one per game
+  ↓
+term-game_core     build_info.cpp, audio/*.cpp — what a game MAY call
+```
+
+**Which file sits in which target is the design, and it was measured rather than
+chosen.** `shell.cpp` is the only TU that references `all_games()`, so it must be
+scanned *before* the roster; `minesweeper.cpp` calls `audio::Engine::play`, so
+audio must be scanned *after* the games. The intuitive shape — core as
+everything-but-games — closes a cycle `core → roster → game → core` that a
+single-pass linker cannot resolve. It fails unconditionally, in every link
+declaration order, because CMake emits the topological order and `game → core`
+pins core last; so the fix is always to move a *file*, never to reorder a link
+line. The rule: **if a game may call it, it belongs in core; if it drives the
+roster or owns the terminal, it belongs in `term-game_lib`.**
+
+Two guarantees fall out of the layering rather than being maintained by hand. A
+game **cannot** reach the Shell — core sits below the games, so `termgame::Shell`
+is not on a game's link line, which makes "games never touch `App`, `Terminal`,
+or each other" a link error. And every target must join the export set, because
+`install(EXPORT)` refuses to name a target it cannot resolve — so adding a game
+and forgetting to list it stops *generation* rather than shipping a package with
+a game missing.
+
+⚠ One thing this deliberately did **not** do, contrary to what this section used
+to promise: `src/lib/games/<name>/` and `include/termgame/games/<name>/` did not
+collapse into a top-level `games/<name>/`. `cmake/install.cmake` ships public
+headers with a single `install(DIRECTORY include/ …)`, so a header that leaves
+`include/` leaves the package; `.clangd` and every `#include <termgame/games/…>`
+in the tree assume that root too. The CMake target is what buys the isolation.
+The directory move would buy nothing and cost a tree-wide rewrite.
+
+⚠ And `games/<name>/` is the game's **namespace**, which is not always its slug —
+a slug is a user-visible id and may begin with a digit, which a namespace may
+not.
 
 ### Registration is explicit, not self-registering
 
@@ -322,14 +360,17 @@ term-game/
 │   │              game.hpp ✓  game_meta.hpp ✓  context.hpp ✓
 │   │              registry.hpp ✓  shell.hpp ✓         (Epic 1)
 │   │              scores.hpp                   (deferred — see GameContext)
-│   ├── games/<slug>/ ✓       # a game's own headers; see the note below
+│   ├── games/<name>/ ✓       # a game's own headers — they stay HERE, not next
+│   │                         #   to its sources, so install(DIRECTORY include/)
+│   │                         #   still ships them
 │   └── audio/    sink.hpp ✓ engine.hpp ✓ synth.hpp ✓ ring.hpp ✓
 │                                                      (Epic 2)
 ├── src/audio_backend/        # ✓ rtaudio, in a NEVER-exported target (#13)
-├── src/lib/                  # ✓ the shared arcade + audio library
-├── src/lib/games/<slug>/ ✓   # a game's sources, until per-game targets exist
+├── src/lib/                  # ✓ four targets: lib / roster / game_* / core
+├── src/lib/games/<name>/ ✓   # a game's sources AND its own CMakeLists.txt —
+│                             #   one static library per game. <name> is the
+│                             #   namespace, not necessarily the slug.
 ├── src/bin/main.cpp          # ✓ the single binary
-├── games/<slug>/             # one static lib per game — deferred to game #2
 ├── assets/                   # venice-generated art
 ├── vendor/stb_image.h
 └── test/                     # ✓ Catch2, mirroring termforge's suite layout

@@ -8,7 +8,7 @@
 # Epic 2's export decision is enforced by nothing except where files happen to
 # live. One plausible-looking line —
 #
-#   target_link_libraries(term-game_lib PRIVATE PkgConfig::RTAUDIO)
+#   target_link_libraries(term-game_core PRIVATE PkgConfig::RTAUDIO)
 #
 # — undoes it, and the damage is INVISIBLE from inside this repo: the build
 # stays green, the tests stay green, and the only symptom is that somebody
@@ -20,6 +20,13 @@
 # has to link it. Judge by what links it, not by the keyword — the same warning
 # cpp-template's own catch2 recipe gives, and the reason cpp-template CT-15
 # happened.
+#
+# ⚠ Since the per-game library split there are FOUR exported targets, and the
+# example above deliberately names term-game_core rather than term-game_lib: core
+# is the one whose name says "audio" and holds audio/*.cpp, so it is where that
+# line would most plausibly be written. This check reads the whole Targets file,
+# so it covers all four — but a reader looking for "where would this go wrong"
+# should look at core first, then at any new game library.
 #
 # So the guard is: install to a scratch prefix and read the Targets file. That
 # is the artefact a consumer actually resolves, which makes this the only check

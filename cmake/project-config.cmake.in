@@ -58,10 +58,16 @@ endif ()
 # Use find_dependency, not find_package: it forwards REQUIRED/QUIET and reports
 # a miss as "package X not found because dependency Y was missing".
 #
-# termforge is linked PUBLIC into term-game_lib (the Shell derives from
-# termforge::App and names its types in our headers), so an installed
-# term-gameTargets.cmake references termforge::lib and this line is what lets a
-# consumer resolve it.
+# termforge is linked PUBLIC into term-game_core — the bottom of src/lib's link
+# chain, so every target above it inherits termforge through the PUBLIC closure,
+# term-game_lib included (the Shell derives from termforge::App and names its
+# types in our headers). An installed term-gameTargets.cmake therefore references
+# termforge::lib, and this line is what lets a consumer resolve it.
+#
+# ⚠ termforge::lib is the ONLY external name any of our four exported targets
+# references, which is what keeps this file to a single find_dependency. Adding
+# an external link to any of them adds a line here — and if it is rtaudio,
+# cmake/check_export.cmake goes red first.
 #
 # ⚠ 0.1.15, at patch granularity, and it must track the floor in
 # cmake/deps/termforge.cmake exactly. This line used to say 0.1 while that file
