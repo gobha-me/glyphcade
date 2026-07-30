@@ -508,6 +508,42 @@ TEST_CASE("a click that enters a game plays select, not move",
   REQUIRE(app.audio().play_count(SfxId::MenuMove) == 0);
 }
 
+TEST_CASE("a click on a NON-selected row plays select and not move",
+          "[selector][audio][mark]") {
+  // ⚠ THE case the two `m_state == State::Selector` guards were waiting for, and
+  // the reason the note above says they shipped untested for two epics.
+  //
+  // The existing click case targets row 0, which is ALREADY selected — so the
+  // selection does not move, MenuMove stays silent with or without the guard, and
+  // the case is blind to it. Established by mutation, not assumed: deleting the
+  // guard from the mouse path left this whole file green.
+  //
+  // A click on row 1 is the gesture that discriminates. ListWidget moves the
+  // selection AND fires on_select inside the same route_mouse() call, so by the
+  // time control returns the Shell is already InGame. Without the state guard that
+  // one gesture emits BOTH sounds; with it, only MenuSelect. One gesture, one
+  // sound.
+  if (termgame::all_games().size() < 2) return;
+
+  using termgame::audio::SfxId;
+
+  Probe app;
+  app.step();  // ListWidget::rect() is only set inside on_render — trap 2
+  REQUIRE(app.selector_index() == 0);
+
+  app.dispatch_event(click(kMarkX, kRow0 + 1));
+
+  REQUIRE(app.state() == Shell::State::InGame);
+  REQUIRE(app.current_game() != nullptr);
+  // It entered the SECOND game, which is also what proves the click landed on
+  // row 1 rather than being clamped back to row 0.
+  REQUIRE(app.current_game()->meta().slug ==
+          termgame::all_games()[1].meta.slug);
+
+  REQUIRE(app.audio().play_count(SfxId::MenuSelect) == 1);
+  REQUIRE(app.audio().play_count(SfxId::MenuMove) == 0);
+}
+
 TEST_CASE("a key that moves nothing makes no sound", "[selector][audio]") {
   // ⚠ THE case, given a one-game roster — and the one that stays meaningful
   // however long the roster grows, because Up at the top and Down at the bottom

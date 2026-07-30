@@ -23,13 +23,21 @@
 #include <iterator>
 
 #include <termgame/games/minesweeper/minesweeper.hpp>
+#include <termgame/games/twenty48/twenty48.hpp>
 
 namespace termgame {
 namespace {
 
 // Menu order is this order.
+//
+// ⚠ Each entry pairs a game's metadata with its factory, and no compiler can
+// check that the two belong together — bind Minesweeper's meta to 2048's factory
+// and the menu says "Minesweeper" while 2048 starts. test/12registry builds every
+// entry and compares the constructed game's meta against the table, which is the
+// only place that mistake is catchable.
 constexpr GameEntry kGames[] = {
     {Minesweeper::kMeta, &make_game<Minesweeper>},
+    {Twenty48::kMeta, &make_game<Twenty48>},
 };
 
 // ── The table checks itself ─────────────────────────────────────────────────
@@ -57,9 +65,26 @@ constexpr auto icons_are_safe() -> bool {
   }
   return true;
 }
+
+// The icon is allowed to be non-ASCII and is checked above; every other text
+// field is not. See meta_text_is_ascii() in arcade/game_meta.hpp for the em dash
+// that got onto a bare terminal and why asserting on rendered output missed it.
+constexpr auto metadata_is_ascii() -> bool {
+  for (const auto& entry : kGames) {
+    if (!meta_text_is_ascii(entry.meta)) return false;
+  }
+  return true;
+}
 static_assert(icons_are_safe(),
               "a registered game's icon is not exactly one two-column "
               "grapheme — see icon_is_safe() in arcade/game_meta.hpp");
+
+static_assert(metadata_is_ascii(),
+              "a registered game's slug, title, description or tag contains a "
+              "non-ASCII byte — the selector prints all four on the no-colour "
+              "tier, which by definition cannot render them. An em dash in a "
+              "description is the usual culprit; see meta_text_is_ascii() in "
+              "arcade/game_meta.hpp.");
 
 }  // namespace
 

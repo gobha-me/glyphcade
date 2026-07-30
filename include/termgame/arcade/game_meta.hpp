@@ -73,4 +73,39 @@ inline constexpr int kIconCols = 2;
          termforge::detail::truncate_to_width(icon, 1).empty();
 }
 
+// Every text field except the icon must be 7-bit ASCII.
+//
+// ⚠ Found on a real pty, not reasoned about. 2048's description originally read
+// "Reach 2048 — then keep going" with an em dash (U+2014), and the selector's
+// detail pane duly printed those three bytes of UTF-8 onto a terminal that had
+// just told us it cannot draw a box. The whole repo promises the bottom tier
+// works; glyphs.hpp static_asserts it for tiles, and icon_is_safe() covers the one
+// field that is deliberately not ASCII — but nothing covered the prose, which is
+// the field most likely to be written by someone reaching for a nice dash.
+//
+// ⚠ Why no test caught it: test/11selector's 7-bit sweep runs at 60x20, where the
+// detail pane wraps the description and the offending character fell outside the
+// visible rows. A wider terminal showed it immediately. That is the general
+// hazard with asserting on rendered output — the assertion only covers what the
+// viewport happened to include — and the reason this belongs at compile time
+// against the SOURCE string instead.
+//
+// The icon is excluded because it is intentionally non-ASCII; icon_is_safe() is
+// its check. Everything else has no business being anything but ASCII: slug keys
+// a score file, title and tag are laid out by column arithmetic, and description
+// is wrapped by it.
+[[nodiscard]] constexpr auto text_is_seven_bit(std::string_view s) noexcept
+    -> bool {
+  for (const char c : s) {
+    if (static_cast<unsigned char>(c) >= 0x80) return false;
+  }
+  return true;
+}
+
+[[nodiscard]] constexpr auto meta_text_is_ascii(const GameMeta& m) noexcept
+    -> bool {
+  return text_is_seven_bit(m.slug) && text_is_seven_bit(m.title) &&
+         text_is_seven_bit(m.description) && text_is_seven_bit(m.tag);
+}
+
 }  // namespace termgame

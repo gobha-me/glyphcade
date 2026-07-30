@@ -89,6 +89,20 @@ half the point of this repo.
 - **A running game owns the whole `Screen`.** The Shell draws no chrome over it,
   so `draw()` coordinates and `MouseEvent` coordinates are the same coordinates.
   A game that assumes an offset is a game that is wrong somewhere else too.
+- **A game's slug and its namespace need not match, and for 2048 they do not.**
+  The slug is `"2048"` — a user-visible stable id that keys the menu and the score
+  file — while the directory, namespace and class are `twenty48`/`Twenty48`,
+  because a C++ identifier may not begin with a digit. Same shape of deliberate
+  split as `term-game`/`termgame`. The directory follows the **namespace**, so
+  `#include <termgame/games/twenty48/board.hpp>` matches
+  `termgame::twenty48::Board`.
+- **Every `GameMeta` text field except the icon must be 7-bit ASCII**, and that is
+  a `static_assert` in `src/lib/arcade/all_games.cpp`, not a convention. The
+  selector prints slug, title, tag and description on the no-colour tier, which by
+  definition cannot render anything else. ⚠ An em dash in a description is the
+  usual culprit and it has happened — and note that a rendering test cannot be
+  relied on to catch it, because such a test only covers what its viewport
+  happened to include.
 - **A `GameMeta` icon must pass `icon_is_safe()`.** It is a `static_assert` in
   `src/lib/arcade/all_games.cpp`, not a convention. Variation-selector emoji
   (⚒️ ⚔️ ⚙️) measure one column and render two, which shifts every cell to their
