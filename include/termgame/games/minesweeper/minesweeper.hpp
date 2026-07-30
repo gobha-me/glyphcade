@@ -20,11 +20,15 @@
 // presentation, and AGENTS.md keeps game logic clear of presentation for the
 // same reason it keeps it clear of rendering.
 //
-// There is no high-score persistence because GameContext has no seam for it and
-// STATUS.md defers that to the second scoring game (gitea #14).
+// A best time PER LEVEL persists through GameContext::scores() (gitea #14). It
+// records on the win transition only, keyed off the Level enum rather than the
+// level's display name, and it is the Better::Lower half of that store's design —
+// 2048 wanting a best score and this wanting a best time is what proved a record
+// is a keyed value with a direction rather than one integer. See announce().
 
 #include <chrono>
 #include <cstdint>
+#include <string>
 
 #include <termforge/core/screen.hpp>
 #include <termforge/core/types.hpp>
@@ -123,6 +127,11 @@ class Minesweeper final : public Game {
 
   auto new_game(minesweeper::Level level) -> void;
   auto move_cursor(int dr, int dc) -> void;
+
+  // The stored best time for the CURRENT level, three columns, or "---" when
+  // there is none — see the note at the definition for why an unset Lower record
+  // cannot be spelled 000.
+  [[nodiscard]] auto best_time() const -> std::string;
   auto draw_status(termforge::Screen& screen) -> void;
   auto draw_hints(termforge::Screen& screen) -> void;
   auto draw_grid(termforge::Screen& screen) -> void;
