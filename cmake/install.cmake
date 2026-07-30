@@ -8,7 +8,16 @@
 #
 # and have it work against an installed prefix, with the *same* target spelling
 # it would use via add_subdirectory() or FetchContent. One spelling, three
-# acquisition modes. See example/consumer/ for all three, exercised.
+# acquisition modes.
+#
+# ⚠ This used to claim "See example/consumer/ for all three, exercised." There is
+# no example/ directory in this repo and there never has been, so nothing
+# automated proves the installed package actually resolves — the closest thing is
+# the audio-export-clean ctest, which only greps the Targets file for rtaudio. The
+# residual risk is bounded rather than absent: the "target not in any export set"
+# case fails loudly at generate time, and termforge::lib is the only external
+# name any exported target references. Treat consumption as unverified until
+# something exercises it.
 #
 # Included from the root CMakeLists behind ${PROJECT_NAME}_INSTALL, which
 # defaults to PROJECT_IS_TOP_LEVEL: an embedded copy of this project must not
@@ -125,7 +134,8 @@ if (TARGET ${PROJECT_NAME}_lib)
   # is quietly wrong.
   #
   # For developing two projects side by side, use add_subdirectory() — same
-  # target spelling, no packaging involved, and example/consumer/ covers it.
+  # target spelling, no packaging involved. (Nothing in this repo exercises that
+  # path either; see the note at the top of this file.)
 
   # ── Headers ───────────────────────────────────────────────────────────────
   # *.hpp only, which picks up the public header and the generated version
