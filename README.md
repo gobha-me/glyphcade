@@ -8,13 +8,13 @@ arcade-of-small-games idea and the same roster to raid, but terminal-native and
 compiled instead of HTML/CSS/JS. One binary, a selector, and a set of
 self-contained games.
 
-> **Status: the arcade runs, there is a game in it, and it makes noise.** Pick
-> Minesweeper from the selector and play it — mouse or keyboard, three
-> difficulties, timer and mine counter, pause and quit-to-menu. Playable on a
-> bare 7-bit terminal with no colour. Sound is synthesized, not sampled, and
-> degrades to silence rather than failing. See [STATUS.md](STATUS.md)
-> for live state, [DESIGN.md](DESIGN.md) for the architecture, and the issue
-> tracker for the epic breakdown.
+> **Status: the arcade runs, there are five games in it, and it makes noise.**
+> Pick Minesweeper, 2048, Snake, Tetris or Sokoban from the selector and play it
+> — mouse or keyboard, high scores that persist, pause and quit-to-menu. All of
+> it playable on a bare 7-bit terminal with no colour. Sound is synthesized, not
+> sampled, and degrades to silence rather than failing. See
+> [STATUS.md](STATUS.md) for live state, [DESIGN.md](DESIGN.md) for the
+> architecture, and the issue tracker for the epic breakdown.
 
 **CI:** [five build arms](https://git.gobha.me/xcaliber/term-game/actions?workflow=ci.yaml)
 — gcc and clang, plus ASan, UBSan and TSan — on every push and pull request,
@@ -47,7 +47,7 @@ graphics from a stdlib-only C++23 API.
 | 3 | 2048 ✓ | tween animation |
 | 4 | Snake ✓ | real-time tick |
 | 5 | Tetris ✓ | held-key feel, the kitty keyboard protocol |
-| 6 | Sokoban | tile maps |
+| 6 | Sokoban ✓ | tile maps, the camera, MapWidget's first consumer |
 | 7 | Solitaire | Kitty sprites, mouse drag-and-drop |
 
 Every game is playable at the bottom tier. Pixel sprites are an enhancement over

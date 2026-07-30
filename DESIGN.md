@@ -293,7 +293,7 @@ TermForge as it exists today.
 | 3 | **2048** ✓ | tween animation, renderer diff | #59 (shipped) |
 | 4 | **Snake** ✓ | real-time tick | #58, #59 (both shipped) |
 | 5 | **Tetris** ✓ | tick + held-key feel | #58, #59, #60 (all shipped) |
-| 6 | **Sokoban** | tile maps | #64 (→ #63) |
+| 6 | **Sokoban** ✓ | tile maps, camera, layers | ~~#64~~ (glyph tier shipped v0.1.19, taken) |
 | 7 | **Solitaire** *(flagship)* | Kitty sprites, venice art, mouse drag | #63 |
 
 Reference implementations for all seven exist in HTML-Games — the game *logic*
@@ -322,7 +322,7 @@ this design pass.
 | [#61](https://github.com/gobha-me/termforge/issues/61) | `Key` enum stops at F4 | ~~UI polish~~ — **fixed in v0.1.9** |
 | [#62](https://github.com/gobha-me/termforge/issues/62) | `Cell` has no text attributes | UI polish, low tiers |
 | [#63](https://github.com/gobha-me/termforge/issues/63) | `Image` has no blit/alpha compositing | sprite games |
-| [#64](https://github.com/gobha-me/termforge/issues/64) | MapWidget (Epic 3.6) | Sokoban |
+| [#64](https://github.com/gobha-me/termforge/issues/64) | MapWidget (Epic 3.6) | ~~Sokoban~~ — **glyph tier fixed in v0.1.19 and spent by Epic 7.** Still open upstream against the SPRITE tier, which does not exist at any tag through v0.5.1 |
 
 Of these, #27, #58, #59 and #61 were the first done, and term-game pins a tag far
 enough forward to get them (plus #71, #72 and #73 — see below). #62/#63 degrade
