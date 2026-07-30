@@ -73,7 +73,7 @@ struct Fingerprint {
 
 // Generated from the implementation and committed as text. Regenerate by
 // rendering each spec at kRate and recomputing the four quantities below.
-constexpr std::array<Fingerprint, 14> kFingerprints{{
+constexpr std::array<Fingerprint, 15> kFingerprints{{
     {.name = "Click", .frames = 1152, .peak = 0.078125F, .rms = 0.038033F,
      .zero_crossings = 31},
     {.name = "Reveal", .frames = 1536, .peak = 0.067755F, .rms = 0.017765F,
@@ -120,6 +120,17 @@ constexpr std::array<Fingerprint, 14> kFingerprints{{
      .zero_crossings = 352},
     {.name = "LevelUp", .frames = 4320, .peak = 0.084824F, .rms = 0.029219F,
      .zero_crossings = 117},
+    // Added with Sokoban, and the same discipline again: the render-and-measure
+    // pass that produced this row reproduced all FOURTEEN committed rows above
+    // exactly before it was read off, which is the only reason to trust it.
+    //
+    // ⚠ Seat and Merge are both triangles sweeping a fifth, which is the
+    // closest two specs in the bank have ever been. They are told apart here by
+    // frames (2640 vs 3360) and crossings (70 vs 90), and by ear they should be
+    // told apart by length. If a future edit makes those columns converge, the
+    // right response is to change the SPEC, not the tolerance.
+    {.name = "Seat", .frames = 2640, .peak = 0.079105F, .rms = 0.027651F,
+     .zero_crossings = 70},
 }};
 
 static_assert(kFingerprints.size() == kSfxIds.size(),

@@ -61,11 +61,17 @@ class Probe final : public Shell {
 
   // ⚠ THE SIZE IS A PARAMETER, and that is what turned two deferrals on.
   // Interior list rows are h - 5, so a roster overflows its pane only when
-  // h - 5 < entries — at four games that is rows == 8, the Shell's own floor
+  // h - 5 < entries — at four games that was rows == 8, the Shell's own floor
   // and nowhere else. Hardcoded at 60x20 this probe could never reach it, so
   // "revisit at four roster entries" was necessary but not sufficient: the
   // fourth game AND this parameter are what make the wheel's positive half and
   // the scrollbar's 7-bit sweep reachable. See STATUS.md.
+  //
+  // ⚠ Sokoban is the FIFTH, so the overflow band is now rows <= 9 rather than
+  // rows == 8 alone. The cases below still drive 8 on purpose: it is the size
+  // that overflows for every roster from four entries upward, so they do not
+  // silently become a test of a roster length instead of a test of a
+  // scrollbar.
   auto step(int frames = 1, int cols = 60, int rows = 20) -> void {
     test_run_frames(frames, cols, rows, &m_sink);
   }
