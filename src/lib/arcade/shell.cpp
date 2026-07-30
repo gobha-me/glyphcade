@@ -682,9 +682,26 @@ auto Shell::draw_selector(termforge::Screen& screen) -> void {
     m_detail_frame.draw(screen);
     const termforge::Rect dinner = m_detail_frame.content_rect();
     if (dinner.w > 0 && dinner.h > 0) {
+      // ⚠ set_style HERE TOO, and it was missing until Epic 6 found it.
+      //
+      // termforge v0.2.1 (#21) gave the shared scrollbar to ListWidget, Table
+      // AND TextBox. The list's set_style above was written with that in mind
+      // and this one was not, so the detail pane painted its track and thumb
+      // from the default BorderStyle — '│' and '█' — onto terminals that had
+      // just told us they cannot render a box.
+      //
+      // ⚠ It was invisible for two releases because it needs the DESCRIPTION to
+      // overflow this pane, and nothing rendered the selector small enough
+      // until test/11selector's probe took a size. The list's own scrollbar
+      // needed a fourth roster entry; this one only ever needed a short window,
+      // which is the more likely thing for a real player to have. Both were
+      // deferred behind the same condition and only one of them was really
+      // waiting on it.
+      //
       // Not in the focus ring and not in route_mouse, on purpose: it is a
       // display surface here, and a focusable one would eat the PageUp/PageDown
       // and wheel events the list needs.
+      m_detail.set_style(style);
       m_detail.set_geometry(dinner);
       m_detail.draw(screen);
     }
