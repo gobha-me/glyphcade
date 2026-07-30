@@ -79,3 +79,28 @@ TEST_CASE("minesweeper is registered", "[registry]") {
   }
   REQUIRE(found);
 }
+
+TEST_CASE("2048 is registered", "[registry]") {
+  bool found = false;
+  for (const auto& entry : termgame::all_games()) {
+    if (entry.meta.slug == "2048") found = true;
+  }
+  REQUIRE(found);
+}
+
+TEST_CASE("the roster holds every game the build was told to link",
+          "[registry]") {
+  // ⚠ What a by-name case CANNOT catch once there is more than one game: a
+  // roster holding only Minesweeper satisfies "minesweeper is registered", and a
+  // roster holding only 2048 satisfies the case above it. Neither notices a game
+  // that was compiled, linked, and then left out of kGames — which since the
+  // per-game library split is a real shape of mistake, because adding a game
+  // touches a CMakeLists AND all_games.cpp and the two can disagree.
+  //
+  // TERMGAME_EXPECT_GAMES is CMake's own belief, passed in by this directory's
+  // CMakeLists.txt from the same list that builds the game libraries. Comparing
+  // it against the roster is the only way the two are held to each other — the
+  // same two-independent-paths trick test/00bootstrap uses for the audio option.
+  REQUIRE(termgame::all_games().size() ==
+          static_cast<std::size_t>(TERMGAME_EXPECT_GAMES));
+}
