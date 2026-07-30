@@ -9,18 +9,28 @@
 //
 // Epic 1 shipped three things: the probed capability tier, the border family
 // the Shell picked from it, and quit_to_menu(). Epic 2 (gitea #3) added audio()
-// — the seam this file reserved, filled in exactly as promised, additively and
+// - the seam this file reserved, filled in exactly as promised, additively and
 // without disturbing a single existing game.
 //
-// One service DESIGN.md names is still a seam rather than an omission:
+// scores() (gitea #14) is the fourth and last service DESIGN.md named, and it
+// filled the same way: one accessor, one setter in the plumbing block below, one
+// new member, and not a line changed in either game's existing code.
 //
-//   * HIGH SCORES — deferred. No game produces a score yet, and a persistence
-//     format chosen before there is anything to persist is a format that gets
-//     migrated. Tracked separately on gitea (#14).
+// It waited on purpose, and the waiting is worth recording because the reason
+// held up. The issue said "pick this up when the SECOND scoring game lands, not
+// the first", since a format chosen before there is anything to persist is a
+// format that gets migrated. When 2048 landed it wanted a best SCORE while
+// Minesweeper wanted a best TIME PER DIFFICULTY — so a record is a keyed value
+// with a direction, and had Minesweeper been the only scoring game this would
+// have shipped as one integer and been wrong.
+//
+// There are now no reserved seams left here. A fifth service is a new design
+// question, not a promise already made.
 
 #include <termforge/core/types.hpp>
 #include <termforge/widgets/glyphs.hpp>
 
+#include <termgame/arcade/scores.hpp>
 #include <termgame/audio/engine.hpp>
 
 namespace termgame {
@@ -69,6 +79,27 @@ class GameContext {
     return m_audio;
   }
 
+  // High scores, and the same null-object discipline: NEVER null. A context with
+  // no store hands back an empty Recorder whose record() returns false and
+  // whose get() returns nullopt, so a game writes
+  //
+  //     ctx.scores().record(kSlug, "best_score", score, scores::Better::Higher);
+  //
+  // with no null check and no has_scores(). "This session persists nothing"
+  // stays a property of the store.
+  //
+  // ⚠ record() is MONOTONE — a worse value cannot displace a better one — which
+  // is why a game may call it freely on every move and needs no end-of-run hook.
+  // 2048 relies on exactly that: undo lowers its live score, and the record does
+  // not follow it down.
+  //
+  // A Recorder exposes get() and record() and deliberately NOT flush(). WHEN to
+  // write is the Shell's I/O policy, because the Shell is what knows which
+  // frames can afford a syscall — the same line audio() draws at the Engine.
+  [[nodiscard]] auto scores() const noexcept -> const scores::Recorder& {
+    return m_scores;
+  }
+
   // Ask the Shell to return to the selector.
   //
   // ⚠ DEFERRED, never immediate, and that deferral is the whole point.
@@ -96,6 +127,9 @@ class GameContext {
   auto set_audio(audio::Engine* engine) noexcept -> void {
     m_audio = audio::Player{engine};
   }
+  auto set_scores(scores::Store* store) noexcept -> void {
+    m_scores = scores::Recorder{store};
+  }
 
  private:
   termforge::Capabilities m_caps{};
@@ -104,6 +138,10 @@ class GameContext {
   // Empty until the Shell sets it, which is what makes a bare GameContext in a
   // test silent rather than a crash.
   audio::Player m_audio{};
+  // Likewise empty: a bare GameContext in a test remembers nothing rather than
+  // dereferencing a store nobody gave it — and, just as importantly, a test that
+  // forgets to inject one cannot write to a real file by accident.
+  scores::Recorder m_scores{};
 };
 
 }  // namespace termgame
