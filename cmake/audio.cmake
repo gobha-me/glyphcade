@@ -91,9 +91,17 @@ endif ()
 # src/audio_backend/ compiles. Same target name, same link line from src/bin,
 # same main.cpp, same installed headers, same exported package.
 #
-# What Epic 0 shipped and this keeps: src/lib gets TERMGAME_WITH_AUDIO as a
-# PRIVATE compile definition and the library reports it at runtime through
+# What Epic 0 shipped and this keeps: TERMGAME_WITH_AUDIO is a PRIVATE compile
+# definition on **term-game_core** and the library reports it at runtime through
 # termgame::build_has_audio(), which test/00bootstrap asserts against CMake's own
-# belief. ⚠ That definition now looks unused inside src/lib, because no audio
-# source is #ifdef'd on it any more — it is not. It is what makes "the option
-# exists but never reached the compiler" a red test rather than a silent lie.
+# belief. ⚠ That definition looks unused, because no audio source is #ifdef'd on
+# it any more — it is not. It is what makes "the option exists but never reached
+# the compiler" a red test rather than a silent lie.
+#
+# ⚠ On core specifically, since the per-game library split, because
+# src/lib/build_info.cpp lives there and is the ONE translation unit in the repo
+# that reads the macro (grep it). Moving the definition up to term-game_lib looks
+# tidier — term-game_lib is "the library", after all — and stops it reaching that
+# TU, at which point build_has_audio() answers false in an audio-ON build and
+# test/00bootstrap goes red. Which is the tripwire working, but the message points
+# at the option rather than at the target that lost the define.
