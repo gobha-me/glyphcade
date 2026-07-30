@@ -19,6 +19,7 @@
 
 #include <string_view>
 
+#include <termforge/core/types.hpp>
 #include <termforge/widgets/detail/width.hpp>
 
 namespace termgame {
@@ -29,6 +30,32 @@ struct GameMeta {
   std::string_view description;  // a sentence or two; the selector wraps it
   std::string_view tag;          // "Puzzle", "Arcade Classic"
   std::string_view icon;         // ONE two-column emoji, or empty. See below.
+
+  // Which keyboard tier this game wants while it is running (termforge #60,
+  // shipped v0.2.2). Defaults to Legacy, which is byte-for-byte what every tag
+  // before #60 emitted — so a game that says nothing gets exactly what the
+  // three games written before this field existed already got.
+  //
+  // ⚠ WHY THIS IS METADATA AND NOT A Game METHOD. set_keyboard_mode lives on
+  // termforge::App, and the Shell is the only App (AGENTS.md, "One App, many
+  // Games"), so a game cannot ask for it directly. The Shell needs the answer
+  // BEFORE the game's first frame, and it already holds this struct from the
+  // registry table. Keeping it here also keeps it constexpr, so which games
+  // want which tier is decidable at compile time rather than by running one.
+  //
+  // ⚠ WHY IT IS PER-GAME AND NOT SET ONCE. Enhanced is not a superset of
+  // Legacy, it is a different contract: every key arrives as CSI-u, so Shift+a
+  // becomes ch=='A' WITH shift set where a plain byte carried no modifier, and
+  // every key gains a Release. Turning it on globally would make Snake turn
+  // twice per keypress and double-fire the selector's bindings. A tier that is
+  // right for one game is wrong for the others.
+  //
+  // ⚠ A game never READS this. What a game reads to find out which arm it
+  // actually got is ctx.capabilities().kitty_keyboard — App::keyboard_mode()
+  // answers "what did we ask for", not "what did the terminal grant". A game
+  // that asks for Enhanced must still work when the answer is no; every game is
+  // playable at the bottom tier, and that rule has no keyboard exemption.
+  termforge::KeyboardMode keyboard{termforge::KeyboardMode::Legacy};
 };
 
 // Columns the selector reserves for an icon, so a game without one still lines
