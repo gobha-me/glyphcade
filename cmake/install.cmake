@@ -24,18 +24,48 @@ set(_cfg_install_dir ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
 
 # ── The library ─────────────────────────────────────────────────────────────
 if (TARGET ${PROJECT_NAME}_lib)
-  # EXPORT_NAME is what makes the imported target read ${PROJECT_NAME}::lib
-  # rather than ${PROJECT_NAME}::${PROJECT_NAME}_lib. Paired with NAMESPACE on
-  # the install(EXPORT) below, a downstream `find_package` gets a target that is
-  # spelled identically to the in-tree ALIAS in src/lib/CMakeLists.txt — so a
-  # consumer can switch acquisition modes without touching its link lines.
-  set_target_properties(${PROJECT_NAME}_lib PROPERTIES EXPORT_NAME lib)
+  # ── Every target in src/lib's chain joins the export set, because it must ──
+  # src/lib is four static libraries since the per-game split, and
+  # ${PROJECT_NAME}_lib links the other three PUBLIC. install(EXPORT) refuses to
+  # write a Targets file that references a target it cannot name:
+  #
+  #   install(EXPORT "term-gameTargets" ...) includes target "term-game_lib"
+  #   which requires target "term-game_roster" that is not in any export set.
+  #
+  # So this is not a decision about how much of the internals to publish — it is
+  # the only way the package generates at all. It is also the guard: add a game,
+  # forget to add it to src/lib's game list, and generation stops with that error
+  # naming your target. A game cannot be silently absent from the package.
+  #
+  # The game targets arrive as ${PROJECT_NAME}_GAME_TARGETS, set PARENT_SCOPE by
+  # src/lib/CMakeLists.txt, so this file needs no edit when a game is added.
+  set(_export_targets
+    ${PROJECT_NAME}_lib
+    ${PROJECT_NAME}_roster
+    ${${PROJECT_NAME}_GAME_TARGETS}
+    ${PROJECT_NAME}_core
+  )
 
-  # One call covers both library variants. For the header-only (INTERFACE)
-  # alternative the ARCHIVE/LIBRARY/RUNTIME destinations simply go unused —
-  # there is no artifact to place — so switching src/lib/CMakeLists.txt needs no
-  # edit here.
-  install(TARGETS ${PROJECT_NAME}_lib
+  # EXPORT_NAME is what makes each imported target read ${PROJECT_NAME}::lib
+  # rather than ${PROJECT_NAME}::${PROJECT_NAME}_lib. Paired with NAMESPACE on
+  # the install(EXPORT) below, a downstream `find_package` gets targets spelled
+  # identically to the in-tree ALIASes in src/lib/CMakeLists.txt — so a consumer
+  # can switch acquisition modes without touching its link lines.
+  #
+  # Derived by dropping the "${PROJECT_NAME}_" prefix rather than listed one by
+  # one, so a new game needs no line here either: term-game_game_2048 exports as
+  # term-game::game_2048. A target without the prefix would export under its own
+  # name, which is a visible oddity rather than a silent one.
+  foreach (_t IN LISTS _export_targets)
+    string(REGEX REPLACE "^${PROJECT_NAME}_" "" _export_name "${_t}")
+    set_target_properties(${_t} PROPERTIES EXPORT_NAME ${_export_name})
+  endforeach ()
+
+  # One call covers every library variant. For a header-only (INTERFACE) target
+  # the ARCHIVE/LIBRARY/RUNTIME destinations simply go unused — there is no
+  # artifact to place — so switching a target's type in src/lib/CMakeLists.txt
+  # needs no edit here.
+  install(TARGETS ${_export_targets}
     EXPORT ${PROJECT_NAME}Targets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
