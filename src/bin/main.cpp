@@ -3,24 +3,53 @@
 // Everything is in the Shell: the terminal, the loop, the selector, the game
 // registry. This file should stay roughly this size forever.
 
-#include <termgame/arcade/exception_boundary.hpp>
-#include <termgame/arcade/shell.hpp>
+#include <cstdlib>
+#include <filesystem>
+#include <string_view>
 
-// ⚠ NOT under include/ — a private header owned by src/audio_backend/, which is
-// never installed and never exported (gitea #13). It declares one function, and
-// CMake decides which translation unit defines it: the RtAudio backend when
-// TERMGAME_WITH_AUDIO is on, a NullSink when it is not.
-//
-// That is why there is no #ifdef in this file. The two build arms differ by a
-// source file, not by a preprocessor branch here.
-#include <termgame/audio/device_sink.hpp>
+#include <termgame/arcade/exception_boundary.hpp>
+#include <termgame/arcade/scores.hpp>
+#include <termgame/arcade/shell.hpp>
 
 // ⚠ NOT under include/. This header belongs to src/audio_backend/, a target that
 // is never installed and never exported (gitea #13), and it is reachable here
-// only because src/bin links that target. There is deliberately no #ifdef
-// TERMGAME_WITH_AUDIO in this file: CMake picks which translation unit DEFINES
-// make_device_sink(), so this file is byte-identical in both build arms.
+// only because src/bin links that target. It declares one function, and CMake
+// decides which translation unit DEFINES it: the RtAudio backend when
+// TERMGAME_WITH_AUDIO is on, a NullSink when it is not.
+//
+// That is why there is deliberately no #ifdef in this file. The two build arms
+// differ by a source file, so this file is byte-identical in both.
 #include <termgame/audio/device_sink.hpp>
+
+namespace {
+
+// getenv, and the whole of the environment's influence on this program, lives
+// HERE and nowhere else.
+//
+// ⚠ Not a stylistic choice. termgame::scores::resolve_path() takes its two
+// directories as strings and core contains no getenv at all, which means THE
+// LIBRARY CANNOT NAME A REAL FILE. A default-constructed Shell is therefore
+// memory-only by construction, so no future edit to shell.cpp — and no test that
+// forgets to inject a temp path — can start writing into a developer's $HOME.
+// Enforcing that with a boundary is worth more than enforcing it with a comment.
+[[nodiscard]] auto env_or_empty(const char* name) -> std::string_view {
+  const char* value = std::getenv(name);  // NOLINT(concurrency-mt-unsafe)
+  return value != nullptr ? std::string_view{value} : std::string_view{};
+}
+
+[[nodiscard]] auto scores_path() -> std::filesystem::path {
+  // A verbatim override, exactly the shape TERMGAME_AUDIO_WAV already has in
+  // src/audio_backend/. It exists for manual QA and for the AGENTS.md pty
+  // recipe, and is NOT how tests get a temp file — they pass the Shell a path.
+  if (const std::string_view override_path = env_or_empty("TERMGAME_SCORES");
+      !override_path.empty()) {
+    return std::filesystem::path{override_path};
+  }
+  return termgame::scores::resolve_path(env_or_empty("XDG_DATA_HOME"),
+                                        env_or_empty("HOME"));
+}
+
+}  // namespace
 
 auto main() -> int {
   return termgame::run_or_report([] {
@@ -39,7 +68,12 @@ auto main() -> int {
     // WavFileSink instead. make_device_sink() never returns null; a device that
     // cannot be opened reports itself through the sink's own open(), and the
     // Shell degrades to silence with a notice.
-    termgame::Shell app{termgame::audio::make_device_sink()};
+    //
+    // The scores path is the same bargain one layer over: the Shell owns the
+    // store, this file decides where it lives, and an empty path (neither
+    // XDG_DATA_HOME nor HOME set) is a memory-only session rather than an error.
+    // Nothing is created on disk until a record is actually made.
+    termgame::Shell app{termgame::audio::make_device_sink(), scores_path()};
     return app.run();
   });
 }

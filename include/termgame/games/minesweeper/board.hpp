@@ -167,6 +167,18 @@ class Board {
   [[nodiscard]] auto seconds() const noexcept -> int;
   static constexpr int kTimerCap = 999;
 
+  // The clock UNCLAMPED, for the record rather than the display.
+  //
+  // ⚠ Not a convenience duplicate of seconds(). A best time must not inherit a
+  // three-column HUD's limit: storing the clamp would write a 1200-second win as
+  // 999, which is both wrong and a record no later win can beat outright — every
+  // subsequent slow game ties it. So the store gets this, the status row gets
+  // seconds(), and a win above the cap displays a frozen BEST 999 over a
+  // correctly stored value. test/15minesweeper-ui pins exactly that split.
+  [[nodiscard]] auto elapsed() const noexcept -> std::chrono::duration<double> {
+    return m_clock;
+  }
+
   // ── Fixture seam ──────────────────────────────────────────────────────────
   // Install an exact mine layout, recompute adjacency, and land in
   // State::Playing — placement has happened, so the next reveal() must not do

@@ -952,3 +952,242 @@ TEST_CASE("marking a revealed cell is silent", "[minesweeper][audio]") {
   REQUIRE(app.audio().play_count(SfxId::Click) == clicks);
   REQUIRE(app.audio().play_count(SfxId::Flag) == flags);
 }
+
+// ── Best time (gitea #14) ───────────────────────────────────────────────────
+//
+// ⚠ Every case below uses the SHELL's default store, which is memory-only. That
+// is the point: none of this needs a file, so none of it can leave one behind or
+// depend on a temp directory. What the store being the SHELL's — rather than the
+// Game's — buys is the only thing these cases care about, since a fresh Game is
+// built per menu entry.
+//
+// The store's own format, merge and degraded modes live in test/24scores.
+
+// A win, in two halves, because the CLOCK has to run between them.
+//
+// ⚠ Do not fold these back together. load_mines() resets the board, which resets
+// the clock — so a case that advances time and then calls a combined helper
+// records a best time of zero and, because zero is a valid Lower record, gets a
+// green screen assertion over a wrong stored value. That is not hypothetical:
+// it is how the first draft of these cases failed.
+
+constexpr Coord kLastCell{.row = 8, .col = 8};
+
+// Installs the layout and opens every safe cell but one, directly on the model.
+// Walling (8,8) off with mines on all three of its neighbours is what keeps the
+// flood fill from opening it — the fill only expands THROUGH zero cells — so
+// there is a last cell left for a keystroke to take. Leaves the clock running.
+auto arm_win(Minesweeper* g) -> void {
+  const Coord mines[]{{0, 0}, {7, 7}, {7, 8}, {8, 7}};
+  g->board().load_mines(mines);
+
+  auto is_mine = [&mines](Coord at) {
+    for (const Coord m : mines) {
+      if (m == at) return true;
+    }
+    return false;
+  };
+
+  auto& board = g->board();
+  for (int r = 0; r < board.rows(); ++r) {
+    for (int c = 0; c < board.cols(); ++c) {
+      const Coord at{.row = r, .col = c};
+      if (is_mine(at) || at == kLastCell) continue;
+      if (!board.at(at).revealed) board.reveal(at);
+    }
+  }
+  REQUIRE_FALSE(board.finished());
+  REQUIRE(board.timer_running());
+}
+
+// Takes the last cell through the REAL input path, which is where announce()
+// runs and therefore the only path that records anything.
+auto finish_win(Probe& app) -> void {
+  Minesweeper* live = game_of(app);
+  REQUIRE(live != nullptr);
+  while (live->cursor().row < kLastCell.row) {
+    app.dispatch_event(key(termforge::Key::Down));
+  }
+  while (live->cursor().col < kLastCell.col) {
+    app.dispatch_event(key(termforge::Key::Right));
+  }
+  app.dispatch_event(ch(U' '));
+}
+
+TEST_CASE("a best time outlives the game that set it", "[minesweeper][scores]") {
+  // ⚠ THE CASE THE WHOLE FEATURE EXISTS FOR. A fresh Game is constructed per menu
+  // entry (Shell::enter_selected_game) and destroyed on the way out, so a best
+  // time held in the Game would die on quit-to-menu — a "best" that resets every
+  // entry is worse than none. Move the store into the Game and every other case
+  // in this file still passes; only this one goes red.
+  Probe app;
+  Minesweeper* g = enter_game(app);
+
+  REQUIRE(screen_contains(app, "BEST ---"));
+
+  arm_win(g);
+  // Three seconds on the clock before the winning keystroke. 3.5 rather than 3
+  // for the same floating-point reason the TIME case above gives: 180 additions
+  // of 1.0/60.0 land at 2.9999999999999996 and seconds() truncates.
+  for (int i = 0; i < 7 * Shell::kTickHz / 2; ++i) {
+    g->tick(std::chrono::duration<double>{1.0 / Shell::kTickHz});
+  }
+  finish_win(app);
+  app.step();
+
+  REQUIRE(app.scores().get("minesweeper", "best_time_easy") == 3);
+  REQUIRE(screen_contains(app, "BEST 003"));
+
+  // Back to the menu — which destroys the Game — and in again, which builds a
+  // brand new one.
+  app.dispatch_event(key(termforge::Key::Escape));
+  app.step();
+  REQUIRE(app.state() == Shell::State::Selector);
+
+  Minesweeper* second = enter_game(app);
+  // ⚠ Freshness is asserted through STATE, not through pointer identity. The
+  // first Game is destroyed before the second is allocated, so the allocator
+  // hands back the same address more often than not — `second != g` looks like
+  // the stronger claim and is in fact a coin flip. A zeroed clock on a board
+  // that had just been won cannot be the old object.
+  REQUIRE(second->board().seconds() == 0);
+  REQUIRE_FALSE(second->board().finished());
+  REQUIRE(screen_contains(app, "BEST 003"));
+}
+
+TEST_CASE("a slower win does not replace a faster one", "[minesweeper][scores]") {
+  // ⚠ THE CASE THAT MAKES Better::Lower LOAD-BEARING AT THIS LAYER. Every other
+  // minesweeper case here records exactly one win per level, so the direction
+  // never gets to matter — record with Better::Higher instead and they all stay
+  // green. This is the one that notices, and it is the direction a naive design
+  // gets backwards: for a TIME, smaller wins.
+  Probe app;
+  Minesweeper* g = enter_game(app);
+
+  arm_win(g);
+  for (int i = 0; i < 7 * Shell::kTickHz / 2; ++i) {
+    g->tick(std::chrono::duration<double>{1.0 / Shell::kTickHz});
+  }
+  finish_win(app);
+  app.step();
+  REQUIRE(app.scores().get("minesweeper", "best_time_easy") == 3);
+
+  // A second, slower game on the same level.
+  app.dispatch_event(ch(U'n'));  // new game, same difficulty
+  app.step();
+  Minesweeper* again = game_of(app);
+  REQUIRE(again != nullptr);
+  arm_win(again);
+  for (int i = 0; i < 20 * Shell::kTickHz; ++i) {
+    again->tick(std::chrono::duration<double>{1.0 / Shell::kTickHz});
+  }
+  REQUIRE(again->board().seconds() >= 20);
+  finish_win(app);
+  app.step();
+
+  REQUIRE(app.scores().get("minesweeper", "best_time_easy") == 3);
+  REQUIRE(screen_contains(app, "BEST 003"));
+
+  // ...and a faster one does replace it, so the case is not passing merely
+  // because nothing is ever written twice.
+  app.dispatch_event(ch(U'n'));
+  app.step();
+  Minesweeper* third = game_of(app);
+  REQUIRE(third != nullptr);
+  arm_win(third);
+  third->tick(std::chrono::duration<double>{1.0 / Shell::kTickHz});
+  finish_win(app);
+  app.step();
+
+  REQUIRE(app.scores().get("minesweeper", "best_time_easy") == 0);
+  REQUIRE(screen_contains(app, "BEST 000"));
+}
+
+TEST_CASE("each difficulty keeps its own best time", "[minesweeper][scores]") {
+  // ⚠ What proves the key is per-LEVEL rather than per-game. Collapse time_key()
+  // to a single constant and this is the case that notices: Medium would inherit
+  // Easy's record and show a time nobody ever played.
+  Probe app;
+  Minesweeper* g = enter_game(app);
+
+  arm_win(g);
+  for (int i = 0; i < 7 * Shell::kTickHz / 2; ++i) {
+    g->tick(std::chrono::duration<double>{1.0 / Shell::kTickHz});
+  }
+  finish_win(app);
+  app.step();
+  REQUIRE(screen_contains(app, "BEST 003"));
+
+  app.dispatch_event(ch(U'2'));  // Medium
+  app.step();
+  REQUIRE(game_of(app)->level() == Level::Medium);
+  REQUIRE(screen_contains(app, "BEST ---"));
+  REQUIRE_FALSE(app.scores().get("minesweeper", "best_time_medium").has_value());
+
+  app.dispatch_event(ch(U'1'));  // back to Easy
+  app.step();
+  REQUIRE(screen_contains(app, "BEST 003"));
+}
+
+TEST_CASE("a win past the timer cap is stored in full and displayed frozen",
+          "[minesweeper][scores]") {
+  // ⚠ THE CASE FOR Board::elapsed(). seconds() clamps at kTimerCap for a
+  // three-column HUD; record the clamp and a 1200-second win is written as 999,
+  // which is wrong AND unbeatable-by-tie — every later slow win draws with it.
+  // Swap elapsed() for seconds() in announce() and the store assertion below goes
+  // red while the screen assertion stays green, which is exactly the split.
+  Probe app;
+  Minesweeper* g = enter_game(app);
+
+  arm_win(g);
+  g->board().advance(std::chrono::duration<double>{1200.0});
+  REQUIRE(g->board().seconds() == Board::kTimerCap);
+
+  finish_win(app);
+  app.step();
+
+  REQUIRE(app.scores().get("minesweeper", "best_time_easy") == 1200);
+  REQUIRE(screen_contains(app, "BEST 999"));
+}
+
+TEST_CASE("the outcome word survives a fourth status field on a narrow board",
+          "[minesweeper][scores][render]") {
+  // ⚠ THE REGRESSION THIS ROW'S REWRITE EXISTS FOR. draw_status() used to build
+  // its left half unconditionally and drop the WORD when the two collided — the
+  // opposite priority from 2048's, and the reason a fourth field could not simply
+  // be appended. Restore that whole shape (unconditional left, word skipped on
+  // collision) and "YOU WIN" disappears here while every wide-terminal case
+  // stays green. Verified by mutation, not assumed.
+  //
+  // ⚠ It is THE BUDGET that is load-bearing, not the unconditional final
+  // write_text of the word. Putting the old `if (word_x > left.size())` guard
+  // back on top of the budget changes nothing and no test notices — correctly,
+  // because the budget already caps left at word_x - 2, so the guard can never
+  // fire. That is the same finding twenty48.cpp records about its draw ORDER:
+  // once the arithmetic is right, the second mechanism is decoration, and two
+  // mechanisms for one property is how a test comes to pass on a broken row.
+  //
+  // At the no-colour tier the word is the only thing that says the game is over;
+  // a dropped counter is merely a narrow terminal.
+  for (const int cols : {30, 40, 52, 80}) {
+    Probe app;
+    Minesweeper* g = enter_game(app, cols, 24);
+
+    arm_win(g);
+    finish_win(app);
+    app.step(1, cols, 24);
+
+    REQUIRE(screen_contains(app, "YOU WIN"));
+    REQUIRE(all_seven_bit(app));
+    // Whole fields or nothing: a field that appears must appear complete, the
+    // same contract test/23twenty48-ui holds 2048's row to.
+    const std::string status = row_text(app, 0);
+    for (const auto& [label, full] :
+         std::vector<std::pair<std::string, std::string>>{
+             {"MINES", "MINES 000"}, {"TIME", "TIME 000"}, {"BEST", "BEST 000"}}) {
+      if (status.find(label) != std::string::npos) {
+        REQUIRE(status.find(full) != std::string::npos);
+      }
+    }
+  }
+}

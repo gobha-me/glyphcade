@@ -34,6 +34,28 @@ auto pad3(int v) -> std::string {
   return s;
 }
 
+// The store key for a level's best time.
+//
+// ⚠ Switched on the Level ENUM, never built by lowercasing preset(level).name.
+// That name is display text — "EASY" on the status row — and deriving a storage
+// key from it would couple the on-disk format to UI copy, so renaming a label
+// would silently orphan every record already written, with nothing to catch it at
+// compile time.
+//
+// ⚠ No `default:` inside the switch, on purpose. A fourth Level then fails to
+// build under -Werror instead of quietly filing its records under Easy.
+[[nodiscard]] auto time_key(Level level) -> std::string_view {
+  switch (level) {
+    case Level::Easy:
+      return "best_time_easy";
+    case Level::Medium:
+      return "best_time_medium";
+    case Level::Hard:
+      return "best_time_hard";
+  }
+  return "best_time_easy";  // unreachable; the switch above is exhaustive
+}
+
 // A per-entry seed. Reading a clock here is fine and is NOT the thing AGENTS.md
 // forbids — that rule is about Game::tick, where dt must be the only time that
 // exists. A constructor runs once, outside the simulation.
@@ -132,6 +154,20 @@ auto Minesweeper::announce(minesweeper::State before,
 
   if (now == minesweeper::State::Won && before != minesweeper::State::Won) {
     m_ctx->audio().play(audio::SfxId::Win);
+    // ⚠ THE ONLY PLACE A BEST TIME CAN BE RECORDED, and the reason it lives in
+    // announce() rather than in the Board: this is the one function that sees
+    // both the WIN TRANSITION and m_level. The Board holds only a Preset, never
+    // a Level, and board.hpp is explicit that it must not learn one. All five
+    // verb paths — three keyboard, two mouse — route through here, so a win by
+    // click and a win by keypress cannot record differently.
+    //
+    // elapsed(), not seconds(): the stored record must not inherit the HUD's
+    // 999-second clamp. Better::Lower, which is the direction a naive design gets
+    // backwards and the reason a record carries one at all.
+    m_ctx->scores().record(
+        kMeta.slug, time_key(m_level),
+        static_cast<long long>(m_board.elapsed().count()),
+        scores::Better::Lower);
     return;
   }
 
@@ -305,13 +341,10 @@ auto Minesweeper::draw(termforge::Screen& screen) -> void {
 
 auto Minesweeper::draw_status(termforge::Screen& screen) -> void {
   const auto bg = termforge::theme::kBg;
-  std::string left = "MINES " + pad3(m_board.mines_remaining()) + "   TIME " +
-                     pad3(m_board.seconds()) + "   ";
-  left += std::string(m_board.name());
-  screen.write_text(0, m_layout.status_y, left, termforge::theme::kFg, bg);
 
   // The state word is required, not decorative: at the no-colour tier "you
-  // lost" cannot be said by painting the mines red.
+  // lost" cannot be said by painting the mines red. So it is measured and
+  // reserved FIRST, and the counters are fitted into what is left.
   std::string_view word;
   termforge::Rgb fg = termforge::theme::kDim;
   switch (m_board.state()) {
@@ -328,10 +361,46 @@ auto Minesweeper::draw_status(termforge::Screen& screen) -> void {
       word = "PLAYING";
       break;
   }
-  const int x = screen.cols() - static_cast<int>(word.size());
-  if (x > static_cast<int>(left.size())) {
-    screen.write_text(x, m_layout.status_y, word, fg, bg);
+  const int word_x = std::max(0, screen.cols() - static_cast<int>(word.size()));
+
+  // ⚠ THIS BUDGET IS 2048's, adopted here rather than re-argued — the reasoning
+  // is at the top of twenty48.cpp's draw_status() and it applies unchanged:
+  // write_text clips at the screen edge but NOT against text already on the row,
+  // so fields are appended only while they still fit and the row degrades by
+  // dropping WHOLE fields rather than truncating a number.
+  //
+  // ⚠ It REPLACES a guard that had the priority inverted. This row used to build
+  // its left half unconditionally and then skip the WORD when the two would
+  // collide — so adding a fourth field here would have made "YOU WIN" disappear
+  // on a narrow terminal, which is the one thing on this row that must survive.
+  // The word now wins by construction instead of by luck about widths.
+  std::string left;
+  const int budget = word_x - 2;  // one blank column between the two
+  for (const std::string& field :
+       {"MINES " + pad3(m_board.mines_remaining()),
+        "TIME " + pad3(m_board.seconds()), std::string(m_board.name()),
+        "BEST " + best_time()}) {
+    const std::string sep = left.empty() ? "" : "   ";
+    if (static_cast<int>(left.size() + sep.size() + field.size()) > budget) {
+      break;
+    }
+    left += sep + field;
   }
+  screen.write_text(0, m_layout.status_y, left, termforge::theme::kFg, bg);
+  screen.write_text(word_x, m_layout.status_y, word, fg, bg);
+}
+
+// ⚠ "---" for no record, NOT "000", and the asymmetry with 2048's `record 0` is
+// forced rather than stylistic. This is a Better::Lower record, so zero is the
+// MAXIMAL value: "BEST 000" would read as a nonexistent 0-second win that no
+// honest game can ever beat. 2048's Higher record has 0 as its identity and a
+// real minimum score, so there it needs no unset spelling at all.
+auto Minesweeper::best_time() const -> std::string {
+  if (m_ctx == nullptr) return "---";
+  const auto held = m_ctx->scores().get(kMeta.slug, time_key(m_level));
+  // pad3 clamps at 999, which is the same freeze TIME already has — a record
+  // above the cap is stored in full and displayed frozen.
+  return held ? pad3(static_cast<int>(*held)) : "---";
 }
 
 auto Minesweeper::draw_hints(termforge::Screen& screen) -> void {
