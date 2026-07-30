@@ -324,8 +324,14 @@ this design pass.
 | [#63](https://github.com/gobha-me/termforge/issues/63) | `Image` has no blit/alpha compositing | sprite games |
 | [#64](https://github.com/gobha-me/termforge/issues/64) | MapWidget (Epic 3.6) | Sokoban |
 
-Of these, #27, #58, #59 and #61 are all done, and term-game pins **v0.1.15** to
-get them (plus #71, #72 and #73 — see below). #62/#63 degrade rather than block.
+Of these, #27, #58, #59 and #61 were the first done, and term-game pins a tag far
+enough forward to get them (plus #71, #72 and #73 — see below). #62/#63 degrade
+rather than block, which is why the design never waited on them.
+
+⚠ This table is **point-in-time**, as the rest of this document is: every gap in
+it has since been closed upstream, and the pin has moved five more times. Read
+[STATUS.md](STATUS.md) for which tag we are actually on and what each one bought
+— not this paragraph, which is kept for the reasoning rather than the numbers.
 
 Three gaps this design pass had not predicted have since been added to the list,
 all found by building against the framework rather than reasoning about it —

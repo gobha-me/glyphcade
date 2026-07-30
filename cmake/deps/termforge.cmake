@@ -24,12 +24,15 @@
 # HTTPS, not SSH: github.com has no key on the dev container or on CI runners.
 # git.gobha.me is the SSH-only forge; github.com is not.
 
-# 0.1.15, not 0.1 — and the patch level here is load-bearing, not pedantry.
+# 0.2.2, not 0.2 — and the patch level here is load-bearing, not pedantry.
 #
 # termforge's package version file is SameMinorVersion: it accepts a candidate
 # whose major.minor match AND whose version is >= the one requested. Asking for
-# "0.1" therefore accepts *any* installed 0.1.x. Three ways that bites, in
-# increasing order of how hard they are to notice:
+# "0.2" therefore accepts *any* installed 0.2.x. The history below is 0.1.x
+# because that is where the floor was learned, and every lesson in it survives
+# the move to 0.2 — the dependency still ships load-bearing API in patch
+# releases. Three ways minor granularity bit, in increasing order of how hard
+# they are to notice:
 #
 #   - 0.1.7 has no App::set_tick_hz. The Shell calls it, so that acceptance
 #     turns a clean "your installed package is too old, falling back to
@@ -56,10 +59,23 @@
 # added members to ListWidget (a style, a marker-enabled flag and a std::string
 # marker), so sizeof(ListWidget) changed — and Shell holds one BY VALUE in
 # include/termgame/arcade/shell.hpp, which we install. A consumer that resolves
-# an older 0.1.x compiles our public header against a different object layout
+# an older 0.2.x compiles our public header against a different object layout
 # than term-game_lib was built with. That is not a link error; it is a silent
 # one. cmake/project-config.cmake.in carries the same floor for that reason.
-find_package(termforge 0.1.15 QUIET CONFIG)
+#
+# v0.2.1 did it again — ListWidget gained m_track_fg and m_thumb_fg for #21's
+# scrollbar — so this is now the SECOND time that class changed size under us.
+# Treat "ListWidget grew a member" as the expected case, not the surprise.
+#
+# ⚠ Crossing 0.1 → 0.2 makes SameMinorVersion cut the other way, and it is worth
+# saying out loud because it is the reason all three files move in ONE commit:
+# asking for 0.2.2 no longer accepts any 0.1.x at all (which is what we want —
+# the wheel semantics differ, see below), but by the same rule anything still
+# asking for 0.1.15 silently stops matching a 0.2.x install. The three places
+# are cmake/deps/termforge.cmake (here), cmake/project-config.cmake.in, and
+# STATUS.md. Two of them are consumer-visible; a half-done bump is a package
+# that resolves on the developer's machine and nowhere else.
+find_package(termforge 0.2.2 QUIET CONFIG)
 
 if (termforge_FOUND)
   message(STATUS "termforge: ${termforge_VERSION} via find_package")
@@ -108,11 +124,59 @@ else ()
   #            ?1006h?1002h we were already emitting, so taking the tag changes
   #            nothing until something calls it. MouseMode::Motion is what
   #            Minesweeper wants for buttonless hover — gitea #18.
+  #  v0.1.16 — Cell::attrs (#62): bold/dim/italic/underline/reverse/strike as a
+  #            bitmask on every cell. The one tag here with a payoff we can
+  #            spend: Minesweeper's cursor is a PAIR OF BRACKETS costing a
+  #            column per cell (Hard needs 63), because colour does not survive
+  #            FallbackDriver. Attr::Reverse does — the fallback driver emits
+  #            Reverse and Bold and drops only the other four — so the brackets
+  #            may be replaceable at BOTH tiers, not just the colour one. That
+  #            is a board-geometry rewrite with its own tests, so it is its own
+  #            issue, not this bump's cargo.
+  #  v0.1.17 — dropdown scroll for Select/MenuBar (#85). We use neither. Inert.
+  #  v0.1.18 — Image sub-rect blit, alpha compositing, sprite-sheet slicing
+  #            (#63). Unblocks Epic 8 (Solitaire) and the back half of Epic 7.
+  #            Also moved Rect out of widgets/widget.hpp into core/types.hpp —
+  #            a header reshuffle, not a break; termforge::Rect still resolves.
+  #  v0.1.19 — MapWidget v1, glyph tier (#64/#86). Unblocks Epic 7 (Sokoban).
+  #            Its TileSet requires a glyph, so the degradation contract is
+  #            type-enforced rather than documented — which is this repo's
+  #            bottom-tier rule expressed in someone else's type system.
+  #  v0.2.0 — ⚠ THE BREAKING ONE (#35). Two halves, and only the undeclared
+  #            half reaches us. The DECLARED break is TableWidget's arrow keys
+  #            moving the selection instead of scrolling; we do not use
+  #            TableWidget, so it misses entirely. What reaches us is that the
+  #            WHEEL NOW SCROLLS THE VIEW EVERYWHERE. ListWidget::on_event used
+  #            to answer a wheel event with set_selected(selected ± 3); it now
+  #            moves a view offset and leaves the selection alone. Our selector
+  #            inherited the old behaviour and never asked for it. We adopted
+  #            upstream's convention rather than rebuilding the old one here —
+  #            see the comment at the mouse branch in src/lib/arcade/shell.cpp,
+  #            and the two cases in test/11selector that hold us to it.
+  #  v0.2.1 — shared scrollbar for List/Table/TextBox (#21). The selector paints
+  #            one the moment the roster outgrows its pane, which it does not
+  #            yet at two entries. Note the strip is keyed off BorderStyle, so
+  #            it is |/# at the ASCII tier and │/█ above it: m_list.set_style()
+  #            in draw_selector is what keeps the bottom tier 7-bit, and that is
+  #            now a SECOND reason that line is load-bearing.
+  #  v0.2.2 — kitty keyboard protocol: KeyAction::{Press,Repeat,Release} and
+  #            KeyboardMode (#60). Additive and opt-in — the default, Legacy, is
+  #            byte-for-byte what every earlier tag emitted, so taking this
+  #            changes nothing until something calls set_keyboard_mode. Taken
+  #            because it is the tip, and because it is the upstream issue
+  #            STATUS.md lists as Epic 6's (Tetris) blocker: hold-to-move stops
+  #            being OS auto-repeat guesswork.
   #
   # Pin a tag, not a SHA: the find_package path above is version-gated, so both
   # acquisition paths should describe the same thing in the same vocabulary.
+  #
+  # ⚠ This variable is also the red-verify seam. `cmake -B build-oldpin
+  # -DTERMFORGE_TAG=v0.1.15` builds the suite against the PREVIOUS pin —
+  # find_package(0.2.2) misses, FetchContent takes the override — which is how
+  # test/11selector's wheel cases were shown to fail before this bump rather
+  # than passing vacuously after it.
   if (NOT TERMFORGE_TAG)
-    set(TERMFORGE_TAG v0.1.15)
+    set(TERMFORGE_TAG v0.2.2)
   endif ()
 
   # termforge's own options already default to PROJECT_IS_TOP_LEVEL, so as a

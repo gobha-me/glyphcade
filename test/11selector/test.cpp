@@ -7,7 +7,7 @@
 // feeds raw bytes through test_pump, so the escape-sequence decoder is covered
 // at least once.
 //
-// ⚠ Four traps for whoever extends this file:
+// ⚠ Five traps for whoever extends this file:
 //
 //   1. Dialog::begin_result()'s latch clears only on the next draw(). A test
 //      that pauses, answers, and pauses again without running a frame in
@@ -29,6 +29,14 @@
 //      down beside the other post-step assertions. (Shell::quit_requested()
 //      used to hide this by latching; it was a workaround for termforge #73
 //      and went with gitea #17.)
+//   5. Mouse events are HIT-TESTED before they are routed. App::route_mouse
+//      only offers an event to a widget whose rect() contains its x/y, so a
+//      wheel or click at coordinates outside the list is not "ignored by the
+//      list" — it never reaches the list at all, and a case built on one
+//      passes while asserting nothing. Combined with trap 2 (rect() is unset
+//      until a frame has rendered), coordinates before the first step() are
+//      always outside. Use kMarkX/kRow0 and step() first, as the wheel and
+//      click cases below do.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -76,6 +84,23 @@ class Probe final : public Shell {
     -> termforge::Event {
   return termforge::Event{termforge::MouseEvent{
       .x = x, .y = y, .button = button, .pressed = pressed}};
+}
+
+// A wheel notch. termforge encodes the wheel as a MouseEvent carrying no
+// button (-1) and one of the two scroll flags — NOT as a button number, which
+// is the shape an xterm-protocol reflex expects. Same encoding as the one wheel
+// event elsewhere in the suite, test/15minesweeper-ui's "the wheel is ignored
+// too".
+//
+// ⚠ pressed stays false. A wheel notch is not a press, and setting it would
+// also send the Shell down the m_ring.focus_at() branch, which is a different
+// gesture entirely.
+[[nodiscard]] auto wheel(int x, int y, bool up) -> termforge::Event {
+  return termforge::Event{termforge::MouseEvent{.x = x,
+                                                .y = y,
+                                                .button = -1,
+                                                .scroll_up = up,
+                                                .scroll_down = !up}};
 }
 
 [[nodiscard]] auto cell_text(Probe& app, int x, int y) -> std::string {
@@ -451,26 +476,33 @@ TEST_CASE("the selector survives entering and leaving repeatedly",
 //     a NullSink Shell still records what was asked for; and
 //   * no sink injection is needed anywhere, so nothing here touches the disk.
 //
-// ⚠ MenuMove cannot be positively asserted yet, and that is a property of the
-// roster rather than of the binding. all_games() has exactly one entry, and
-// ListWidget clamps, so Up/Down/Home/End/wheel move the selection NOWHERE — the
-// edge detector correctly stays silent because nothing moved. The negative case
-// below is therefore the real one today, and the positive case sits behind the
-// same `size() > 1` guard the "arrow keys move the selection" case above
-// already uses, for the same reason. Epic 4 unlocks it.
+// This note used to record two things as UNTESTABLE on a one-game roster: that
+// MenuMove could never be positively asserted, and that the
+// `m_state == State::Selector` guard in both handlers was consequently blind.
+// Epic 4 registered a second game and both went live — "moving the selection
+// plays the move sound" and "a click on a NON-selected row plays select and not
+// move" below are those two cases. Kept in outline because the shape recurs:
+// coverage that depends on the roster's LENGTH reads as coverage that exists.
 //
-// ⚠ AND SO IS THE `m_state == State::Selector` GUARD in both handlers UNTESTED,
-// which was established by mutation rather than assumed: deleting it from the
-// mouse path leaves this whole file green. With one game a click on row 0 does
-// not change the selection, so MenuMove does not fire with or without it.
+// ⚠ The wheel is no longer one of the gestures that can move the selection at
+// all, and this is where that stops being obvious. Before termforge v0.2.0,
+// ListWidget answered a wheel notch with set_selected(selected ± 3) — so with
+// two entries a wheel-down DID move the selection and DID fire MenuMove. #35
+// unified the wheel onto the view offset instead. Both halves of the new
+// contract are asserted below rather than left to the release note, because
+// nothing else in this file can see the difference: every other case passed
+// identically before and after the bump.
 //
-// The guard is still correct and is deliberately kept — the moment a second
-// game exists, a click on a NON-selected row moves the selection and fires
-// on_select in the same call, and without the guard that one gesture emits two
-// sounds. But "kept because the argument is sound" is a weaker claim than
-// "kept because a test says so", and the difference belongs in writing rather
-// than in a comment that implies coverage this file does not have. Recorded in
-// STATUS.md's Epic 2 deferral table; it becomes testable with Epic 4.
+// ⚠ What is still deferred, with a condition. The wheel's POSITIVE half — that
+// a notch moves ListWidget::scroll_offset() — needs a roster longer than the
+// pane, and there is no size at which two entries overflow: the Shell's floor
+// is 20x8, which leaves the list three interior rows. all_games() is a
+// file-local constexpr table with no injection seam. Revisit when the roster
+// reaches four entries (Epic 6), or when a test-only substitute for the
+// term-game_roster target earns its keep — src/lib/CMakeLists.txt already makes
+// the roster its own archive, so the seam exists at the link level. Until then
+// the negative half is the whole assertion, and it is the load-bearing one:
+// what changed under us is that the selection stopped moving.
 
 TEST_CASE("entering a game plays the select sound", "[selector][audio]") {
   using termgame::audio::SfxId;
@@ -542,6 +574,54 @@ TEST_CASE("a click on a NON-selected row plays select and not move",
 
   REQUIRE(app.audio().play_count(SfxId::MenuSelect) == 1);
   REQUIRE(app.audio().play_count(SfxId::MenuMove) == 0);
+}
+
+TEST_CASE("the wheel scrolls the view and does not move the selection",
+          "[selector][wheel]") {
+  // ⚠ RED-VERIFIED against the previous pin, which is the only reason this case
+  // is worth anything: `cmake -B build-oldpin -DTERMFORGE_TAG=v0.1.15` builds
+  // the suite against termforge v0.1.15, where ListWidget answers a wheel notch
+  // with set_selected(selected ± 3). With two entries that clamps 0 -> 1 and
+  // this REQUIRE fails. Every other case in this file passes on both pins.
+  //
+  // What it pins going forward is the decision, not just the framework: the
+  // wheel scrolls the view, the selection stays put, and the Shell does not
+  // reach back in to re-implement the old behaviour. See the mouse branch in
+  // src/lib/arcade/shell.cpp.
+  Probe app;
+  app.step();  // ListWidget::rect() is only set inside on_render — trap 2
+  REQUIRE(app.selector_index() == 0);
+
+  // Down first: from row 0 this is the direction with somewhere to go, so it is
+  // the notch the old behaviour would have moved. Up afterwards would clamp at
+  // the top and prove nothing on its own.
+  app.dispatch_event(wheel(kMarkX, kRow0, /*up=*/false));
+  REQUIRE(app.selector_index() == 0);
+
+  app.dispatch_event(wheel(kMarkX, kRow0, /*up=*/true));
+  REQUIRE(app.selector_index() == 0);
+
+  // And the wheel is not a way into a game either — it never fired on_select,
+  // before or after #35, but a Shell that "helpfully" re-bound it could.
+  REQUIRE(app.state() == Shell::State::Selector);
+}
+
+TEST_CASE("the wheel plays no sound", "[selector][wheel][audio]") {
+  // The other half, and it is a claim about OUR code rather than termforge's:
+  // MenuMove is edge-detected on the selection, so a wheel that moves nothing
+  // must be silent. Binding the sound to the gesture instead — the mistake the
+  // key path's comment warns about — would blip on every notch of a wheel that
+  // did nothing at all.
+  using termgame::audio::SfxId;
+
+  Probe app;
+  app.step();
+
+  app.dispatch_event(wheel(kMarkX, kRow0, /*up=*/false));
+  app.dispatch_event(wheel(kMarkX, kRow0, /*up=*/true));
+
+  REQUIRE(app.audio().play_count(SfxId::MenuMove) == 0);
+  REQUIRE(app.audio().play_count(SfxId::MenuSelect) == 0);
 }
 
 TEST_CASE("a key that moves nothing makes no sound", "[selector][audio]") {
