@@ -14,6 +14,31 @@ namespace {
 
 constexpr termforge::Rgb kAccent{0x00, 0xFF, 0x80};
 
+// True for a key event the SHELL may act on itself.
+//
+// ⚠ This drops Release, and deliberately does NOT keep only Press. The three
+// values are not one axis with Press at the useful end:
+//
+//   Press   — the key went down. Also what OS auto-repeat looks like without
+//             the kitty keyboard protocol.
+//   Repeat  — the key is being held. termforge sends this INSTEAD OF a second
+//             Press, and documents that a widget treating it like a press keeps
+//             hold-to-scroll and hold-to-type. Gate Repeat out and holding Down
+//             in the selector stops scrolling the menu the moment any game asks
+//             for Enhanced — a regression with no error message.
+//   Release — the key came up. Never delivered under KeyboardMode::Legacy.
+//
+// ⚠ It reads as dead code and is not. No game on the roster asks for anything
+// but Legacy today, so no Release can reach this function yet; the moment one
+// does, an ungated Escape quits to the menu twice and an ungated Ctrl+C quits
+// the app on the way UP from the keystroke that was meant to be caught on the
+// way down. This lands before the first game that turns the tier on, which is
+// the whole point of doing it in its own change.
+[[nodiscard]] constexpr auto shell_may_act(
+    const termforge::KeyEvent& key) noexcept -> bool {
+  return key.action != termforge::KeyAction::Release;
+}
+
 }  // namespace
 
 Shell::Shell() : Shell(std::make_unique<audio::NullSink>()) {}
@@ -112,7 +137,8 @@ auto Shell::on_event(const termforge::Event& ev) -> void {
   // paused — otherwise a modal with no wired close path is unkillable from its
   // own terminal.
   if (const auto* key = std::get_if<termforge::KeyEvent>(&ev)) {
-    if (key->ctrl && (key->ch == U'c' || key->ch == U'C')) {
+    if (shell_may_act(*key) && key->ctrl &&
+        (key->ch == U'c' || key->ch == U'C')) {
       quit_app();
       return;
     }
@@ -226,7 +252,7 @@ auto Shell::handle_selector_key(const termforge::Event& ev,
 
   // Escape quits the app HERE and only here. The paired case is in
   // handle_in_game_key, where the same key means "back to the menu".
-  if (key.key == termforge::Key::Escape) quit_app();
+  if (shell_may_act(key) && key.key == termforge::Key::Escape) quit_app();
 }
 
 auto Shell::handle_in_game_key(const termforge::Event& ev,
@@ -240,13 +266,20 @@ auto Shell::handle_in_game_key(const termforge::Event& ev,
 
   // Shell-level keys, on anything the game declined. This is how every game
   // gets pause and quit-to-menu without implementing either.
-  if (key.key == termforge::Key::Escape) {
-    request_to_menu();
-    return;
-  }
-  if (key.key == termforge::Key::Char && (key.ch == U'p' || key.ch == U'P')) {
-    open_pause();
-    return;
+  //
+  // ⚠ The gate is HERE and not above the game's refusal. A game that asked for
+  // Enhanced asked to see releases — that is the entire reason it asked — so
+  // dropping them before m_game->on_event would take away the thing the tier
+  // exists to deliver. What must not happen is the SHELL acting on one twice.
+  if (shell_may_act(key)) {
+    if (key.key == termforge::Key::Escape) {
+      request_to_menu();
+      return;
+    }
+    if (key.key == termforge::Key::Char && (key.ch == U'p' || key.ch == U'P')) {
+      open_pause();
+      return;
+    }
   }
   apply_transitions();
 }
@@ -334,10 +367,25 @@ auto Shell::enter_selected_game() -> void {
   // on_select for each — so the two entry paths cannot drift apart.
   m_audio.play(audio::SfxId::MenuSelect);
 
+  const GameMeta& meta = games[static_cast<std::size_t>(index)].meta;
+
   // A NEW object, from the registry's factory. Freshness is structural: there
   // is no previous instance to have leaked a field. See registry.hpp.
   m_game = games[static_cast<std::size_t>(index)].make();
   m_ctx.clear_quit_to_menu();
+
+  // The keyboard tier is the GAME's, for as long as the game is up (gitea #32).
+  // Restored to Legacy in apply_transitions(), so the selector and every game
+  // that did not ask for a tier keep the input contract they were written
+  // against.
+  //
+  // ⚠ Safe mid-run, and that is upstream's design rather than our luck:
+  // Terminal::set_keyboard_mode OVERWRITES the pushed flag set with
+  // `CSI = flags;1 u` instead of pushing again, so the terminal's keyboard
+  // stack stays exactly zero or one deep however many games are entered and
+  // left. The pop lives in termforge's async-signal-safe leave sequence, so a
+  // crash cannot leave the user's shell enhanced either.
+  set_keyboard_mode(meta.keyboard);
 
   // Re-arming the same rate is a no-op except for the part that matters:
   // set_tick_hz clears the accumulator, so a game starts with no residue banked
@@ -347,6 +395,29 @@ auto Shell::enter_selected_game() -> void {
   m_state = State::InGame;
   m_notice.clear();
   m_game->start(m_ctx);
+
+  // ── Degradation is an event, and termforge's own one cannot fire for us ────
+  //
+  // Upstream reports this exactly once, from App::setup(), by asking
+  // detail::keyboard_fallback_event whether the mode it holds is available. We
+  // set the mode at game ENTRY, long after setup() has returned, so that call
+  // has already happened and answered about Legacy. Without the line below a
+  // player on a terminal with no kitty protocol would get a Tetris whose DAS
+  // silently is not DAS — the exact silent downgrade AGENTS.md forbids.
+  //
+  // ⚠ AFTER start(), not before. on_event hands ErrorEvents to the running
+  // game, and a game that has not been started yet has no GameContext stored to
+  // read the capability out of.
+  //
+  // ⚠ Keyed on capabilities(), never on keyboard_mode(). The latter is a mirror
+  // of the setter above and would be true on every terminal.
+  if (meta.keyboard != termforge::KeyboardMode::Legacy &&
+      !capabilities().kitty_keyboard) {
+    on_event(termforge::Event{termforge::ErrorEvent{
+        termforge::Severity::Info, "keyboard",
+        "terminal has no kitty keyboard protocol: no key release, so "
+        "hold-to-move falls back to discrete steps"}});
+  }
 }
 
 auto Shell::request_to_menu() -> void {
@@ -381,6 +452,16 @@ auto Shell::apply_transitions() -> void {
   m_game.reset();
   m_ctx.clear_quit_to_menu();
   m_state = State::Selector;
+
+  // ⚠ Unconditionally, not "if the game we just left had asked for something".
+  // The condition would be one more piece of state to keep in step with the
+  // game pointer we have just reset, and re-requesting the tier we are already
+  // on costs one overwrite of a flag set — see the note at the setter in
+  // enter_selected_game(). Restoring here rather than at each exit path is also
+  // why there is only one site: this is the single point every exit funnels
+  // through, which is the same reason the score flush below lives here.
+  set_keyboard_mode(termforge::KeyboardMode::Legacy);
+
   refresh_detail();
 
   // ⚠ THE ONLY REPORTABLE FLUSH, and this is the frame to do it on: exactly one
