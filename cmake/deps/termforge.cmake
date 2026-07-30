@@ -8,7 +8,14 @@
 #      own install(EXPORT) then fails during *generation*, before a single
 #      translation unit is compiled.
 #   2. find_dependency(termforge) in cmake/project-config.cmake.in.
-#   3. Nothing at all in cmake/install.cmake — it stays verbatim.
+#      ⚠ This is now the second reason a target can be missing from an export
+#      set, and both produce the same generate-time error. If it names one of
+#      OUR targets rather than termforge_lib, the cause is src/lib's game list,
+#      not this file — see cmake/install.cmake.
+#   3. cmake/install.cmake names every target in src/lib's chain in the export
+#      set. It used to say "nothing at all — it stays verbatim", which stopped
+#      being true when src/lib became four targets: install(EXPORT) will not
+#      write a Targets file that references a target it cannot resolve.
 #
 # No FetchContent SOURCE_DIR pin needed here, unlike a cpp-template-derived
 # dependency: termforge hardcodes project(termforge ...) rather than deriving it

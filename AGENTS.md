@@ -53,6 +53,18 @@ half the point of this repo.
   libraries, so the registrar vanishes and the game silently disappears from the
   menu with no error at any stage. Explicit registration fails at compile time
   instead.
+- **One static library per game.** A game is
+  `src/lib/games/<name>/` with its own `CMakeLists.txt`, listed by
+  `add_subdirectory` **and** in `src/lib`'s `_game_targets` list; its public
+  headers stay under `include/termgame/games/<name>/`, because
+  `cmake/install.cmake` ships them with one `install(DIRECTORY include/ …)`.
+  `<name>` is the game's **namespace**, which is not always its slug — a slug may
+  begin with a digit and a namespace may not.
+- **A game links `term-game_core` and nothing else in this repo.** Not
+  `term-game_lib`, not another game. Because core sits *below* the games in the
+  link chain, a game physically cannot reference the Shell — that is the previous
+  rule enforced by the linker instead of by review. If a game needs something the
+  Shell has, it belongs in `GameContext`, or in core.
 - **The audio callback is a realtime thread.** No locks, no allocation, no
   syscalls, no I/O inside it — ever. Commands cross a lock-free SPSC ring.
   Overflow drops and counts; it never blocks the UI thread and never grows.
@@ -127,25 +139,51 @@ if you ask for it.
 
 ```bash
 # 1. GCC, audio auto-detected
-cmake -B build -DCMAKE_CXX_FLAGS=-Werror && cmake --build build --parallel \
+cmake -B build -DCMAKE_CXX_FLAGS=-Werror && cmake --build build \
   && ctest --test-dir build --output-on-failure
 
 # 2. GCC, audio explicitly OFF
 cmake -B build-noaudio -DTERMGAME_WITH_AUDIO=OFF -DCMAKE_CXX_FLAGS=-Werror \
-  && cmake --build build-noaudio --parallel \
+  && cmake --build build-noaudio \
   && ctest --test-dir build-noaudio --output-on-failure
 
 # 3. Clang
 cmake -B build-clang -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain/clang.cmake \
-  -DCMAKE_CXX_FLAGS=-Werror && cmake --build build-clang --parallel \
+  -DCMAKE_CXX_FLAGS=-Werror && cmake --build build-clang \
   && ctest --test-dir build-clang --output-on-failure
 
 # 4. Thread sanitizer — the arm that judges the audio command ring
 cmake -B build-tsan -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain/thread.cmake \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_CXX_FLAGS=-Werror \
-  && cmake --build build-tsan --parallel \
+  && CMAKE_BUILD_PARALLEL_LEVEL=2 cmake --build build-tsan \
   && ctest --test-dir build-tsan --output-on-failure
 ```
+
+### ⚠ Do not add `--parallel` back to those commands
+
+They used to read `cmake --build <dir> --parallel`, with **no value**, and that is
+worse than redundant. `cmake --build` consults `CMAKE_BUILD_PARALLEL_LEVEL` *only
+when `--parallel` is absent*; this project uses the Unix Makefiles generator, so a
+bare `--parallel` becomes `make -j` with **no limit at all**, and whatever cap the
+environment set is silently discarded.
+
+That matters because the machine lies about its size. Check the container, not the
+kernel: `/sys/fs/cgroup/cpu.max` and `/sys/fs/cgroup/memory.max`, never `nproc` or
+`free`, which report the host. On the development box `nproc` says 20 while the
+cgroup allows 8 CPUs and 16 GiB — shared with other C++ projects, so the real
+budget at any moment is well under that. **Exit code 137 is the cgroup OOM killer,
+not a compiler error**, and it takes the whole session down with it.
+
+Omit the flag and the environment's cap applies. **The TSan arm needs a lower cap
+than the rest** — it OOM-killed `cc1plus` at 4 parallel jobs and needs 2, because
+`RelWithDebInfo` plus TSan instrumentation plus Catch2 is the heaviest translation
+unit combination in the repo. Hence the explicit `CMAKE_BUILD_PARALLEL_LEVEL=2` on
+command 4 and nowhere else.
+
+⚠ `.gitea/workflows/ci.yaml` still passes a bare `--parallel`, against a
+container-limited runner. Left alone deliberately — CI is green and changing it
+belongs in its own change, not bundled into one whose signal depends on CI being
+trustworthy. Tracked as its own gitea issue.
 
 ⚠ **TSan is its own build, never a flag added to another one** — it does not
 compose with ASan or UBSan. It needs an explicit `-DCMAKE_BUILD_TYPE`, because

@@ -154,10 +154,96 @@ Every one of these is a decision with a condition attached, not an oversight.
 |---|---|
 | Audio in `GameContext` | **shipped in Epic 2** as `audio() -> const audio::Player&`, additively, exactly as the seam promised |
 | High-score persistence | the *second* scoring game, not the first — gitea [#14](https://git.gobha.me/xcaliber/term-game/issues/14) |
-| One static library target per game | the second real game; today `src/lib/games/<slug>/` compiles into `term-game_lib`. Minesweeper was the first, so this now triggers on the **next** one |
+| One static library target per game | **done** — landed ahead of Epic 4 as its own change, since a build restructure bundled with a new game makes a red CI run ambiguous. `src/lib` is now `term-game_lib` → `_roster` → `_game_<name>` → `_core`; see the section below |
 | `StubGame` | **done** — deleted by Epic 3 |
 | `Shell::quit_requested()` | **done** — retired by gitea [#17](https://git.gobha.me/xcaliber/term-game/issues/17); termforge [#73](https://github.com/gobha-me/termforge/issues/73) shipped `App::running()` in v0.1.14. ⚠ Not a drop-in: see the section below |
 | The selector's gutter marker | **done** — retired by gitea [#17](https://git.gobha.me/xcaliber/term-game/issues/17); termforge [#72](https://github.com/gobha-me/termforge/issues/72) shipped in v0.1.11 and the two columns went back to the list |
+
+---
+
+## One static library per game
+
+Landed ahead of Epic 4, deliberately on its own: it is a **pure refactor** — no
+C++ moved, no symbol left the program, only which archive holds it — and a build
+restructure bundled with a new game makes a red CI run ambiguous between the two.
+
+```
+term-game_lib      arcade/shell.cpp, arcade/exception_boundary.cpp
+  ↓                the ALIAS, the export, the only spelling outside src/lib
+term-game_roster   arcade/all_games.cpp
+  ↓
+term-game_game_minesweeper
+  ↓
+term-game_core     build_info.cpp, audio/*.cpp
+```
+
+`term-game_lib` stayed the umbrella, which is why **`src/bin` and all 14
+auto-discovered test dirs needed no change at all** — they link
+`${PROJECT_NAME}::lib`, still an ALIAS to a STATIC target, now carrying the whole
+chain PUBLIC.
+
+### ⚠ What would silently undo this
+
+- **`arcade/shell.cpp` must stay in `term-game_lib`, above the roster.** It is the
+  only TU that references `all_games()` (three sites), so its archive must be
+  scanned first. Tidying it down into `core` closes a cycle
+  `core → roster → game → core`. That fails *loudly* — `undefined reference to
+  termgame::all_games()` — and, verified both ways, in **every** link declaration
+  order: CMake emits the topological order, and `game → core` pins core last, so
+  no `target_link_libraries` argument order can rescue it and `core` never gets
+  duplicated. The fix is always to move the file.
+- **`audio/*.cpp` must stay in `core`, below the games.** `minesweeper.cpp` calls
+  `audio::Engine::play`. That one edge is the whole reason core reads
+  "build_info + audio" rather than "everything that is not a game".
+- **`target_link_libraries(_roster PUBLIC ${_game_targets})` is load-bearing
+  twice.** Removing it fails at *compile* time, not link time —
+  `all_games.cpp:20` cannot find `<termgame/arcade/registry.hpp>`, because that
+  edge carries core's include directory as well as the game archives.
+- **`TERMGAME_WITH_AUDIO` belongs on `core`, PRIVATE.** `build_info.cpp` is the
+  one TU in the repo that reads it. Promoting it to `term-game_lib` to look
+  tidier stops it reaching that TU, `build_has_audio()` answers false in an
+  audio-ON build, and `test/00bootstrap` goes red — the tripwire it exists to arm.
+- **Every target must be in the export set.** This one enforces itself:
+  `install(EXPORT)` refuses to name a target it cannot resolve, so adding a game
+  and forgetting `src/lib`'s game list stops *generation*. The list is handed to
+  `cmake/install.cmake` via `PARENT_SCOPE`, and `EXPORT_NAME`s are derived by
+  stripping the `term-game_` prefix, so a new game needs no line there.
+
+**Packaging changed, intentionally**: the install prefix gains three `.a` files
+and `term-gameTargets.cmake` now defines four imported targets —
+`term-game::lib`, `::roster`, `::game_minesweeper`, `::core`.
+`find_package(term-game)` + `target_link_libraries(app term-game::lib)` is
+unchanged. `include/` and `bin/` are unchanged. A consumer linking
+`term-game::core` alone would get an undefined `all_games()`, which is the
+roster becoming a substitutable piece rather than a defect.
+
+**A guarantee the layering now provides for free:** a game cannot reach the Shell,
+because core sits *below* the games, so `termgame::Shell` is not on a game's link
+line. AGENTS.md's "games never touch `App`, `Terminal`, or each other" is a link
+error rather than a convention.
+
+### How it was proven to be a pure refactor
+
+Measured against a build of the parent commit on the same box, not asserted:
+
+- **175/175 compile commands identical** modulo `-DTERMGAME_WITH_AUDIO`, which
+  five TUs lost and **none of them reads** (only `build_info.cpp` does).
+- **Archive symbols conserved exactly** — 1500 defined, 101 undefined, zero diff
+  between the old single archive and the union of the four.
+- **Same program**: identical 4258-symbol set, 600 functions, 130435 function
+  bytes. `.text` is 16 bytes *smaller*, and that was chased down rather than
+  waved at: total symbol bytes are identical, so it is inter-section padding from
+  a different input-section order.
+- **`ctest -N` byte-identical** — no test appeared or vanished.
+- **Two-tier pty capture renders identically**, including 353 truecolor SGRs at
+  the colour tier and zero at the bare one, one `?1049h`/`?1049l` pair each.
+- Six arms green at 20/20: GCC, GCC `TERMGAME_WITH_AUDIO=OFF`, Clang, TSan
+  (`RelWithDebInfo`), ASan, UBSan — all `-Werror`, no `ctest -E`.
+
+Mutation-tested five ways, and **two of the five findings corrected a claim** in
+the design that had been reasoned out carefully and was wrong — the word-order
+story above, and the roster edge failing at compile rather than link time. See
+the commit message for all five verbatim.
 
 ---
 
