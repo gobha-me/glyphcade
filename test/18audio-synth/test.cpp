@@ -73,7 +73,7 @@ struct Fingerprint {
 
 // Generated from the implementation and committed as text. Regenerate by
 // rendering each spec at kRate and recomputing the four quantities below.
-constexpr std::array<Fingerprint, 11> kFingerprints{{
+constexpr std::array<Fingerprint, 14> kFingerprints{{
     {.name = "Click", .frames = 1152, .peak = 0.078125F, .rms = 0.038033F,
      .zero_crossings = 31},
     {.name = "Reveal", .frames = 1536, .peak = 0.067755F, .rms = 0.017765F,
@@ -104,6 +104,22 @@ constexpr std::array<Fingerprint, 11> kFingerprints{{
     // exactly, which is the only reason to trust it.
     {.name = "Eat", .frames = 2400, .peak = 0.078125F, .rms = 0.042784F,
      .zero_crossings = 108},
+    // Added with Tetris. Same render-and-measure pass, and the same reason to
+    // trust it: that pass reproduced all ELEVEN committed rows above byte for
+    // byte before these three were read off it.
+    //
+    // Lock is the only effect in the bank that sweeps DOWNWARD (220 -> 165 Hz),
+    // which is why 45 ms buys just 17 crossings — the lowest count here after
+    // MenuMove. Tetris is a square sweeping an octave over 180 ms, so its 352 is
+    // the second-highest non-noise count. LevelUp lands on 117, the same as
+    // MenuSelect by coincidence rather than by construction; they differ in
+    // every other column.
+    {.name = "Lock", .frames = 2160, .peak = 0.057699F, .rms = 0.016746F,
+     .zero_crossings = 17},
+    {.name = "Tetris", .frames = 8640, .peak = 0.101562F, .rms = 0.064265F,
+     .zero_crossings = 352},
+    {.name = "LevelUp", .frames = 4320, .peak = 0.084824F, .rms = 0.029219F,
+     .zero_crossings = 117},
 }};
 
 static_assert(kFingerprints.size() == kSfxIds.size(),

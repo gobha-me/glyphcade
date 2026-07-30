@@ -96,6 +96,28 @@ enum class SfxId : std::uint8_t {
   // metronome — the same argument that kept Spawn out for 2048, but stronger,
   // because a step does not even follow a keystroke.
   Eat,
+  // Added for Tetris (gitea #7), which asks for "move, rotate, lock, line
+  // clear, tetris, level-up, top-out" — and gets THREE new ids, not seven.
+  //
+  // Reused instead: a move and a rotate are Click (a generic acknowledged
+  // gesture, which is what Click is for), a hard drop is Slide (a decisive
+  // movement, which is what Slide already means in 2048), a one-to-three line
+  // clear is Merge (things combined and vanished — 2048's exact meaning), and
+  // topping out is Lose. Only three events had nothing in the bank that already
+  // meant them.
+  //
+  // ⚠ There is deliberately no sound for gravity or for auto-shift. A piece
+  // falls several times a second with no input at all, and DAS fires every
+  // 50 ms while a key is held — either would be a metronome rather than
+  // feedback. Same argument that kept Spawn out of 2048 and Step out of Snake,
+  // and it now applies twice in one game.
+  //
+  // ⚠ Tetris is a SEPARATE spec, not a transposed Merge. "The same sound but
+  // higher" needs 2^(cents/1200), i.e. exp, which is the portability trap this
+  // synth exists to avoid — see the note on Merge.
+  Lock,
+  Tetris,
+  LevelUp,
 };
 
 // Every id, in order, so a test can loop the whole bank and a new effect cannot
@@ -109,10 +131,11 @@ enum class SfxId : std::uint8_t {
 // ⚠ ENUM order, not thematic order. Slide and Merge are appended at the end
 // rather than grouped with the other in-game effects, because appending cannot
 // renumber an existing id — and kBank is indexed by that number.
-inline constexpr std::array<SfxId, 11> kSfxIds{
+inline constexpr std::array<SfxId, 14> kSfxIds{
     SfxId::Click,    SfxId::Reveal,     SfxId::Flag,  SfxId::Explode,
     SfxId::Win,      SfxId::Lose,       SfxId::MenuMove, SfxId::MenuSelect,
     SfxId::Slide,    SfxId::Merge,      SfxId::Eat,
+    SfxId::Lock,     SfxId::Tetris,     SfxId::LevelUp,
 };
 
 // Every id appears exactly once: each entry equals its own index, which is only
