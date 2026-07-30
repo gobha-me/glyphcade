@@ -107,7 +107,42 @@ auto Twenty48::apply(twenty48::Dir d) -> bool {
   const auto result = m_board.move(d);
   m_anim.begin(result, m_board.cells());
   announce(before, moves_before, score_before);
+  record_best();
   return true;
+}
+
+// ⚠ Called here and NOT from announce(), even though announce() is looking at the
+// same transition one line up. announce() returns early on the Lost branch and
+// again on the Won branch, so a record placed inside it would lose the losing and
+// the winning move — the two scores a player most wants kept. Sound and
+// persistence share a trigger by coincidence, not by rule.
+//
+// ⚠ And NOT from the undo path either, which is the interesting half. Undo
+// restores the pre-move score, so Board::score() genuinely goes DOWN — but
+// Store::record() is monotone, so a lower value cannot displace the record it
+// already holds. A call in undo would be unremovable-looking decoration: delete
+// it and no test changes. The monotonicity is doing the work, which is why the
+// test for it asserts on the store after an undo rather than on this call site.
+auto Twenty48::record_best() -> void {
+  if (m_ctx == nullptr) {
+    return;
+  }
+  m_ctx->scores().record(kMeta.slug, "best_score", m_board.score(),
+                         scores::Better::Higher);
+  // Persisted but not shown: the status row has no width for a fifth field, and
+  // "best" there is already the LIVE maximum tile. Kept anyway because two keys
+  // under one slug is the concrete form of "a record is not one integer", and
+  // because it costs a line — not because anything reads it yet.
+  m_ctx->scores().record(kMeta.slug, "best_tile", m_board.best_tile(),
+                         scores::Better::Higher);
+}
+
+auto Twenty48::best_score() const -> int {
+  if (m_ctx == nullptr) {
+    return 0;
+  }
+  return static_cast<int>(
+      m_ctx->scores().get(kMeta.slug, "best_score").value_or(0));
 }
 
 auto Twenty48::announce(twenty48::State before, int moves_before,
@@ -296,9 +331,19 @@ auto Twenty48::draw_status(termforge::Screen& screen) -> void {
   // failure mode, not a second guard — do not read it as one.
   std::string left;
   const int budget = word_x - 2;  // one blank column between the two
+  // ⚠ The ORDER of this list is the priority order, because the loop below
+  // appends until a field does not fit and then stops. "record" goes last on
+  // purpose: it is the least urgent thing on the row, and at this game's own
+  // 29-column minimum the budget is 20 and "moves" is ALREADY being dropped, so a
+  // fourth field is only ever visible on a wide terminal.
+  //
+  // ⚠ And it is labelled "record", not "best", because "best" is already spent on
+  // the live maximum tile one field to the left — and because test/23's
+  // whole-fields check keys off find(label), so a label that is a substring of
+  // another would make that assertion match the wrong field.
   for (const std::string& field :
        {"score " + num(m_board.score()), "best " + num(m_board.best_tile()),
-        "moves " + num(m_board.moves())}) {
+        "moves " + num(m_board.moves()), "record " + num(best_score())}) {
     const std::string sep = left.empty() ? "" : "   ";
     if (static_cast<int>(left.size() + sep.size() + field.size()) > budget) {
       break;

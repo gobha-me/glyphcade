@@ -66,14 +66,22 @@ class Game {
 `GameContext` is the game's only channel to shared services. Games never touch
 the `App`, the `Terminal`, or each other.
 
-What it carries today is deliberately small — the probed `capabilities()`, the
-`border_style()` the Shell chose from them, and `quit_to_menu()`. Two services
-this design originally listed are **seams, not omissions**, and are left
-unfilled on purpose: **audio** belongs to Epic 2 and inventing its handle before
-the engine exists would pin an API nothing has consumed, and **high-score
-persistence** is deferred because no game produces a score yet and a format
-chosen before there is anything to persist is a format that gets migrated. Both
-are additive — a new accessor breaks no existing game.
+What it carries: the probed `capabilities()`, the `border_style()` the Shell
+chose from them, `quit_to_menu()`, `audio()` and `scores()`. The last two were
+**seams, not omissions** — declared here before they existed and filled later,
+each additively, without a line changing in any existing game.
+
+Both deferrals had conditions, and both conditions earned their keep. Audio
+waited for an engine, so its handle was not an API invented before anything
+consumed it. High-score persistence waited for the **second** scoring game,
+because a format chosen before there is anything to persist is a format that
+gets migrated — and when 2048 arrived it wanted a best *score* while Minesweeper
+wanted a best *time per difficulty*, so a record is a keyed value with a
+**direction**. Had it shipped with the first scoring game it would have been one
+integer, and wrong.
+
+There are now no reserved seams left. A sixth service is a new design question,
+not a promise already made.
 
 `quit_to_menu()` sets a flag; it never calls back. Returning to the menu
 destroys the `Game`, so a synchronous callback would destroy a game that called

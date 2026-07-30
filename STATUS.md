@@ -2,7 +2,7 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-07-30** (Epic 4 — 2048)
+**Last updated: 2026-07-30** (gitea #14 — high-score persistence)
 
 ---
 
@@ -53,10 +53,15 @@ not**: whether 90 ms of slide and 70 ms of pop are right, whether the board is
 pleasant to play, and whether Slide and Merge sound like anything — all still
 need a human. Nothing in this container can judge any of them.
 
+**Epic 4's follow-up has landed too: high scores persist** (gitea
+[#14](https://git.gobha.me/xcaliber/term-game/issues/14)). Both games keep a
+record across quit-to-menu and across restarts — 2048 a best score, Minesweeper
+a best time per difficulty — in a versioned text file under `$XDG_DATA_HOME`.
+See "What the score store is" below.
+
 **Next move: Epic 5 (Snake)**, or gitea
-[#14](https://git.gobha.me/xcaliber/term-game/issues/14) (high-score
-persistence), whose deferral condition — "the second scoring game" — Epic 4 has
-now met.
+[#24](https://git.gobha.me/xcaliber/term-game/issues/24) (the termforge pin is
+five tags behind).
 
 Since Epic 3, two housekeeping issues have landed.
 gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16) moved the pin to
@@ -169,7 +174,7 @@ Every one of these is a decision with a condition attached, not an oversight.
 | Deferred | Condition to revisit |
 |---|---|
 | Audio in `GameContext` | **shipped in Epic 2** as `audio() -> const audio::Player&`, additively, exactly as the seam promised |
-| High-score persistence | the *second* scoring game, not the first — gitea [#14](https://git.gobha.me/xcaliber/term-game/issues/14) |
+| High-score persistence | **shipped after Epic 4** as `scores() -> const scores::Recorder&`, additively, exactly as the seam promised — and the "second scoring game, not the first" condition is what kept it from shipping as one integer. gitea [#14](https://git.gobha.me/xcaliber/term-game/issues/14) |
 | One static library target per game | **done** — landed ahead of Epic 4 as its own change, since a build restructure bundled with a new game makes a red CI run ambiguous. `src/lib` is now `term-game_lib` → `_roster` → `_game_<name>` → `_core`; see the section below |
 | `StubGame` | **done** — deleted by Epic 3 |
 | `Shell::quit_requested()` | **done** — retired by gitea [#17](https://git.gobha.me/xcaliber/term-game/issues/17); termforge [#73](https://github.com/gobha-me/termforge/issues/73) shipped `App::running()` in v0.1.14. ⚠ Not a drop-in: see the section below |
@@ -260,6 +265,102 @@ Mutation-tested five ways, and **two of the five findings corrected a claim** in
 the design that had been reasoned out carefully and was wrong — the word-order
 story above, and the roster edge failing at compile rather than link time. See
 the commit message for all five verbatim.
+
+---
+
+## What the score store is (gitea #14)
+
+Landed straight after Epic 4, on the condition the issue itself set: **the second
+scoring game, not the first**. That condition paid for itself. 2048 wants a best
+*score*, Minesweeper wants a best *time per difficulty* — so a record is a keyed
+value with a **direction** (`Better::Higher` / `Better::Lower`), and had this
+shipped with Minesweeper alone it would have been one integer per game and wrong.
+Wiring the *second* game is what proved the shape; wiring the first only closed
+the issue.
+
+**Where it lives.** `include/termgame/arcade/scores.hpp` +
+`src/lib/arcade/scores.cpp`, in **`term-game_core`** — both games call it, which
+is the rule at `src/lib/CMakeLists.txt`. The `arcade/` prefix does *not* imply
+`_lib`; its three siblings sit in three different targets. No new dependency:
+`<filesystem>` and `<fstream>` were already in core via `audio/sink.cpp`.
+
+**The file**, at `$XDG_DATA_HOME/term-game/scores` (else `$HOME/.local/share/…`,
+else memory-only):
+
+```
+# term-game scores v1
+2048 best_score 20488
+2048 best_tile 2048
+minesweeper best_time_easy 42
+```
+
+Greppable and hand-editable beats compact at this scale. Versioned from the first
+commit; an unknown version is **refused, not clobbered** — read-only, a notice,
+and `flush()` reports rather than overwriting a newer format's file. A single
+**malformed line** is skipped instead, so a truncated last line from a crash does
+not cost a player every record above it.
+
+**Two types, not one.** `Store` owns the file and has `flush()`. `Recorder` is
+what a game gets and has no `flush()` — *when* to write is the Shell's I/O policy.
+That is `audio::Player`'s argument transposed, null-object discipline included:
+`ctx.scores().record(...)` needs no null check and no `has_scores()`.
+
+**`record()` is monotone**, and that one property removes every hard case. 2048
+records after *every* move with no end-of-run hook, and undo genuinely lowers
+`Board::score()` — the record simply does not follow it down. A call in the undo
+path would be decoration: removable with nothing going red.
+
+### Five things here that a plausible change breaks
+
+1. **`getenv` appears nowhere in core.** `resolve_path()` takes both directories
+   as strings, so the **library cannot name a real file** and a
+   default-constructed `Shell` is memory-only *by construction*. Only
+   `src/bin/main.cpp` reads the environment. Move the resolution "down where it
+   belongs" and the test suite starts writing into a developer's `$HOME`.
+2. **Every diagnostic is a fixed 7-bit literal** — never a path, never
+   `std::error_code::message()` (locale-translated). Errors reach `m_notice`,
+   `m_notice` is painted on the selector footer, and `test/11selector` sweeps
+   every cell for bytes `>= 0x80`. This found a **pre-existing** bug: the audio
+   notice used an em dash, so a headless run that failed to open a device would
+   have turned that case red. Fixed here.
+3. **The direction is stored per entry, not just passed per call.** `flush()`
+   re-reads and merges, so it must know the direction for a key it did not record
+   this session. A merge that assumes `Higher` publishes a *slower* Minesweeper
+   time as a record.
+4. **The temp file name is unique per writer** (`scores.tmp.<hex>`). A fixed
+   `scores.tmp` lets two arcades interleave into one file and rename the mixture
+   — the only way this design can produce a file that was never any process's
+   view of the records.
+5. **`Board::elapsed()` is not a duplicate of `seconds()`.** `seconds()` clamps
+   at 999 for a three-column HUD; storing the clamp writes a 1200-second win as
+   999, which is wrong *and* unbeatable-by-tie. The store gets the unclamped
+   value, the row shows a frozen `BEST 999`.
+
+### What is deliberately not guaranteed
+
+- **A SIGKILL loses the current run's records.** Flush happens once per game exit
+  and once at teardown, never per improvement — a flush per record would be a
+  write syscall on every 2048 move, which is what "no syscalls on the frame path"
+  exists to prevent.
+- **Concurrency is honest, not total.** Read-merge-`rename` means the file is
+  never half-written and never clobbered key-wise by a process that read it, and
+  a same-key race resolves to the *better* value — *provided the loser's value was
+  on disk when the winner read*. A write landing inside another process's
+  read→rename window is lost, not merged. There is no lock file.
+- **On the ASCII tier the startup scores notice is outranked** by the colour
+  notice, because `m_notice` keeps only the most recent message and the colour one
+  describes the whole session. A bare-terminal player learns their file is
+  unusable on the **first game exit** instead, which is why the Shell reports from
+  two places rather than one.
+- **The selector's detail pane does not show high scores**, and could not without
+  a fix first: `refresh_detail()` early-returns on an unchanged index, so its call
+  at the end of `apply_transitions()` is currently **decoration**. Filed rather
+  than smuggled in here.
+
+⚠ **Feel is unverified**, as ever. Whether `record` and `BEST` are in the right
+place on the two status rows, and whether a persisted best is actually rewarding,
+need a human. What is verified is the format, the merge, both directions, the
+degraded modes, and the end-to-end path in a real pty.
 
 ---
 
@@ -397,7 +498,7 @@ unfixed description first.
 
 | Deferred | Condition to revisit |
 |---|---|
-| **High-score persistence** | gitea [#14](https://git.gobha.me/xcaliber/term-game/issues/14). Its condition — "the second scoring game" — is now **met**; this is the next thing to build, wired into *both* games so the record shape is proven not to be one integer |
+| **High-score persistence** | **done**, immediately after Epic 4 — gitea [#14](https://git.gobha.me/xcaliber/term-game/issues/14). Wired into *both* games, and that is what proved the record is not one integer |
 | A **mouse** gesture | 2048 is four directions and an undo. Nothing a click could mean that a key does not already say, and inventing one is a feel decision with no reference behind it |
 | A minimum terminal size in `GameMeta` | gitea [#15](https://git.gobha.me/xcaliber/term-game/issues/15), same answer as Epic 3: the game ships its own too-small screen (needs 29×19; the Shell's floor is 20×8) |
 | A **tuned** tween | 90 ms slide, 70 ms pop, linear. Named constants in `anim.hpp` rather than inline, precisely so whoever can play it has one place to change. An ease curve is a feel decision |
@@ -464,7 +565,7 @@ Clang builds.
 | Deferred | Condition to revisit |
 |---|---|
 | **SFX** (reveal, flag, explode, win) | **shipped in Epic 2.** Bound in `minesweeper.cpp` via `announce()`, which compares board state across the verb — `Board` learned nothing about audio. |
-| **High-score persistence** | the *second* scoring game — gitea [#14](https://git.gobha.me/xcaliber/term-game/issues/14). `GameContext` has no persistence seam, and a fresh `Game` is built per entry, so an in-memory best time would die on quit-to-menu. The timer and mine counter ship; only the record does not. |
+| **High-score persistence** | **done** — gitea [#14](https://git.gobha.me/xcaliber/term-game/issues/14), after Epic 4 met its "second scoring game" condition. The diagnosis here was right: a fresh `Game` per entry is exactly why the store had to live on the Shell. Minesweeper now shows `BEST nnn` beside the timer. |
 | A minimum terminal size in `GameMeta` | Hard needs 63x20 and the Shell's floor is 20x8, so the selector will launch a board the terminal cannot show. Epic 3 ships the in-game too-small screen instead — gitea [#15](https://git.gobha.me/xcaliber/term-game/issues/15). |
 
 ---

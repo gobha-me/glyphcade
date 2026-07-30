@@ -111,6 +111,17 @@ class Twenty48 final : public Game {
   auto announce(twenty48::State before, int moves_before, int score_before)
       -> void;
 
+  // Persist the two records this game keeps. Called after every applied move,
+  // which is safe and sufficient because Store::record() is monotone — see the
+  // note at the definition for why undo does not need a guard here.
+  auto record_best() -> void;
+
+  // The stored best score, or 0 when there is none. Zero is the honest identity
+  // for a Higher record and also a real minimum score, so the status row needs
+  // no "unset" spelling — unlike minesweeper's best TIME, where 0 would be an
+  // unbeatable lie.
+  [[nodiscard]] auto best_score() const -> int;
+
   auto draw_status(termforge::Screen& screen) -> void;
   auto draw_hints(termforge::Screen& screen) -> void;
   auto draw_grid(termforge::Screen& screen) -> void;
