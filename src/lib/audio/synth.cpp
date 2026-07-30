@@ -20,7 +20,7 @@ namespace {
 // tuned bank — expect the maintainer to move them after listening, and treat
 // the fingerprints in test/18audio-synth as recording what IS, not what should
 // be.
-constexpr std::array<SfxSpec, 8> kBank{{
+constexpr std::array<SfxSpec, 10> kBank{{
     // Click — the generic acknowledgement. Short, dry, unobtrusive.
     {.wave = Wave::Square,
      .freq_start_hz = 660,
@@ -105,6 +105,40 @@ constexpr std::array<SfxSpec, 8> kBank{{
      .env = {.attack_ms = 2, .decay_ms = 18, .sustain_q8 = 150,
              .release_ms = 50},
      .gain_q8 = 24,
+     .duty_q8 = 128},
+
+    // Slide (2048) — tiles moving and nothing merging. A short noise burst
+    // sweeping DOWN, so it reads as a shove rather than a note: it is the most
+    // frequent sound in that game by far, once per arrow key, and anything
+    // pitched becomes a melody you did not ask for. Same argument Reveal makes
+    // for being a tick rather than a note, taken one step further because 2048's
+    // input rate is higher than minesweeper's.
+    //
+    // Quietest of the in-game effects for the same reason.
+    {.wave = Wave::Noise,
+     .freq_start_hz = 1600,
+     .freq_end_hz = 700,
+     .duration_ms = 40,
+     .env = {.attack_ms = 1, .decay_ms = 12, .sustain_q8 = 90,
+             .release_ms = 22},
+     .gain_q8 = 12,
+     .duty_q8 = 128},
+
+    // Merge (2048) — replaces Slide on any move that merged, so it must be
+    // clearly the *same family* as Slide and clearly better. Triangle rising a
+    // fifth: pitched where Slide is unpitched, which is the most audible
+    // distinction available without touching gain.
+    //
+    // ⚠ ONE Merge for every tile value. Pitching by the resulting tile is the
+    // obvious idea and it needs exp() — the portability trap this synth was
+    // written to avoid. See the note on SfxId::Merge.
+    {.wave = Wave::Triangle,
+     .freq_start_hz = 523,
+     .freq_end_hz = 784,
+     .duration_ms = 70,
+     .env = {.attack_ms = 1, .decay_ms = 16, .sustain_q8 = 170,
+             .release_ms = 40},
+     .gain_q8 = 22,
      .duty_q8 = 128},
 }};
 
