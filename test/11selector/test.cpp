@@ -796,14 +796,23 @@ TEST_CASE("a released p does not open the pause dialog",
   REQUIRE(app.state() == Shell::State::Paused);
 }
 
-TEST_CASE("a repeated arrow still moves the selection",
+TEST_CASE("a repeated arrow still moves the selection, a released one does not",
           "[selector][keyboard]") {
-  // ⚠ THE HALF THAT IS EASY TO GET WRONG IN THE OTHER DIRECTION. The gate is
-  // "drop Release", not "keep only Press". Under Enhanced the terminal sends
-  // Repeat INSTEAD OF a second Press while a key is held, so a gate written as
-  // `action == Press` would silently kill hold-to-scroll in the menu the day
-  // any game turns the tier on — with no error and nothing in the suite to say
-  // so, since a plain press would keep working.
+  // ⚠ THIS CASE GUARDS A PAIR OF CHANGES, NEITHER OF WHICH IS VISIBLE ALONE,
+  // and that is worth stating because mutation testing is what established it.
+  // The two tidies a future reader will reach for are (a) writing the Shell's
+  // gate as `action == Press`, which reads cleaner, and (b) hoisting the gate
+  // to the top of handle_selector_key instead of applying it at the Escape
+  // branch. Each on its own leaves every case in this file green — (a) because
+  // Press and Repeat mean the same thing for the only keys the Shell owns, (b)
+  // because the ring drops releases without our help. Together they stop a held
+  // Down from scrolling the menu, with no error anywhere.
+  //
+  // ⚠ The second half also pins UPSTREAM's contract, not ours: FocusRing::
+  // handle_key returns false for a Release (focus_ring.cpp:50) so that a widget
+  // cannot insert twice per keystroke. If a future pin bump changed that, the
+  // selection would move on the way up as well as the way down, and this is
+  // where that would surface.
   if (termgame::all_games().size() < 2) return;
 
   Probe app;
@@ -812,6 +821,38 @@ TEST_CASE("a repeated arrow still moves the selection",
 
   app.dispatch_event(key_repeated(termforge::Key::Down));
   REQUIRE(app.selector_index() == 1);
+
+  app.dispatch_event(key_released(termforge::Key::Down));
+  REQUIRE(app.selector_index() == 1);
+}
+
+TEST_CASE("a released key still reaches the running game",
+          "[selector][keyboard]") {
+  // ⚠ THE OTHER DIRECTION OF THE GATE, and it went untested until a mutation
+  // that hoisted shell_may_act() above the game's refusal in
+  // handle_in_game_key came back green. The placement is the whole point: a
+  // game that asks for KeyboardMode::Enhanced asks to see releases — that is
+  // the only reason to ask — so the Shell must stop acting on them itself
+  // without stopping them from arriving. A gate above m_game->on_event would
+  // take away exactly the thing the tier exists to deliver, and Tetris's DAS
+  // would never see a key come up.
+  //
+  // Minesweeper is the vehicle because it is what this file already enters and
+  // its arrow keys move an observable cursor. It does not inspect KeyAction —
+  // no game does yet — which is precisely why a release arriving is visible as
+  // a cursor move.
+  Probe app;
+  enter_game(app);
+
+  const auto* game = game_of(app);
+  REQUIRE(game != nullptr);
+  const auto before = game->cursor();
+
+  app.dispatch_event(key_released(termforge::Key::Right));
+
+  const auto after = game_of(app)->cursor();
+  REQUIRE(after.col == before.col + 1);
+  REQUIRE(after.row == before.row);
 }
 
 TEST_CASE("the keyboard tier is the game's, and is given back on the way out",
