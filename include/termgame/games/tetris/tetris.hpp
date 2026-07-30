@@ -1,0 +1,109 @@
+#pragma once
+
+// term-game — Tetris: the Game.
+//
+// board.hpp has the rules and all five clocks, layout.hpp the geometry,
+// glyphs.hpp the tables — and none of them includes a termforge header. This
+// file is where Screen, Event and GameContext appear, which is what makes the
+// split load-bearing rather than decorative: test/27tetris exercises the rules,
+// the gravity clock and DAS with no terminal because it *cannot* reach one.
+//
+// ── What this file does NOT do ──────────────────────────────────────────────
+//
+// It does not implement pause, and it does not implement quit-to-menu. The
+// Shell binds 'p' and Escape on anything a game declines, so gitea #7's "pause"
+// is satisfied by NOT writing it. Same as the other three games.
+//
+// ── This is the first game to ask for a keyboard tier ────────────────────────
+//
+// kMeta declares KeyboardMode::Enhanced (gitea #32). The Shell sets it on
+// entry, restores Legacy on the way out, and raises an ErrorEvent{Info} when
+// the terminal cannot deliver it. What THIS file does with that is read
+// ctx.capabilities().kitty_keyboard once and hand the answer to the model as a
+// HoldSupport, because the difference is a rule and not a rendering detail: you
+// cannot reconstruct "held" from press-only input, and pretending otherwise is
+// how you ship a Tetris that feels broken and says nothing.
+
+#include <chrono>
+#include <cstdint>
+#include <string>
+
+#include <termforge/core/screen.hpp>
+#include <termforge/core/types.hpp>
+#include <termforge/widgets/frame.hpp>
+
+#include <termgame/arcade/game.hpp>
+#include <termgame/games/tetris/board.hpp>
+#include <termgame/games/tetris/glyphs.hpp>
+#include <termgame/games/tetris/layout.hpp>
+
+namespace termgame {
+
+class Tetris final : public Game {
+ public:
+  static constexpr GameMeta kMeta{
+      .slug = "tetris",
+      .title = "Tetris",
+      // ⚠ 7-bit ASCII only, enforced by a static_assert in all_games.cpp. The
+      // selector prints this on the no-colour tier, which by definition cannot
+      // render anything else — 2048's first draft had an em dash here and it
+      // reached a bare pty.
+      .description =
+          "Stack the falling tetrominoes and clear lines. Full SRS rotation "
+          "with wall kicks, a seven-bag randomiser, hold, a three-piece "
+          "preview and a ghost. Hold left or right to auto-shift, if your "
+          "terminal can tell us the key came back up.",
+      .tag = "Arcade Classic",
+      .icon = "\U0001F9F1",
+      // The first non-Legacy declaration in the repo. See the header note.
+      .keyboard = termforge::KeyboardMode::Enhanced,
+  };
+
+  Tetris();
+
+  [[nodiscard]] auto meta() const -> const GameMeta& override { return kMeta; }
+  auto start(GameContext& ctx) -> void override;
+  auto tick(std::chrono::duration<double> dt) -> void override;
+  auto on_event(const termforge::Event& ev) -> bool override;
+  auto draw(termforge::Screen& screen) -> void override;
+
+  // ── Test seams ────────────────────────────────────────────────────────────
+  [[nodiscard]] auto board() const noexcept -> const tetris::Board& {
+    return m_board;
+  }
+  [[nodiscard]] auto board() noexcept -> tetris::Board& { return m_board; }
+  [[nodiscard]] auto layout() const noexcept -> const tetris::Layout& {
+    return m_layout;
+  }
+  [[nodiscard]] auto ticks() const noexcept -> int { return m_ticks; }
+  [[nodiscard]] auto hold_support() const noexcept -> tetris::HoldSupport {
+    return m_board.hold_support();
+  }
+
+  auto new_game(tetris::StartLevel level) -> void;
+
+ private:
+  auto handle_key(const termforge::KeyEvent& key) -> bool;
+  auto announce(const tetris::TickResult& r) -> void;
+  auto record_best() -> void;
+  [[nodiscard]] auto best_score() const -> long long;
+  [[nodiscard]] auto best_lines() const -> long long;
+
+  auto draw_status(termforge::Screen& screen) -> void;
+  auto draw_well(termforge::Screen& screen) -> void;
+  auto draw_panel(termforge::Screen& screen) -> void;
+  auto draw_hints(termforge::Screen& screen) -> void;
+  auto draw_too_small(termforge::Screen& screen) -> void;
+  auto draw_piece_box(termforge::Screen& screen, int x, int y,
+                      const tetris::Piece* p) -> void;
+
+  GameContext* m_ctx{nullptr};
+  tetris::Board m_board;
+  tetris::Layout m_layout{};
+  std::uint64_t m_seed;
+  int m_ticks{0};
+  termforge::Frame m_well{"Tetris"};
+  termforge::Frame m_panel{};
+};
+
+}  // namespace termgame
