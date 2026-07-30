@@ -192,10 +192,12 @@ if (${PROJECT_NAME}_BUILD_LIB)
   # handed up.
   add_subdirectory(games/minesweeper)
   add_subdirectory(games/twenty48)
+  add_subdirectory(games/snake)
 
   set(_game_targets
     ${PROJECT_NAME}_game_minesweeper
     ${PROJECT_NAME}_game_twenty48
+    ${PROJECT_NAME}_game_snake
   )
 
   # ── the roster: the registry table, and nothing else ─────────────────────
@@ -253,6 +255,8 @@ if (${PROJECT_NAME}_BUILD_LIB)
                                       ALIAS ${PROJECT_NAME}_game_minesweeper)
   add_library(${PROJECT_NAME}::game_twenty48
                                       ALIAS ${PROJECT_NAME}_game_twenty48)
+  add_library(${PROJECT_NAME}::game_snake
+                                      ALIAS ${PROJECT_NAME}_game_snake)
 
   # Hand the game list up to the top-level scope, where cmake/install.cmake is
   # included, so the export set cannot drift from the build. Every target above

@@ -280,6 +280,29 @@ enters the alternate screen, so there are no escape bytes to look at.
 restores the terminal, and the test passes even with termforge's guard removed.
 Read `test/pty_restore_probe.cpp` before "fixing" it to match.
 
+**Measuring that the loop runs while nothing is pressed** — the check Epic 5
+needed, and the only one that can judge termforge #58 from here. Enter a game
+that advances on its own, put it in a mode where it survives, then send *nothing*
+and count repaints:
+
+```bash
+{ sleep 3; printf '\033[B\033[B'; sleep 1; printf '\r'; sleep 1; printf 'm'; \
+  sleep 8; printf '\033'; sleep 1; printf '\033'; sleep 2; } | \
+  timeout 40 script -q -c "$PWD/build/src/bin/term-game" /tmp/idle.raw
+perl -pe 's/\e\][^\a\e]*(\a|\e\\)//g; s/\e_[^\e]*\e\\//g; s/\e\[[0-9;?]*[a-zA-Z]//g' \
+  /tmp/idle.raw | grep -o '@@' | wc -l    # 91 over 8 s == ~11.4/s
+```
+
+Snake steps every 100 ms at Normal, so ~80 head repaints in eight seconds is the
+floor for a healthy loop; #58 capped an idle loop at ~7.5 fps, which puts a hard
+ceiling of ~60 on the same window. **Counting a glyph is the measurement** — do
+not try to read a frame rate out of the capture directly, and remember the
+renderer diffs, so only cells that changed are rewritten.
+
+⚠ To reconstruct a whole screen from a capture, replay the CUP sequences AND
+handle `\r`/`\n`. A replay that ignores them silently drops rows and looks
+exactly like a game that failed to draw.
+
 This covers rendering and terminal restore. It does **not** cover *feel* — frame
 pacing, input latency, animation smoothness still need a human to play it, and
 audio needs a human to hear it. Say so rather than guessing.

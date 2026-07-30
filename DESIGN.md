@@ -291,7 +291,7 @@ TermForge as it exists today.
 | 1 | **Shell + selector** | ListWidget, Frame, dialogs, theme, FocusRing | — |
 | 2 | **Minesweeper** | mouse L/R routing, grid rendering | — |
 | 3 | **2048** ✓ | tween animation, renderer diff | #59 (shipped) |
-| 4 | **Snake** | real-time tick | #58, #59 |
+| 4 | **Snake** ✓ | real-time tick | #58, #59 (both shipped) |
 | 5 | **Tetris** | tick + held-key feel | #58, #59, #60 |
 | 6 | **Sokoban** | tile maps | #64 (→ #63) |
 | 7 | **Solitaire** *(flagship)* | Kitty sprites, venice art, mouse drag | #63 |

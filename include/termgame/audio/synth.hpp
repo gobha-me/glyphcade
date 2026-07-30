@@ -86,6 +86,16 @@ enum class SfxId : std::uint8_t {
   // portability trap this synth exists to avoid (see the header note above).
   Slide,
   Merge,
+  // Added for Snake (gitea #6), which asks for "eat, turn, die" — and gets ONE
+  // new id, not three. Turn is Click (a turn is a generic acknowledged gesture,
+  // which is exactly what Click is for) and dying is Lose, so only eating had
+  // nothing in the bank that already meant it.
+  //
+  // ⚠ There is deliberately no Step effect. Snake advances several times a
+  // second with no input at all, so a per-step sound is not feedback, it is a
+  // metronome — the same argument that kept Spawn out for 2048, but stronger,
+  // because a step does not even follow a keystroke.
+  Eat,
 };
 
 // Every id, in order, so a test can loop the whole bank and a new effect cannot
@@ -99,10 +109,10 @@ enum class SfxId : std::uint8_t {
 // ⚠ ENUM order, not thematic order. Slide and Merge are appended at the end
 // rather than grouped with the other in-game effects, because appending cannot
 // renumber an existing id — and kBank is indexed by that number.
-inline constexpr std::array<SfxId, 10> kSfxIds{
+inline constexpr std::array<SfxId, 11> kSfxIds{
     SfxId::Click,    SfxId::Reveal,     SfxId::Flag,  SfxId::Explode,
     SfxId::Win,      SfxId::Lose,       SfxId::MenuMove, SfxId::MenuSelect,
-    SfxId::Slide,    SfxId::Merge,
+    SfxId::Slide,    SfxId::Merge,      SfxId::Eat,
 };
 
 // Every id appears exactly once: each entry equals its own index, which is only

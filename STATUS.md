@@ -2,7 +2,7 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-07-30** (gitea #24 — the termforge pin, v0.1.15 → v0.2.2)
+**Last updated: 2026-07-30** (gitea #6 — Epic 5, Snake)
 
 ---
 
@@ -67,7 +67,32 @@ more**: #63 and #64 shipped and are taken, so Epics 7 and 8 are unblocked, and
 guesswork. One upstream behaviour change reached us and was decided rather than
 inherited — the wheel. See "What the v0.2.2 bump brought" below.
 
-**Next move: Epic 5 (Snake).**
+**Epic 5 has landed. There are three games, and one of them moves on its own.**
+Snake is registered, playable with arrows/hjkl/wasd, three difficulties, and
+walls that either kill you or wrap you around — the last of which the reference
+does not have at all. gitea
+[#6](https://git.gobha.me/xcaliber/term-game/issues/6) is closed. See "What Epic
+5 built" below.
+
+It is the first game that is *directly* broken by a wobbling frame rate, which is
+why the issue called it the forcing function for termforge
+[#58](https://github.com/gobha-me/termforge/issues/58). #58 is fixed and we are
+pinned past it, and this is where that gets checked against a real artifact:
+**91 head repaints in eight seconds with nothing pressed**, i.e. about 11.4 a
+second, against the ~7.5 fps ceiling #58 imposed on an idle loop. Recipe below.
+
+⚠ What is verified is rules, geometry, rendering, the clock and sound-intent.
+**Feel is not**: whether the speed curve is right, whether two-column cells are
+pleasant to play on, and whether `Eat` sounds like anything all still need a
+human.
+
+**Next move: Epic 6 (Tetris)** — and it is the roster's fourth entry, which is
+the condition two deferrals below have been waiting on.
+
+⚠ **Three registered games is not four.** The selector's deferred scrollbar
+assertion (see "What the v0.2.2 bump brought") still cannot run: at 58x20 the
+list pane holds three entries without overflowing. Epic 6 is the one that turns
+it on.
 
 Since Epic 3, two housekeeping issues have landed.
 gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16) moved the pin to
@@ -382,6 +407,143 @@ Mutation-tested five ways, and **two of the five findings corrected a claim** in
 the design that had been reasoned out carefully and was wrong — the word-order
 story above, and the roster edge failing at compile rather than link time. See
 the commit message for all five verbatim.
+
+---
+
+## What Epic 5 built (gitea #6)
+
+Snake, in four pieces — minesweeper's shape exactly, and 2048's minus the tween:
+
+- **[`board.hpp`](include/termgame/games/snake/board.hpp)** — the rules AND the
+  step clock. Snake body as a deque with an incrementally-maintained occupancy
+  grid, a two-deep turn queue, food, both wall modes, the speed curve. It
+  includes **no termforge header**, which is what makes `test/25snake` *unable*
+  to construct a `Screen`.
+- **[`layout.hpp`](include/termgame/games/snake/layout.hpp)** — 28x16 cells at
+  **two columns each**, **58x20 needed**. No `cell_at`: Snake takes no mouse
+  input, so nothing hit-tests.
+- **[`glyphs.hpp`](include/termgame/games/snake/glyphs.hpp)** — two tiers and
+  three `static_assert`s (7-bit, exactly `kCellCols` wide, pairwise distinct).
+- **[`snake.hpp`](include/termgame/games/snake/snake.hpp)** — the `Game`, and the
+  only file that knows `Screen`, `Event` or `GameContext` exist.
+
+**There is deliberately no `anim.hpp`.** 2048 needed one because sliding *is* the
+mechanic; Snake occupies whole cells, and a sub-cell tween in a character grid is
+a feel decision with no reference behind it to answer it.
+
+### The step clock, and why it is not the accumulator AGENTS.md bans
+
+AGENTS.md says "do not hand-roll an accumulator, in the Shell or in a game", and
+`Board::tick()` contains one. They are different objects and the distinction is
+worth keeping straight:
+
+| | owned by | turns | into |
+|---|---|---|---|
+| the **banned** one | `termforge::App` (#59) | wall-clock frame deltas | fixed 1/60 s `dt` |
+| the one **here** | `snake::Board` | fixed 1/60 s `dt` | game steps at 33-8 Hz |
+
+The Shell still calls `set_tick_hz(60)` and nothing about that changed. What
+Snake adds is that 60 Hz is not one of the speed curve's values — the curve runs
+from 120 ms down to a 30 ms floor — so something has to turn ticks into steps,
+and doing it from `dt` alone is what keeps the model drivable by N ticks with no
+clock and no TTY.
+
+### Three reference defects fixed rather than ported
+
+Each is pinned by its own case in `test/25snake`, and each is the same *shape* as
+something this repo has already been bitten by.
+
+| Reference | Ours | Why |
+|---|---|---|
+| `game.js:78` **assigns** the frame timestamp after a step instead of subtracting the interval | accumulate and subtract | The reference's own speed table is intent, not behaviour: every step rounds up to the next ~16.7 ms rAF boundary, so its "100 ms" is 100-117 ms and its 30 ms floor is really ~33 ms |
+| `snake.js:14` keeps **one** queued direction, judged against the last *applied* one | a two-deep queue, each turn judged against the **previous queued** direction | ⚠ This is the bug gitea #6 names. A fast double-tap loses its first turn. And Right→Up→Left judges Left against a stale Right — the reference survives that only because the other bug then discards the Up, so one bug masks the other |
+| `food.js:13` is an **unbounded rejection sampler** with no board-full case | pick the k-th free cell in two passes; a full board is a **win** | Exactly the trap minesweeper's mine placement already replaced. ⚠ Restoring the reference's version there makes `test/14minesweeper` **hang, not fail** — and a hang is a much worse thing to diagnose than a red case |
+
+**Stripped**, on the 2048 power-tile precedent: local 2-4 player multiplayer
+(`multiplayer.js` + `controls.js`, about half the JS in the directory) and the
+"ghost trail" toggle. Both are worth a sentence because neither is merely extra:
+the multiplayer mode leaves eliminated snakes on the board as **invisible lethal
+obstacles** (`checkCollisions` ignores `alive`, the renderer does not), and the
+ghost trail is **dead code** — it paints translucent rectangles at the exact
+coordinates `drawSnakeBody` then overpaints opaquely, so enabling it has no
+visual effect whatsoever. Same category as 2048's slide animation that never
+fires.
+
+### Wrap is ours, and it keys the record
+
+gitea #6 asks for "wrap-vs-wall as a mode" and the reference has no wrap at all.
+It ships as a real player-facing toggle (`m`) rather than a compile-time option,
+because an unexposed mode is dead code and this repo has just finished deleting
+the last of that.
+
+⚠ **The high-score key carries BOTH settings** — `best_score_<level>_<walls>`,
+six records. Wrap removes four of the five ways to die, so a single
+per-difficulty record would let a wrap run permanently outrank every solid one.
+The key is switched on the **enums**, never derived by lowercasing the UI labels,
+which is minesweeper's `time_key()` rule for the same reason: rename a label and
+a derived key orphans every record a player has earned.
+
+**One key, not two.** 2048 keeps `best_score` *and* `best_tile` because they are
+genuinely independent. Here length is `kStartLen + eaten` and score is
+`kFoodScore * eaten`, so a `best_length` record would be an affine restatement of
+the same number — two values that can never disagree, which is a format inviting
+a future reader to ask which one is authoritative.
+
+### Audio: one new id, not the three the issue lists
+
+`SfxId` gains **`Eat`** and nothing else. A turn is `Click` (a turn is a generic
+acknowledged gesture, which is what Click is for) and dying is `Lose`, so eating
+was the only one with nothing in the bank that already meant it.
+
+- **No `Step` effect.** Snake advances several times a second with no input at
+  all, so a per-step sound is not feedback, it is a metronome. Same argument that
+  kept `Spawn` out for 2048, but stronger — a step does not even follow a
+  keystroke.
+- **A refused turn is silent**, matching both other games: there is no deny blip
+  in the bank and inventing one is a feel decision nobody who cannot hear it
+  should make.
+- The `test/18audio-synth` fingerprint was **generated by measurement**. ⚠ Still
+  unheard, like the rest of the bank.
+
+### Mutation-tested, and four claims turned out to be decoration
+
+Thirteen mutations. Nine went red immediately; one is a **compile error by
+design** (making the ASCII body glyph equal the head glyph trips the distinctness
+`static_assert` — the guard that matters most here, because the reference
+separates head, body and food by **colour alone** and `FallbackDriver` discards
+colour). Three went green, and all three were findings:
+
+1. **Deleting the status row's width budget changed nothing observable.** Every
+   width the case swept was wide enough that the priority loop stopped before the
+   fields could reach the right-aligned word. ⚠ Epic 4's status-row mutation went
+   green for the same reason, which makes this the second time — the fix is that
+   the case now includes **40 and 50**, *narrower than the game's own 58x20
+   minimum*, which is exactly where the status row is still drawn and an
+   unbudgeted one truncates a field mid-number.
+2. **Moving the step counter below the death returns left every case green**, so
+   `board.cpp`'s comment claiming a fatal step still counts was decoration.
+   Asserted now, because `steps` is what the frame-rate cases are written in
+   terms of.
+3. **Making `score_key()` ignore the wall mode left every case green** — the
+   keying case only ever recorded in `Solid`, so the wrap branch was never
+   evaluated. It now records in both, with a *higher* score in wrap, so a shared
+   key would walk the solid record up rather than merely writing twice.
+
+⚠ A fourth "green" was not a finding at all: the `sed` pattern spanned two lines,
+which `sed` does not match, so the mutation had never been applied. Applied
+properly it is red. **A mutation harness that cannot fail loudly reports every
+no-op as a passing test** — check that the edit landed, not just that the build
+did.
+
+### What Epic 5 deliberately did not build
+
+| Deferred | Condition to revisit |
+|---|---|
+| A **mouse** gesture | Snake's only verb is a direction. There is nothing a click could mean that a key does not already say, and `layout.hpp` therefore has no `cell_at` at all |
+| A **tween** between cells | See above. Half-block sub-cell motion is possible at the colour tier and impossible at the 7-bit floor, so it would be a tier-only feel change — and feel is the one thing this container cannot judge |
+| A minimum terminal size in `GameMeta` | gitea [#15](https://git.gobha.me/xcaliber/term-game/issues/15), the same answer Epics 3 and 4 gave: the game ships its own too-small screen (needs 58x20; the Shell's floor is 20x8) |
+| A **tuned** speed curve | The reference's numbers, ported exactly, as named constants in `board.hpp`. Whoever can play it has one place to change them |
+| `best_length` | Affine in `best_score` — see above. Revisit if a rule ever makes them independent (a bonus food worth more than one segment would) |
 
 ---
 

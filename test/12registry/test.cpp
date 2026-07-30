@@ -88,6 +88,14 @@ TEST_CASE("2048 is registered", "[registry]") {
   REQUIRE(found);
 }
 
+TEST_CASE("snake is registered", "[registry]") {
+  bool found = false;
+  for (const auto& entry : termgame::all_games()) {
+    if (entry.meta.slug == "snake") found = true;
+  }
+  REQUIRE(found);
+}
+
 TEST_CASE("the roster holds every game the build was told to link",
           "[registry]") {
   // ⚠ What a by-name case CANNOT catch once there is more than one game: a
