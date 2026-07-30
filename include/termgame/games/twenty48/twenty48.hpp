@@ -44,10 +44,13 @@ class Twenty48 final : public Game {
   static constexpr GameMeta kMeta{
       .slug = "2048",
       .title = "2048",
+      // ⚠ 7-bit ASCII only, enforced by a static_assert in all_games.cpp. The
+      // selector prints this on the no-colour tier, which cannot render anything
+      // else — the first draft had an em dash here and it reached a bare pty.
       .description =
           "Slide the board with the arrow keys. Tiles of equal value merge into "
-          "their sum, and every move spawns a new tile. Reach 2048 — then keep "
-          "going. One level of undo.",
+          "their sum, and every move spawns a new tile. Reach 2048, then keep "
+          "going as long as you can. One level of undo.",
       .tag = "Puzzle Sliding",
       .icon = "\U0001F522",
   };
