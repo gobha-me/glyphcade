@@ -20,6 +20,16 @@
 //      the selection marker is '>' here and '▸' on a capable terminal. That is
 //      the tier worth testing (it is the one the repo promises always works),
 //      but do not write a case that only holds there and call it universal.
+//      ⚠ There is no way to reach the OTHER tier from here, and it is not for
+//      want of a seam: test_wire_headless is private, hardcodes the
+//      FallbackDriver, and that driver's capabilities() is an all-false
+//      literal, so TERM= in the ctest environment changes nothing. The pause
+//      dialog's border (gitea #44) joins the ▸ marker and the ↑↓ hint row on
+//      the list of things whose colour-tier arm lives only in AGENTS.md's pty
+//      recipe. The consequence worth stating out loud: at this tier
+//      set_border_style(m_ctx.border_style()) and a hardcoded
+//      set_border_style(Ascii) are indistinguishable, so the cases below pin
+//      the tier's OUTPUT and not the fact that it was derived.
 //   4. App::running() is NOT STICKY. test_run_frames sets m_running = true on
 //      entry, so running() answers "did a quit happen during the last run",
 //      not "has one ever happened". Assert it BEFORE the step() you needed for
@@ -51,6 +61,7 @@
 
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <termforge/core/types.hpp>
@@ -529,6 +540,90 @@ TEST_CASE("Escape resumes from pause", "[selector][pause]") {
   REQUIRE(app.state() == Shell::State::InGame);
   REQUIRE(app.overlay_count() == 0);
   REQUIRE(app.current_game() != nullptr);
+}
+
+// ── the pause dialog's border tier (gitea #44) ───────────────────────────────
+//
+// The dialog was the one widget in the app the tier never reached. termforge's
+// Dialog owns a Frame privately and that Frame defaults to BorderStyle::Single,
+// which is a family sync_capabilities() NEVER chooses — its two answers are
+// Ascii and Rounded. Nothing set it, so the pause dialog painted U+250C/U+2500/
+// U+2502 onto terminals that had just reported no colour, in every release since
+// the dialog existed.
+//
+// ⚠ This could not be asserted before gitea #36. See trap 6: frame_step restores
+// the backdrop before it returns, so a sweep after step() was sweeping the GAME.
+// paint_overlay_pass() is what makes the dialog's cells readable at all, and it
+// was deliberately left unspent there — an unrelated red inside a pin bump
+// destroys the "nothing else moved" signal that is the point of doing one alone.
+
+TEST_CASE("the pause dialog is 7-bit at the ASCII tier",
+          "[selector][pause][render]") {
+  Probe app;
+  enter_game(app);
+  app.step();  // a real game frame to composite the dialog over — trap 6
+  app.dispatch_event(ch(U'p'));
+  REQUIRE(app.state() == Shell::State::Paused);
+  app.paint_overlay_pass();
+
+  // ⚠ THE CONTROLS COME FIRST, and not as tidiness. all_seven_bit() below passes
+  // on a screen with no dialog on it at all — it does exactly that in four other
+  // cases in this file — and the backdrop here is the Minesweeper board, which
+  // test/15minesweeper-ui already pins 7-bit. So a green sweep on its own is
+  // fully consistent with "the overlay was never drawn", which is what happens
+  // if paint_overlay_pass() is dropped or moved above the step(). A REQUIRE
+  // aborts its case, so putting these first turns that into its own message
+  // instead of a vacuous pass. "Paused" is the Frame's own title, so it proves
+  // the widget under test drew; "Resume" is a Button label, so it proves
+  // draw_content ran too.
+  const auto title = find_word(app, "Paused");
+  REQUIRE(title.size() == 1);
+  REQUIRE(find_word(app, "Resume").size() == 1);
+
+  // Frame::draw writes the title as ONE string — title_left, space, the title,
+  // space, title_right — starting at r.x + 1. Every border family's delimiter is
+  // one column wide, so the 'P' sits at r.x + 3: two columns left of it is the
+  // opening delimiter, and three is the frame's top-left corner. ⚠ Mind the
+  // space between them; -1 is blank and an assertion there tests nothing.
+  //
+  // ⚠ Anchored to the title's position rather than searched for globally. The
+  // Minesweeper board underneath is drawn at the same tier and contributes its
+  // own '+' and '|', so a count or a find_word() of either proves nothing about
+  // the dialog. Same trap the scrollbar-thumb case below had to avoid.
+  //
+  // Two glyphs, two causes. The corner is the box-drawing ring the issue was
+  // filed about; the delimiter is a SECOND leak from the same table that the
+  // issue did not mention, because Frame takes title_left/title_right out of
+  // border_glyphs(style) as well. Single and Rounded both give ┤/├ there.
+  REQUIRE(cell_text(app, title[0].x - 2, title[0].y) == "|");
+  REQUIRE(cell_text(app, title[0].x - 3, title[0].y) == "+");
+
+  // And nothing else in the dialog leaked either.
+  REQUIRE(all_seven_bit(app));
+}
+
+TEST_CASE("the pause dialog stays 7-bit at every window size",
+          "[selector][pause][render]") {
+  // ⚠ NOT tier coverage — the glyph families do not vary with size, so this
+  // cannot say anything the case above did not. What it covers is Dialog::layout
+  // clamping to the screen and Frame dropping its title when the budget runs
+  // out: at the Shell's own 20x8 floor the dialog is clamped to the full width,
+  // and "Paused" survives on 14 columns of title budget by four. A change that
+  // narrowed the chrome would take the control out with it.
+  for (const auto& [cols, rows] :
+       {std::pair{20, 8}, std::pair{40, 12}, std::pair{60, 20},
+        std::pair{80, 24}}) {
+    INFO("size: " << cols << "x" << rows);
+    Probe app;
+    enter_game(app);  // enters at the default 60x20; the size below is the paint
+    app.step(1, cols, rows);
+    app.dispatch_event(ch(U'p'));
+    REQUIRE(app.state() == Shell::State::Paused);
+    app.paint_overlay_pass();
+
+    REQUIRE(find_word(app, "Paused").size() == 1);  // the control, as above
+    REQUIRE(all_seven_bit(app));
+  }
 }
 
 // ── the pause dialog's press flash (gitea #36) ───────────────────────────────
