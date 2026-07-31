@@ -318,6 +318,32 @@ auto Shell::on_tick(std::chrono::duration<double> dt) -> void {
   // modal() as well as the state, so that a *future* overlay — an error toast,
   // a confirm-quit — pauses the game too rather than silently letting it run
   // underneath.
+  //
+  // ⚠ Do NOT add tick_widgets(dt, {&m_pause}) here (gitea #36). It is a
+  // two-word line that looks like an omission, and it is not.
+  //
+  // Since termforge v0.4.0 a Button's press flash is a wall-clock countdown in
+  // Widget::on_tick, and App keeps no widget registry — so a widget nobody
+  // ticks never finishes animating. m_pause holds two Buttons, which makes this
+  // look like the exact gap that API exists to close. It is not, because
+  // ConfirmDialog closes itself on activation: the flash is armed and the
+  // overlay popped in the same dispatch, so it never renders, and v0.5.0's
+  // Dialog::draw() clears it at the per-showing boundary before the next
+  // showing paints. Ticking it would put out a flash that is already out.
+  //
+  // To be correct the call would have to sit ABOVE this gate — a paused game's
+  // dialog animating while the simulation does not — which puts it in the eight
+  // lines of this function that already cost the most to re-derive. That is the
+  // real price, not the two words.
+  //
+  // We are not taking upstream's doc comment on trust: test/11selector pins the
+  // BEHAVIOUR, in our tree, at our pin — a button activated in one showing is
+  // not lit in the next. ⚠ That case guards one direction only. It goes red if
+  // upstream stops clearing at the boundary, or if we ever push an overlay that
+  // does not close on activation (a toast, a ProgressBar, a settings panel that
+  // stays up — all of those genuinely DO need ticks, and the answer here is not
+  // a general rule about overlays). It cannot go red for adding the line, since
+  // adding it is harmless. This comment is the only thing guarding that half.
   if (m_state != State::InGame || modal() || !m_game) return;
 
   // dt is forwarded verbatim. termforge's accumulator already guarantees the
