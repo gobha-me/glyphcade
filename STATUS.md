@@ -2,7 +2,7 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-07-31** (gitea #38 — the pre-start options screen)
+**Last updated: 2026-07-31** (gitea #36 — the termforge pin moves to v0.6.0)
 
 ---
 
@@ -68,13 +68,17 @@ record across quit-to-menu and across restarts — 2048 a best score, Minesweepe
 a best time per difficulty — in a versioned text file under `$XDG_DATA_HOME`.
 See "What the score store is" below.
 
-**The termforge pin is now v0.2.2** (gitea
+**The termforge pin is now v0.6.0** (gitea
+[#36](https://git.gobha.me/xcaliber/term-game/issues/36)) — six tags, not the
+four the issue was written against, and the first bump that **fixed a bug we
+were shipping** rather than merely staying current. See "What the v0.6.0 bump
+brought" below. Before it the pin was **v0.2.2** (gitea
 [#24](https://git.gobha.me/xcaliber/term-game/issues/24)) — seven tags, not the
-five the issue was written against. **Nothing upstream blocks any epic any
-more**: #63 and #64 shipped and are taken, so Epics 7 and 8 are unblocked, and
+five that issue was written against. **Nothing upstream blocks any epic**:
+#63 and #64 shipped and are taken, so Epics 7 and 8 are unblocked, and
 #60 shipped in v0.2.2, so Epic 6's hold-to-move stops being OS auto-repeat
-guesswork. One upstream behaviour change reached us and was decided rather than
-inherited — the wheel. See "What the v0.2.2 bump brought" below.
+guesswork. One upstream behaviour change reached us at v0.2.2 and was decided
+rather than inherited — the wheel. See "What the v0.2.2 bump brought" below.
 
 **Epic 5 has landed. There are three games, and one of them moves on its own.**
 Snake is registered, playable with arrows/hjkl/wasd, three difficulties, and
@@ -155,12 +159,15 @@ every CI run exercises the **degraded** path. The held path is covered on the
 model, where `HoldSupport` is a parameter, and nowhere else.
 
 **Next move: Epic 8 (Solitaire)**, the flagship and the last of the roster — but
-read the upstream note below before starting it. ⚠ termforge is now at **v0.5.1**,
-four tags past our pin, and `MapWidget`'s **sprite tier still does not exist at
-any tag**. Its two gates (#83/#84) lifted and the design doc was updated to say
-so, but no code followed. Epic 8's premise — cards as pixel sprites — needs that
-tier or an `Image`-and-`draw_image` path written by hand. The pin bump itself is
-its own issue, not part of an epic; see "Upstream has moved four tags" below.
+read the upstream note below before starting it. ⚠ We are now pinned to
+**v0.6.0** (gitea #36), so the `draw_image(Rect cells, …)` contract is available
+— but `MapWidget`'s **sprite tier still does not exist at any tag**. Its two
+gates (#83/#84) lifted and the design doc was updated to say so, but no code
+followed. Epic 8's premise — cards as pixel sprites — needs that tier or an
+`Image`-and-`draw_image` path written by hand. What the bump changed is that the
+hand-written path is now viable: at v0.2.2 `draw_image` took an image's *pixel*
+dims as a *cell* count, so it could not have worked. See "What the v0.6.0 bump
+brought" below.
 
 Since Epic 3, two housekeeping issues have landed.
 gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16) moved the pin to
@@ -329,28 +336,152 @@ Needs a real kitty/foot/ghostty terminal, the same position the SFX bank has bee
 in since Epic 2.
 
 
-## Upstream has moved four tags past our pin, and it changes nothing here
+## What the v0.6.0 bump brought (gitea #36)
 
-Checked at the start of Epic 7, because this project has now found the blocking
-picture staler than the issue describing it four times. termforge is at
-**v0.5.1**; we pin **v0.2.2**.
+Six tags, not the four the issue describes — it was written when upstream was at
+v0.5.1, and upstream was at **v0.6.0** by the time this was implemented. Third
+bump running where the issue's own picture was stale, which is why re-reading
+upstream before implementing an issue *about* upstream is a rule here.
+
+**`src/` has no behaviour change**, and that null diff is the finding: six
+configurations green across four minor versions of the dependency with nothing
+rewritten. The only source edit is a comment.
 
 Reading the tags rather than their titles:
 
 | tag | what it is | reaches us? |
 |---|---|---|
-| v0.3.0 | #83/#84 — `draw_image(Rect cells, …)`, `preferred_pixel_extent`, `draw_pixels` returns a borrowed `const Image*` | **no.** Breaking only for a `TerminalDriver` implementor or a `draw_pixels` override; we have neither |
-| v0.4.0 | #69 — `Widget::on_tick(dt)`, and `ProgressBar`/`Button` animation became **wall-clock** | ⚠ **silently, if we ever hold either.** `App` keeps no widget registry, so a widget nobody ticks stops animating: a press flash sticks on, a pulse stands still. No compile error |
-| v0.5.0 | #122 — `Widget::reset_transient()` at a Dialog showing boundary | no |
-| v0.5.1 | #123 — container overloads for `route_mouse`/`tick_widgets`, and `route_mouse` now skips nulls | no |
+| v0.3.0 | #83/#84 — `draw_image(Rect cells, …)`, `preferred_pixel_extent`, `draw_pixels` returns a borrowed `const Image*` and takes an `Extent` | **not today, but it is the point.** Breaking only for a `TerminalDriver` implementor or a `draw_pixels` override, and we are neither. ⚠ It is what **unblocks gitea #39**: at v0.2.2 `draw_image` used an image's *pixel* dims as a *cell* count, so an atlas rendered as one flat colour per cell |
+| v0.4.0 | #69 — `Widget::on_tick(dt)`; `ProgressBar`/`Button` animation became **wall-clock** | ⚠ **yes** — see below. The issue says "only if we hold one", and we hold two without naming either |
+| v0.5.0 | #122 — `Widget::reset_transient()` at a Dialog showing boundary | ⚠ **yes**, and it is v0.4.0's cure |
+| v0.5.1 | #123 — container overloads for `route_mouse`/`tick_widgets`, `route_mouse` skips nulls | no. Our one call passes a braced list of one non-null pointer; the `initializer_list` overload still wins |
+| v0.5.2 | #102 — `Screen::fill_rect` clips via `Rect::intersect` instead of `x + w` in `int` | no. Our three call sites pass small in-bounds values, so the arithmetic is identical for every input we produce |
+| v0.6.0 | #22 — `TabBar`, and `MarkGlyphs` grew `arrow_left`/`arrow_right` (`all()` 9 → 11) | no. We read `.selector` **by name**, never `all()`, never an aggregate initialiser. ⚠ The options cycler hardcodes `<`/`>`, which is what the new fields are for — correct at the ASCII tier, wrong above it. gitea [#45](https://git.gobha.me/xcaliber/term-game/issues/45) |
 
-**`MapWidget` and `Image` are byte-identical from v0.2.2 to v0.5.1** — `git diff`
+### ⚠ The one thing that reached us, and the issue is wrong about it twice
+
+Activating a `ConfirmDialog`'s button arms a press flash **and closes the dialog
+in the same dispatch**, so the flash never renders in the showing that armed it.
+What clears it afterwards is what moved — measured across three pins, not read
+off the release notes:
+
+| pin | 1st paint of the next showing | 2nd paint | `test/11selector` |
+|---|---|---|---|
+| v0.2.2 | **LIT** | clear | next-showing RED, outlive-one-paint GREEN |
+| v0.4.0 | **LIT** | **LIT** | both RED |
+| v0.6.0 | clear | clear | both GREEN |
+
+⚠ **v0.4.0 did not introduce this — we were shipping it.** At v0.2.2
+`Button::draw()` cleared the flag *after* painting with it, so every re-opening
+of the pause dialog showed one frame of a wrongly-lit Resume button. v0.4.0
+(#69) made the flash a wall-clock countdown in `Widget::on_tick`; `App` keeps no
+widget registry and `Shell::on_tick` forwards only to `m_game`, so nothing ticks
+`m_pause` and one frame becomes **permanent**. v0.5.0 (#122) clears it at the
+showing boundary before anything paints, and cures both.
+
+Confirmed in a pty, old binary against new, identical keystrokes and controls:
+the pressed background `48;2;128;64;255` appears **once** on v0.2.2 and **zero**
+times on v0.6.0. So this bump is the first that **fixed a live defect** rather
+than only staying current.
+
+⚠ **gitea #36's table is wrong on both rows** — it calls v0.4.0 conditional on
+holding a `ProgressBar` or `Button` and v0.5.0 unreachable. And the audit it
+prescribes, grepping for those two type names, comes back **CLEAN and is
+therefore misleading**: the Buttons are inside `ConfirmDialog`, and our source
+never names them. The same blind spot shows up in the ABI floor —
+`sizeof(Button)` grew, so `sizeof(Shell)` moved through a class our installed
+header does not mention, and `Widget`'s two new virtuals were **inserted at
+slots 3–4 ahead of six existing ones**, so a mixed-version consumer gets
+`hit_test` dispatched into `draw_pixels` rather than a missing symbol.
+**Auditing the widget types a header names is not sufficient; transitive members
+and vtable layout both count.**
+
+### We do not forward ticks, and only half of that is testable
+
+`tick_widgets(dt, {&m_pause})` is the line this looks like it wants, and it is
+not added. To be correct it would sit *above* the pause gate — a paused game's
+dialog animating while the simulation does not — in the eight lines of
+`Shell::on_tick` that already cost the most to re-derive; and upstream's
+`dialogs.hpp` says outright that the three standard dialogs need no ticks. We
+pin the **behaviour** rather than that doc comment.
+
+⚠ The test guards the *removal* direction only: it goes red if upstream stops
+clearing at the boundary, or if we push an overlay that does not close on
+activation. **Adding the line is harmless and stays green**, so only the comment
+at the call site guards that half. Said out loud rather than implied, because a
+comment claiming a test it does not have is the failure this file exists to
+prevent.
+
+### Two red arms, because one could not have told them apart
+
+The reflex from #24 is to build against the previous pin and expect green. That
+prediction was **written into `cmake/deps/termforge.cmake` before the arms were
+run, and it was wrong** — v0.2.2 came back red. The three columns above need
+both arms *and* two test cases: a `REQUIRE` aborts its case, so one case can
+only ever report the first claim.
+
+On both old arms `11selector` is the **only** red suite, 29 of 30 green. The
+isolation is the evidence, not the failure.
+
+### What is verified, and what is not
+
+Six configurations green — GCC, GCC without audio, Clang, ASan, UBSan, TSan, 30
+suites each, `-Werror` throughout. Verified in a pty at **both** tiers, with
+controls: the "pressed colour never appears" check was **vacuous on the first
+attempt** — grepping the raw capture for `Resume` returns 0 at every pin,
+because the renderer positions every cell and screen adjacency is not byte
+adjacency. Four controls now run, including that the button's *focused*
+background does render, which is what shows the grep can match a Button's own
+colour at all.
+
+⚠ **`find_dependency(termforge 0.6.0)` is exercised by nothing in `ctest`.**
+`cmake/check_export.cmake` installs to a scratch prefix and greps the generated
+targets file; it never calls `find_package(term-game)`. Checked by hand here — a
+throwaway consumer against the install tree resolves term-game 0.13.0 and
+termforge 0.6.0 — and that gap is gitea
+[#46](https://git.gobha.me/xcaliber/term-game/issues/46).
+
+### ⚠ A latent tier bug the new test seam makes reachable
+
+`Probe::paint_overlay_pass` exists because `App::frame_step` restores the
+backdrop before it returns, so **no test in this repo could read an overlay's
+cells** until now. The moment they can, this becomes assertable: the pause
+dialog paints U+2500/U+2502/U+250C box-drawing characters onto a terminal that
+just reported no colour. `Dialog` owns a `Frame` defaulting to
+`BorderStyle::Single` and nothing in `Shell` ever calls `set_border_style`.
+Filed as gitea [#44](https://git.gobha.me/xcaliber/term-game/issues/44).
+
+Measured at both pins, so it is **pre-existing and not this bump's**: identical
+glyph sets, counts differing only by showing count. Filed as its own issue and
+deliberately **not** fixed here — an unrelated red inside a pin bump destroys
+the "nothing else moved" signal that is the whole point of doing it alone. Same
+story as the detail pane's scrollbar in Epic 6: a latent tier bug found by a
+test *capability*, not by a feature.
+
+### A dependency reached into, and nothing recorded it
+
+Six of our headers call `termforge::detail::display_width` /
+`truncate_to_width`, several inside `static_assert`s
+(`arcade/game_meta.hpp`, the five `games/*/glyphs.hpp`). `widgets/detail/` is
+byte-identical across all six tags so this bump is safe, but a change there
+would be a hard compile break in a `constexpr` context, not a warning. Written
+down here for the first time.
+
+---
+
+## Upstream had moved four tags past our pin, and it changed nothing then
+
+Checked at the start of Epic 7, because this project has now found the blocking
+picture staler than the issue describing it four times. Superseded by the
+section above, and kept because the reasoning is still the precedent.
+
+**`MapWidget` and `Image` are byte-identical from v0.2.2 to v0.6.0** — `git diff`
 over `map_widget.*`, `image.cpp`, `image_loader.*` and their suites is empty. So
 the bump buys Epic 7 nothing, and it was deliberately not bundled into it: the
 whole signal of a pin bump is "nothing else moved", and burying it in an epic
-destroys that. Same reasoning that made gitea #24 its own issue — and it is now
+destroys that. Same reasoning that made gitea #24 its own issue — and it became
 gitea [#36](https://git.gobha.me/xcaliber/term-game/issues/36), which also
-carries the `Widget::on_tick` audit the bump needs.
+carried the `Widget::on_tick` audit the bump needed.
 
 ⚠ **The `MapWidget` sprite tier still does not exist at any tag.** Its gates
 (#83/#84) landed and `docs/map-widget.md` was updated to record that they had —
@@ -374,7 +505,7 @@ the issue.
 | 5 — Snake | **done** | — |
 | 6 — Tetris | **done** | ~~termforge #60~~ — shipped in **v0.1.19…v0.2.2** and taken. `KeyboardMode::Enhanced` gives real `KeyAction::Repeat`/`Release`; DAS is now expressible rather than inferred from OS auto-repeat. gitea **#32** built the seam that reaches it: declare `Enhanced` in `kMeta` and the Shell does the rest. ⚠ Still degradable: a terminal without the kitty protocol never delivers `Release` — and note the notice is **ours**, not upstream's, because `App::setup()` has already run by the time a game entry sets the mode. Tetris must fall back to discrete steps **knowingly** |
 | 7 — Sokoban | **done** | ~~termforge #64 → #63~~ — both shipped and **taken**. `MapWidget` v1 (glyph tier) is now SPENT: Sokoban is its first consumer, and the four pieces of API friction it found are listed in "What Epic 7 built" |
-| 8 — Solitaire | **ready, with a caveat** | ~~termforge #63~~ — `Image` sub-rect blit and alpha shipped at v0.1.18 and are taken. ⚠ But `MapWidget`'s **sprite tier does not exist at any tag through v0.5.1**, and the cards-as-sprites premise wants it. Not a block — `Image` plus `draw_image` is reachable from game code — but it is a design decision this epic must make first, not inherit |
+| 8 — Solitaire | **ready, with a caveat** | ~~termforge #63~~ — `Image` sub-rect blit and alpha shipped at v0.1.18 and are taken. ⚠ But `MapWidget`'s **sprite tier does not exist at any tag through v0.6.0**, and the cards-as-sprites premise wants it. Not a block — `Image` plus `draw_image` is reachable from game code — but it is a design decision this epic must make first, not inherit |
 
 **Nothing upstream blocks any epic.** That has been true since gitea #24, and it is what gitea
 [#24](https://git.gobha.me/xcaliber/term-game/issues/24) bought. termforge
@@ -382,7 +513,7 @@ the issue.
 [#58](https://github.com/gobha-me/termforge/issues/58) (frame pacing),
 [#59](https://github.com/gobha-me/termforge/issues/59) (`on_tick`) and
 [#61](https://github.com/gobha-me/termforge/issues/61) (F5–F12) are all closed,
-and we pin **v0.2.2** to get them, plus
+and we pin **v0.6.0** to get them, plus
 [#71](https://github.com/gobha-me/termforge/issues/71) (terminal restore on the
 exception path), [#72](https://github.com/gobha-me/termforge/issues/72)
 (`ListWidget` marks its own selection) and
@@ -508,7 +639,7 @@ volunteered us for.
    one-grapheme glyph is half glyph and half background fill. Two-column strings
    work — `write_text` lays out text — but the contract does not say so.
 
-⚠ And the sprite tier **still does not exist at any tag**, v0.2.2 through v0.5.1.
+⚠ And the sprite tier **still does not exist at any tag**, v0.2.2 through v0.6.0.
 Its gates lifted and the doc was updated to say so; no code followed. That is
 Epic 8's problem, not this one's.
 
@@ -1018,7 +1149,7 @@ argument.
   directory name, as does the gitea repo).
 - **termforge consumed** via [cmake/deps/termforge.cmake](cmake/deps/termforge.cmake)
   — `find_package(termforge ... CONFIG)` first, FetchContent as the fallback.
-  Epic 0 pinned v0.1.7; the pin is now **v0.2.2** — see below.
+  Epic 0 pinned v0.1.7; the pin is now **v0.6.0** — see below.
 - **`TERMGAME_WITH_AUDIO`** auto-detection in [cmake/audio.cmake](cmake/audio.cmake).
   Epic 2 answered the export question (gitea #13): rtaudio is linked by
   `src/audio_backend/` alone, which is never installed and never exported.
@@ -1713,7 +1844,7 @@ shipping.
 | [#63](https://github.com/gobha-me/termforge/issues/63) | `Image` has no blit/alpha compositing | **closed — shipped in v0.1.18, and we are pinned to it.** Unblocks Epic 8 |
 | [#127](https://github.com/gobha-me/termforge/issues/127) | `MapWidget::set_map_size()` wipes every layer while claiming to preserve the corner | **open** — filed from Epic 7. Not a blocker: size first, populate second |
 | [#128](https://github.com/gobha-me/termforge/issues/128) | `MapWidget` has no `tile_at()`, so hit-testing re-derives the widget's private viewport arithmetic | **open** — filed from Epic 7, and the **deletion condition for this repo's one workaround** |
-| [#64](https://github.com/gobha-me/termforge/issues/64) | MapWidget (Epic 3.6) | **shipped as `MapWidget` v1 (glyph tier) in v0.1.19, and SPENT by Epic 7** — Sokoban is its first consumer and produced four pieces of API feedback (see "What MapWidget's first consumer found"), reported upstream as a comment on #64 plus #127 and #128. ⚠ Still open upstream against the sprite tier, which **does not exist at any tag through v0.5.1** even though both its gates landed. We did not need it; **Epic 8 might** |
+| [#64](https://github.com/gobha-me/termforge/issues/64) | MapWidget (Epic 3.6) | **shipped as `MapWidget` v1 (glyph tier) in v0.1.19, and SPENT by Epic 7** — Sokoban is its first consumer and produced four pieces of API feedback (see "What MapWidget's first consumer found"), reported upstream as a comment on #64 plus #127 and #128. ⚠ Still open upstream against the sprite tier, which **does not exist at any tag through v0.6.0** even though both its gates landed. We did not need it; **Epic 8 might** |
 | [#75](https://github.com/gobha-me/termforge/issues/75) | Mouse tracking mode hardcoded to `?1002h`; no `?1003h`, no way to disable | **closed — shipped as `Terminal::set_mouse_mode` in v0.1.15, and the pin has been past it since — but nothing calls it.** The default, `MouseMode::Drag`, is byte-for-byte what we already emitted, so taking the tag changed nothing. `MouseMode::Motion` is what Minesweeper wants for buttonless hover; deferred to gitea [#18](https://git.gobha.me/xcaliber/term-game/issues/18) because it is a *feel* change and the dev container cannot verify feel |
 | [#71](https://github.com/gobha-me/termforge/issues/71) | `App::run()` skips `teardown()` on a throw | **closed — shipped in v0.1.10, and we are on it** (gitea [#16](https://git.gobha.me/xcaliber/term-game/issues/16)). The terminal-restore workaround is gone; our boundary survives as a diagnostic. `test/21exception` asserts the upstream guarantee via `test_winch_hooked()`, `pty-restore` asserts the escape bytes. |
 | [#72](https://github.com/gobha-me/termforge/issues/72) | `ListWidget` selection invisible at the fallback tier | **closed — shipped in v0.1.11, and we are on it** (gitea [#17](https://git.gobha.me/xcaliber/term-game/issues/17)). Our gutter marker is gone and the two columns went back to the list. The marker is `ListWidget`'s now, on by default and **inside `rect()`**, so a click on it selects — which the workaround could not do. `test/11selector` asserts the glyph in cell text at the ASCII tier, coverage the workaround never had. |
@@ -1721,14 +1852,14 @@ shipping.
 
 Check state with `gh` rather than trusting this table if it looks stale.
 
-### The pin is v0.2.2, and the version request is patch-level
+### The pin is v0.6.0, and the version request is patch-level
 
-`cmake/deps/termforge.cmake` asks `find_package(termforge 0.2.2 …)`, not `0.2`.
-termforge's package version file is `SameMinorVersion`, so `0.2` accepts *any*
-installed 0.2.x. The worked examples below are all 0.1.x because that is where
+`cmake/deps/termforge.cmake` asks `find_package(termforge 0.6.0 …)`, not `0.6`.
+termforge's package version file is `SameMinorVersion`, so `0.6` accepts *any*
+installed 0.6.x. The worked examples below are all 0.1.x because that is where
 the lesson was learned; every one of them survives the move, because the
-dependency still ships load-bearing API in patch releases — v0.2.1 and v0.2.2
-both did. Three ways minor granularity bit:
+dependency still ships load-bearing API in patch releases — v0.2.1, v0.2.2 and
+v0.5.2 all did. Three ways minor granularity bit:
 
 - **0.1.7** has no `set_tick_hz`, so accepting it turns "your copy is too old,
   falling back to FetchContent" into a wall of compiler errors in `shell.cpp`,

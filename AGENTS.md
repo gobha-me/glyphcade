@@ -268,6 +268,22 @@ expect to find `ticks: 42` in the capture — later frames only repaint the digi
 that changed. Look for a *sequence* of distinct `elapsed: N.NNs` values instead;
 that is the evidence the simulation is advancing.
 
+⚠ **Grep the STRIPPED text for words and the RAW capture for escapes**, and get
+this backwards and a check goes vacuous rather than red. `grep 'Resume'` on the
+raw file returns 0 at every pin — the renderer positions every cell, so screen
+adjacency is not byte adjacency. A colour check that also proves the widget
+never rendered proves nothing (gitea #36, and the same family as the `MINES`
+capture in gitea #38).
+
+⚠ **A "this colour never appears" check needs a control that CAN appear.** Four
+were used for #36's press flash, and the fourth is the one that matters: the
+same button's *focused* background, `48;2;64;128;255`, does appear — which is
+what shows the grep can match a Button's own colour at all. Without it, "the
+pressed colour is absent" is indistinguishable from "no Button was ever drawn".
+Better still where a second binary exists: run the SAME capture against the old
+pin's binary and diff the counts. For #36 that was 1 against 0, which is
+evidence a single arm cannot produce.
+
 **The throw path is automated** — `ctest -R pty-restore -V`, or by hand
 `cmake/pty_restore.sh build/test/pty-restore-probe`. It drives a
 deliberately-throwing binary through the same harness and asserts one `?1049h`,
