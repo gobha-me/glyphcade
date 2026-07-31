@@ -123,6 +123,12 @@ inline constexpr Dir kDirs[]{Dir::Up, Dir::Down, Dir::Left, Dir::Right};
 enum class Level : std::uint8_t { Easy, Normal, Hard };
 inline constexpr Level kLevels[]{Level::Easy, Level::Normal, Level::Hard};
 
+// ⚠ Index-aligned with kLevels; Snake::start() casts the chosen index back to
+// Level. See minesweeper/board.hpp's kLevelNames for the full argument.
+inline constexpr std::string_view kLevelNames[]{"Easy", "Normal", "Hard"};
+static_assert(std::size(kLevelNames) == std::size(kLevels),
+              "every snake::Level needs an options-screen name, in enum order");
+
 // gitea #6 asks for "wrap-vs-wall as a mode". The reference has no wrap at all —
 // snake.js:117 is unconditionally fatal — so this half is ours, and it is a real
 // player-facing mode rather than a compile-time option, because an unexposed mode
@@ -132,6 +138,12 @@ inline constexpr Level kLevels[]{Level::Easy, Level::Normal, Level::Hard};
 // Solid, so one shared record would let a wrap run outrank a solid one.
 enum class Walls : std::uint8_t { Solid, Wrap };
 inline constexpr Walls kWallModes[]{Walls::Solid, Walls::Wrap};
+
+// ⚠ "Solid" and "Wrap" rather than "Deadly"/"Wrap around": the options screen
+// has to fit 20 columns, and the row is "> Walls: < Solid >".
+inline constexpr std::string_view kWallNames[]{"Solid", "Wrap"};
+static_assert(std::size(kWallNames) == std::size(kWallModes),
+              "every snake::Walls mode needs an options-screen name");
 
 // Won is the BOARD-FULL case and is genuinely unreachable in play on 28x16 — it
 // exists because the alternative is the reference's infinite loop. Unlike 2048's

@@ -33,10 +33,19 @@
 #include <termgame/arcade/context.hpp>
 #include <termgame/arcade/game.hpp>
 #include <termgame/arcade/game_meta.hpp>
+#include <termgame/arcade/options_screen.hpp>
 #include <termgame/games/snake/board.hpp>
 #include <termgame/games/snake/layout.hpp>
 
 namespace termgame {
+
+// ⚠ Namespace scope, not inline in kMeta — OptionSpec::choices is a span, and
+// an array written inside the initialiser would dangle. See arcade/game_meta.hpp.
+inline constexpr OptionSpec kSnakeOptions[]{
+    // Defaults match what the constructor already builds: Normal, Solid.
+    {.label = "Level", .choices = snake::kLevelNames, .default_index = 1},
+    {.label = "Walls", .choices = snake::kWallNames, .default_index = 0},
+};
 
 class Snake final : public Game {
  public:
@@ -61,6 +70,7 @@ class Snake final : public Game {
           "around to the far side.",
       .tag = "Arcade Classic",
       .icon = "\U0001F40D",
+      .options = kSnakeOptions,
   };
 
   Snake();
@@ -107,6 +117,9 @@ class Snake final : public Game {
   auto draw_field(termforge::Screen& screen) -> void;
   auto draw_too_small(termforge::Screen& screen) -> void;
 
+  // The pre-start screen (gitea #38). A member the game consults, not a Shell
+  // state — see arcade/options_screen.hpp.
+  OptionsScreen m_options{};
   GameContext* m_ctx{nullptr};
   snake::Board m_board;
   snake::Layout m_layout{};

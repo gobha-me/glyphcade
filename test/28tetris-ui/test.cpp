@@ -25,6 +25,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
+#include <utility>
 
 #include <termforge/core/types.hpp>
 
@@ -84,6 +85,21 @@ auto enter_tetris(Probe& app, int cols = 80, int rows = 24) -> void {
   }
   app.dispatch_event(key(termforge::Key::Enter));
   REQUIRE(app.state() == Shell::State::InGame);
+  // ⚠ A SECOND Enter, and it goes AFTER the REQUIRE above, not before. The
+  // REQUIRE is what proves the Shell entered on the FIRST Enter; moving it below
+  // this line would make the case pass even if entering had come to need two.
+  //
+  // gitea #38: entering a game now opens its pre-start options screen, so a
+  // suite that wants a BOARD has to say so. This is the change telling the truth
+  // about itself, not a regression -- and the per-suite cases below assert the
+  // screen is there before this dismisses it.
+  //
+  // ⚠ Leaving this out does not produce a red test, it produces a HANG. Several
+  // cases here steer with `while (cursor().row < N) dispatch(Down)`, which is
+  // bounded by the code under test: with the options screen up the arrows move a
+  // cycler instead of the cursor, the predicate never becomes true, and the
+  // suite spins forever.
+  app.dispatch_event(key(termforge::Key::Enter));
   app.step(1, cols, rows);
 }
 
@@ -537,4 +553,165 @@ TEST_CASE("lines are recorded separately from score", "[tetris][scores]") {
 
   REQUIRE(app.scores().get("tetris", "best_lines_start1") == 1);
   REQUIRE(app.scores().get("tetris", "best_score_start1").value_or(0) > 1);
+}
+
+// ── The pre-start options screen (gitea #38) ────────────────────────────────
+
+namespace {
+// Enter tetris and STOP on the options screen, which enter_tetris() dismisses.
+auto enter_to_options(Probe& app) -> Tetris* {
+  app.step(1, 80, 24);
+  const int index = tetris_index();
+  REQUIRE(index >= 0);
+  while (app.selector_index() < index) {
+    app.dispatch_event(key(termforge::Key::Down));
+  }
+  app.dispatch_event(key(termforge::Key::Enter));
+  REQUIRE(app.state() == Shell::State::InGame);
+  app.step(1, 80, 24);
+  Tetris* g = game_of(app);
+  REQUIRE(g != nullptr);
+  return g;
+}
+}  // namespace
+
+TEST_CASE("entering tetris shows the options screen, not the well",
+          "[tetris][options]") {
+  Probe app;
+  enter_to_options(app);
+  std::string all;
+  for (int y = 0; y < 24; ++y) all += row_text(app, y) + "\n";
+  INFO(all);
+  CHECK(all.find("Start level") != std::string::npos);
+  CHECK(all.find("Enter start") != std::string::npos);
+  CHECK(all.find("PLAYING") == std::string::npos);
+  CHECK(all_seven_bit(app));
+}
+
+TEST_CASE("gravity does not run while the options screen is up",
+          "[tetris][options]") {
+  // ⚠ The gate in Tetris::tick. Without it the piece falls behind the screen
+  // and can lock -- or top out -- before a start level has been chosen. Every
+  // enter_tetris() dismisses before its first step(), so deleting the gate
+  // leaves this whole suite green.
+  //
+  // ⚠ tick() is called directly: Probe sets frame_ms(0), so app.step(N) passes
+  // almost no real time and never crosses the gravity interval.
+  Probe app;
+  Tetris* g = enter_to_options(app);
+  const int y_before = g->board().active().y;
+  const int lines_before = g->board().lines();
+
+  for (int i = 0; i < 240; ++i) {
+    g->tick(std::chrono::duration<double>{1.0 / 60.0});
+  }
+  CHECK(g->board().active().y == y_before);
+  CHECK(g->board().lines() == lines_before);
+  CHECK(g->ticks() == 240);  // the ticks arrived; the gate is why nothing fell
+
+  // ⚠ THE CONTROL: without it this passes against a Tetris whose gravity is
+  // broken outright. Dismiss and the same dt must move the piece.
+  app.dispatch_event(key(termforge::Key::Enter));
+  Tetris* live = game_of(app);
+  REQUIRE(live != nullptr);
+  const auto started = live->board().active();
+  for (int i = 0; i < 240; ++i) {
+    live->tick(std::chrono::duration<double>{1.0 / 60.0});
+  }
+  // Either the piece has fallen, or it locked and a new one spawned -- both are
+  // "gravity ran", and pinning only one of them makes the control flaky.
+  const auto after = live->board().active();
+  CHECK((after.y != started.y || after.piece != started.piece ||
+         after.x != started.x));
+}
+
+TEST_CASE("the chosen start level is what the game begins on",
+          "[tetris][options]") {
+  Probe app;
+  enter_to_options(app);
+  app.dispatch_event(key(termforge::Key::Right));   // 1 -> 5
+  app.dispatch_event(key(termforge::Key::Right));   // 5 -> 10
+  app.dispatch_event(key(termforge::Key::Enter));
+  app.step(1, 80, 24);
+
+  Tetris* g = game_of(app);
+  REQUIRE(g != nullptr);
+  CHECK(g->board().start_level() == StartLevel::Ten);
+}
+
+TEST_CASE("accepting the default starts tetris on level one",
+          "[tetris][options]") {
+  // ⚠ The pair of the case above. A game that ignored selected() and always
+  // used default_index would pass this one alone.
+  Probe app;
+  enter_tetris(app);
+  Tetris* g = game_of(app);
+  REQUIRE(g != nullptr);
+  CHECK(g->board().start_level() == StartLevel::One);
+}
+
+TEST_CASE("HoldSupport survives the options screen, on BOTH arms",
+          "[tetris][options]") {
+  // What this pins: dismissing the pre-start screen calls new_game(), which
+  // rebuilds the Board as `tetris::Board(level, m_board.hold_support(), seed)`.
+  // The degradation arm start() chose must survive that rebuild -- otherwise
+  // picking a start level would silently cost you DAS.
+  //
+  // ⚠ Driven through a hand-built GameContext, NOT through the Shell, and that
+  // is the whole reason this case can exist. test_run_frames installs a
+  // FallbackDriver whose capabilities are all false, so under the Shell
+  // kitty_keyboard is never true and the Held arm below is unreachable -- the
+  // same blind spot the SFX bank has had since Epic 2.
+  // GameContext::set_capabilities is public precisely so a degradation arm can
+  // be chosen by a test instead of by a terminal.
+  //
+  // ⚠ AND A CORRECTION, recorded because the wrong version was nearly shipped
+  // as a load-bearing comment. This case was written believing the ORDER of
+  // start()'s `m_board.reset(...)` and `m_options.open(...)` was a trap -- open
+  // first and the constructor's Discrete would leak through. Mutation testing
+  // says otherwise: swapping them is green even on the Held arm, because open()
+  // never touches the board and both calls are in start(), so the reset has
+  // always happened before any dismissal can. The reasoning was plausible and
+  // wrong. The case is still worth having -- it covers the Held arm, which
+  // nothing else does -- but not for the reason it was written.
+  using termgame::GameContext;
+
+  const auto run = [](bool kitty) {
+    GameContext ctx;
+    termforge::Capabilities caps{};
+    caps.kitty_keyboard = kitty;
+    ctx.set_capabilities(caps);
+
+    Tetris game;
+    game.start(ctx);
+    const auto at_start = game.hold_support();
+
+    // Dismiss the options screen without changing anything.
+    REQUIRE(game.on_event(key(termforge::Key::Enter)));
+    return std::pair{at_start, game.hold_support()};
+  };
+
+  SECTION("no kitty protocol: Discrete, and it stays Discrete") {
+    const auto [at_start, after] = run(false);
+    CHECK(at_start == HoldSupport::Discrete);
+    CHECK(after == HoldSupport::Discrete);
+  }
+
+  SECTION("kitty protocol granted: Held, and dismissal must not lose it") {
+    // ⚠ This is the arm nothing in this container could reach before. It is
+    // also the only assertion that fails when start() opens the screen too
+    // early -- the Discrete arm above passes either way.
+    const auto [at_start, after] = run(true);
+    CHECK(at_start == HoldSupport::Held);
+    CHECK(after == HoldSupport::Held);
+  }
+}
+
+TEST_CASE("Escape from tetris' options screen goes back to the menu",
+          "[tetris][options]") {
+  Probe app;
+  enter_to_options(app);
+  app.dispatch_event(key(termforge::Key::Escape));
+  app.step(1, 80, 24);
+  CHECK(app.state() == Shell::State::Selector);
 }

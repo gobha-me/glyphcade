@@ -77,6 +77,12 @@ auto Minesweeper::start(GameContext& ctx) -> void {
   // ago by the registry factory; freshness is structural, not a routine.
   m_ctx = &ctx;
   m_frame.set_style(ctx.border_style());
+
+  // gitea #38: ask before starting rather than starting on Easy and making the
+  // player throw the board away. The constructor already built an Easy board,
+  // so the screen is a chance to change that, not a prerequisite for having one
+  // — a resize or a stray frame before the first Enter still draws something.
+  m_options.open(kMeta.title, kMeta.options, &ctx);
 }
 
 auto Minesweeper::tick(std::chrono::duration<double> dt) -> void {
@@ -113,6 +119,26 @@ auto Minesweeper::move_cursor(int dr, int dc) -> void {
 }
 
 auto Minesweeper::on_event(const termforge::Event& ev) -> bool {
+  // ⚠ FIRST, before the game's own keys. While the pre-start screen is up the
+  // board is not being played, so nothing below should see input.
+  if (m_options.is_open()) {
+    switch (m_options.on_event(ev)) {
+      case OptionsScreen::Reply::Ignored:
+        // Escape and 'p' land here. Returning false is what lets the Shell
+        // quit to menu and pause from the options screen.
+        return false;
+      case OptionsScreen::Reply::Consumed:
+        return true;
+      case OptionsScreen::Reply::Dismissed:
+        // ⚠ UNCONDITIONAL, even when nothing was changed. "The player accepted
+        // Easy" and "the player picked Hard" take the same path, so there is no
+        // special case to drift and no branch a mutation can delete. new_game()
+        // also re-seeds, which is what makes the board you get the one you
+        // chose rather than the one the constructor guessed.
+        new_game(static_cast<Level>(m_options.selected(0)));
+        return true;
+    }
+  }
   if (const auto* key = std::get_if<termforge::KeyEvent>(&ev)) {
     return handle_key(*key);
   }
@@ -322,6 +348,15 @@ auto Minesweeper::handle_mouse(const termforge::MouseEvent& mouse) -> bool {
 }
 
 auto Minesweeper::draw(termforge::Screen& screen) -> void {
+  // ⚠ Before the layout is computed, and before anything else is drawn. The
+  // pre-start screen owns the whole Screen exactly as draw_too_small() does —
+  // this is the same arm, not a new concept. Returning here is also what keeps
+  // the status and hint rows off it: they describe a board that is not in play.
+  if (m_options.is_open()) {
+    m_options.draw(screen);
+    return;
+  }
+
   m_layout = minesweeper::compute_layout(screen.cols(), screen.rows(),
                                          m_board.rows(), m_board.cols());
 

@@ -104,6 +104,25 @@ auto Tetris::start(GameContext& ctx) -> void {
                            ? tetris::HoldSupport::Held
                            : tetris::HoldSupport::Discrete;
   m_board.reset(m_board.start_level(), support);
+
+  // ⚠ THE ORDER OF THESE TWO LINES DOES NOT MATTER, and that is worth stating
+  // because it looks like it should. new_game() rebuilds the board as
+  // `tetris::Board(level, m_board.hold_support(), m_seed)` — it reads
+  // hold_support back OFF the board the reset above installed it on — so the
+  // obvious worry is that opening the screen first would carry the
+  // constructor's default Discrete through the dismissal and silently lose DAS
+  // on a kitty terminal.
+  //
+  // It cannot. open() does not touch the board, and both calls are in start(),
+  // so the reset has always happened by the time any dismissal can. Swapping
+  // them was mutation-tested and changes nothing — including on the Held arm,
+  // which test/28tetris-ui now reaches by handing a Tetris a hand-built
+  // GameContext with kitty_keyboard set, rather than through the Shell.
+  //
+  // What WOULD break is moving the reset out of start(), or reading
+  // hold_support() before it. Neither is what this ordering protects, so do not
+  // read the ordering as a guard.
+  m_options.open(kMeta.title, kMeta.options, &ctx);
 }
 
 auto Tetris::new_game(StartLevel level) -> void {
@@ -115,7 +134,17 @@ auto Tetris::new_game(StartLevel level) -> void {
 }
 
 auto Tetris::tick(std::chrono::duration<double> dt) -> void {
+  // ⚠ Above the gate: a diagnostic of the Shell's tick routing, not of
+  // simulated time. Same rule as Snake's.
   ++m_ticks;
+
+  // ⚠ Gravity runs on its own, so without this the piece is falling behind the
+  // pre-start screen and can lock — or top out — before the player has chosen a
+  // start level. Every enter_tetris() dismisses before its first step(), so
+  // deleting this leaves the suite green; the case that catches it ticks with
+  // the screen open, far enough to cross the gravity interval.
+  if (m_options.is_open()) return;
+
   const tetris::TickResult r = m_board.tick(dt);
   announce(r);
   if (r.lines > 0) record_best();
@@ -180,6 +209,18 @@ auto Tetris::best_lines() const -> long long {
 // ── Input ───────────────────────────────────────────────────────────────────
 
 auto Tetris::on_event(const termforge::Event& ev) -> bool {
+  if (m_options.is_open()) {
+    switch (m_options.on_event(ev)) {
+      case OptionsScreen::Reply::Ignored:
+        return false;  // Escape and 'p' stay the Shell's
+      case OptionsScreen::Reply::Consumed:
+        return true;
+      case OptionsScreen::Reply::Dismissed:
+        new_game(static_cast<tetris::StartLevel>(m_options.selected(0)));
+        return true;
+    }
+  }
+
   // Mouse and resize are declined, not swallowed. Tetris hit-tests nothing, and
   // a resize is answered by recomputing the layout in draw().
   if (const auto* key = std::get_if<termforge::KeyEvent>(&ev)) {
@@ -299,6 +340,11 @@ auto Tetris::handle_key(const termforge::KeyEvent& key) -> bool {
 // ── Rendering ───────────────────────────────────────────────────────────────
 
 auto Tetris::draw(termforge::Screen& screen) -> void {
+  if (m_options.is_open()) {
+    m_options.draw(screen);
+    return;
+  }
+
   // ONE Layout per frame. See layout.hpp.
   m_layout = tetris::compute_layout(screen.cols(), screen.rows());
   draw_status(screen);
