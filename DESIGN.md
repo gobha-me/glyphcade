@@ -275,6 +275,23 @@ Every game must be **playable at the bottom tier**. Pixel sprites are an
 enhancement over a glyph fallback that always exists — the same relationship
 `Widget::draw_pixels` has to `Widget::draw`.
 
+**Every widget that draws chrome takes its `BorderStyle` from
+`GameContext::border_style()`, and the push happens at the moment of use** —
+per frame for the selector's four widgets, at the push site for an overlay.
+Not once at construction, and not once at probe time. Two reasons, and the
+second is the one that keeps being relearned:
+
+- A widget built in a constructor **cannot know the tier**; the constructor has
+  no terminal to ask. A one-shot at probe time is no better, because it can
+  never reach a widget built after the first frame.
+- **Styling the widgets you name does not style the widgets they own.**
+  Upstream's defaults are `BorderStyle::Single` and the light scrollbar glyphs —
+  neither of which this application ever *chooses*, since the tier resolves only
+  to `Ascii` or `Rounded`. So an unstyled sub-widget is not merely inconsistent,
+  it is drawing from a family nothing here selected. This has now cost two
+  releases twice: the detail pane's scrollbar (Epic 6) and the pause dialog's
+  frame and title delimiters (gitea #44).
+
 Venice-generated PNG art is decoded via a vendored `stb_image` in term-game.
 TermForge's stdlib-only policy is *its* constraint and correctly keeps decode out
 of `Image`; term-game has no such policy and is the right place for it.
