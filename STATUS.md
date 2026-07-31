@@ -2,7 +2,7 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-07-31** (gitea #36 — the termforge pin moves to v0.6.0)
+**Last updated: 2026-07-31** (gitea #44 — the pause dialog joins the border tier)
 
 ---
 
@@ -441,22 +441,102 @@ throwaway consumer against the install tree resolves term-game 0.13.0 and
 termforge 0.6.0 — and that gap is gitea
 [#46](https://git.gobha.me/xcaliber/term-game/issues/46).
 
-### ⚠ A latent tier bug the new test seam makes reachable
+### The pause dialog was the one widget the tier never reached — fixed
 
-`Probe::paint_overlay_pass` exists because `App::frame_step` restores the
-backdrop before it returns, so **no test in this repo could read an overlay's
-cells** until now. The moment they can, this becomes assertable: the pause
-dialog paints U+2500/U+2502/U+250C box-drawing characters onto a terminal that
-just reported no colour. `Dialog` owns a `Frame` defaulting to
-`BorderStyle::Single` and nothing in `Shell` ever calls `set_border_style`.
-Filed as gitea [#44](https://git.gobha.me/xcaliber/term-game/issues/44).
+gitea [#44](https://git.gobha.me/xcaliber/term-game/issues/44), landed on its
+own after #36. `Dialog` owns a `Frame` privately, that `Frame` defaults to
+`BorderStyle::Single`, and nothing in `Shell` ever called `set_border_style` —
+so the pause dialog painted U+250C/U+2500/U+2502 onto terminals that had just
+reported no colour, in every release since the dialog existed.
 
-Measured at both pins, so it is **pre-existing and not this bump's**: identical
-glyph sets, counts differing only by showing count. Filed as its own issue and
-deliberately **not** fixed here — an unrelated red inside a pin bump destroys
-the "nothing else moved" signal that is the whole point of doing it alone. Same
-story as the detail pane's scrollbar in Epic 6: a latent tier bug found by a
-test *capability*, not by a feature.
+**Found by a test *capability*, not by a feature.** `Probe::paint_overlay_pass`
+exists because `App::frame_step` restores the backdrop before it returns, so
+**no test in this repo could read an overlay's cells** until #36 added it. The
+moment they could, this became assertable. Measured at both pins, so it is
+**pre-existing and not the bump's** — identical glyph sets, counts differing
+only by showing count — which is why it was deliberately left for its own issue:
+an unrelated red inside a pin bump destroys the "nothing else moved" signal that
+is the whole point of doing one alone. Same story as the detail pane's scrollbar
+in Epic 6.
+
+**The fix is one line in `open_pause()`**, beside the `set_default(false)` that
+is there for the same shape of reason:
+
+```cpp
+m_pause.set_border_style(m_ctx.border_style());
+```
+
+⚠ **Not in `sync_capabilities()`.** The `rebuild_list()` call there looks like
+the precedent and is not — `rebuild_list()` sits at probe time because it
+*cannot* be done per frame (`set_items` resets the scroll offset). It is the
+exception the repo was forced into. Every *other* tier-derived style is
+re-pushed at the moment of use; `draw_selector` does it four times a frame. And
+`open_pause()` reads `m_ctx`, never `driver()`, so it is safe at any time —
+whereas a one-shot at probe time could never reach an overlay built after the
+first frame. The rule this generalises is now in DESIGN.md's "Graphics tiers".
+
+**Two things the issue did not know.**
+
+1. **The title delimiters leak from the same table.** `Frame::draw` takes
+   `title_left`/`title_right` out of `border_glyphs(style)` too, so the dialog
+   read `┤ Paused ├` at the floor — not just a box-drawn ring.
+2. **It was wrong at the colour tier as well**, as a consistency defect.
+   `sync_capabilities` only ever answers `Ascii` or `Rounded`, so **`Single` is a
+   family this application never chooses** — the dialog drew `┌┐└┘` while every
+   other frame drew `╭╮╰╯`. That is also what makes `┌` a *tier-independent*
+   discriminator in a pty: its only possible source anywhere in the binary is an
+   unstyled `Dialog`.
+
+**The audit** (the issue's second scope bullet) — `set_border_style` is a
+complete fix, and complete for the whole `Dialog` family, not just `Confirm`:
+
+| surface | tier-sensitive? |
+|---|---|
+| `Dialog`'s frame ring | **yes** — the bug |
+| `Dialog`'s title chrome | **yes** — `┤ Paused ├`, not in the issue |
+| interior fill, body text | no — colour only; our text is ASCII and `wrap_to_width` inserts nothing |
+| `ConfirmDialog`'s two `Button`s | **no** — `fill_rect` + centred label, no `BorderStyle`, no glyph table; only axis is colour |
+| button labels | no — ASCII `[ ]` brackets, ASCII labels |
+| scrollbar / `MarkGlyphs` | `Dialog` owns neither |
+
+**pty counts**, same capture driven against the pre-fix and fixed binaries — the
+paired evidence a single arm cannot produce. Controls first (`Paused` and
+`Resume` both present in all four captures, or every count below is vacuous):
+
+| capture | ┌ | ┐ | └ | ┘ | ╭ | ┤ |
+|---|---|---|---|---|---|---|
+| bare, pre-fix | 1 | 1 | 1 | 1 | 0 | 1 |
+| **bare, fixed** | **0** | **0** | **0** | **0** | 0 | **0** |
+| colour, pre-fix | 1 | 1 | 1 | 1 | 7 | 8 |
+| **colour, fixed** | **0** | **0** | **0** | **0** | **8** | 8 |
+
+At the bare tier the dialog was the *only* source of all four `Single` corners —
+the game underneath draws `+-|` — and the whole session is now 7-bit by the
+`LC_ALL=C grep -P '[\x80-\xff]'` sweep. At the colour tier **`╭` goes 7 → 8**:
+the positive half, showing the dialog did not merely stop drawing but joined the
+rounded family. `┤` and `│` correctly do *not* move there, because `Rounded`
+shares both with `Single`; only the corners differ.
+
+**Mutations**, three rows:
+
+| mutation | result |
+|---|---|
+| `set_border_style(Single)` | RED — `test/11selector` |
+| `set_border_style(Rounded)` hardcoded | RED — `test/11selector` |
+| `set_border_style(Ascii)` hardcoded | **GREEN** — the blind spot, named below |
+
+⚠ **The Rounded arm is pty-only, and the headless cases pin the tier's OUTPUT
+rather than the fact that it was derived.** At the ASCII tier
+`set_border_style(m_ctx.border_style())` and a hardcoded
+`set_border_style(Ascii)` are indistinguishable, and no cheap seam changes that:
+`test_wire_headless` is private, hardcodes the `FallbackDriver`, and that
+driver's `capabilities()` is an all-false literal, so `TERM=` in a ctest
+environment does nothing. The only seam that would work is a private virtual
+capability probe on `Shell` — real production code, and out of scope for a
+focused fix. Filed as its own issue; it would unlock the `▸` marker, the
+`↑↓ select` hint row, the *absence* of the colour notice, and the notice-ordering
+contract as well, all of which are pty-only today. Trap 3 in `test/11selector`
+records the limit at the site.
 
 ### A dependency reached into, and nothing recorded it
 
