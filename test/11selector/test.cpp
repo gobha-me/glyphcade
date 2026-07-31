@@ -7,7 +7,7 @@
 // feeds raw bytes through test_pump, so the escape-sequence decoder is covered
 // at least once.
 //
-// ⚠ Five traps for whoever extends this file:
+// ⚠ Six traps for whoever extends this file:
 //
 //   1. Dialog::begin_result()'s latch clears only on the next draw(). A test
 //      that pauses, answers, and pauses again without running a frame in
@@ -37,11 +37,21 @@
 //      until a frame has rendered), coordinates before the first step() are
 //      always outside. Use kMarkX/kRow0 and step() first, as the wheel and
 //      click cases below do.
+//   6. AFTER step() THE SCREEN HOLDS NO OVERLAY. App::frame_step draws the
+//      overlay stack, present()s it, and then restore_backdrop()s every cell
+//      back from a snapshot taken before the dialog was drawn — upstream's own
+//      comment on that line is "the overlay pass leaves no trace behind". So
+//      row_text() after a pause shows the game underneath, and a case that
+//      searched it for dialog text would assert nothing and pass. Nothing in
+//      this file could read an overlay's cells until Probe::paint_overlay_pass
+//      below. Use it, and mind that it leaves the Screen dimmed and overlaid
+//      until the next step().
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <termforge/core/types.hpp>
 
@@ -75,6 +85,20 @@ class Probe final : public Shell {
   auto step(int frames = 1, int cols = 60, int rows = 20) -> void {
     test_run_frames(frames, cols, rows, &m_sink);
   }
+
+  // Draw the overlay stack into the Screen and LEAVE IT THERE — see trap 6.
+  // This is the only way to read a dialog's cells, because frame_step undoes
+  // the overlay pass before it returns.
+  //
+  // ⚠ Not a shortcut for step(): it runs no tick and no on_render, so the
+  // frame underneath is whatever the last step() left. Call step() first, or
+  // the dialog is composited over a blank screen.
+  //
+  // render_overlays is upstream's documented test seam ("protected so a test
+  // can drive the draw pass without a tty") and is protected at every tag from
+  // v0.2.2 to v0.6.0, which is what makes the red-verify below buildable.
+  using Shell::render_overlays;
+  auto paint_overlay_pass() -> void { render_overlays(screen()); }
 
  private:
   std::string m_sink;
@@ -165,6 +189,48 @@ class Probe final : public Shell {
   std::string out;
   for (int x = 0; x < app.screen().cols(); ++x) out += cell_text(app, x, y);
   return out;
+}
+
+// Where a word sits, one grapheme per cell, as write_text lays it out.
+//
+// ⚠ Column-exact, and that is why it does not go through row_text(): blank
+// cells contribute nothing there (see its comment), so an offset into that
+// string is not a column index — and a dialog row is mostly gaps.
+//
+// Returns EVERY match rather than the first, so a caller can require there is
+// exactly one. On an overlay pass a second hit would mean the backdrop is
+// showing through as well as the dialog, which is a different bug wearing the
+// same assertion.
+struct Hit {
+  int x{}, y{};
+};
+
+[[nodiscard]] auto find_word(Probe& app, std::string_view word)
+    -> std::vector<Hit> {
+  std::vector<Hit> hits;
+  auto& s = app.screen();
+  const int n = static_cast<int>(word.size());
+  for (int y = 0; y < s.rows(); ++y) {
+    for (int x = 0; x + n <= s.cols(); ++x) {
+      bool all = true;
+      for (int i = 0; i < n && all; ++i) {
+        all = s.at(x + i, y).text == std::string(1, word[static_cast<std::size_t>(i)]);
+      }
+      if (all) hits.push_back(Hit{x, y});
+    }
+  }
+  return hits;
+}
+
+// The cell a button's label starts in — which carries the button's colours,
+// because Button::draw fill_rect()s its whole rect in (fg, bg) before writing
+// the label in the same pair. Read after paint_overlay_pass(), where the
+// dialog is drawn AFTER the backdrop dim, so these are the undimmed values.
+[[nodiscard]] auto button_cell(Probe& app, std::string_view label)
+    -> termforge::Cell {
+  const auto hits = find_word(app, label);
+  REQUIRE(hits.size() == 1);
+  return app.screen().at(hits[0].x, hits[0].y);
 }
 
 // Every byte of every cell on the screen must be 7-bit. Same helper, same
@@ -463,6 +529,127 @@ TEST_CASE("Escape resumes from pause", "[selector][pause]") {
   REQUIRE(app.state() == Shell::State::InGame);
   REQUIRE(app.overlay_count() == 0);
   REQUIRE(app.current_game() != nullptr);
+}
+
+// ── the pause dialog's press flash (gitea #36) ───────────────────────────────
+//
+// Two cases, and they are deliberately NOT one. The pin bump v0.2.2 -> v0.6.0
+// crosses two upstream tags that both touch this, and the only way to say which
+// of them did what is to make the two claims fail independently — a REQUIRE
+// aborts its case, so a single case can only ever report the first one.
+//
+// The mechanism. Activating a ConfirmDialog's button arms a press flash and
+// closes the dialog in the SAME dispatch, so the flash never renders in the
+// showing that armed it. What happens to it afterwards is what moved:
+//
+//              first paint of showing 2   second paint   what clears it
+//   v0.2.2     LIT                        clear          draw(), after painting
+//   v0.4.0     LIT                        LIT            nothing — see below
+//   v0.6.0     clear                      clear          reset_transient()
+//
+// v0.4.0 (#69) rebuilt the flash as a wall-clock countdown in Widget::on_tick.
+// App keeps no widget registry and Shell::on_tick forwards only to m_game, so
+// nothing ticks m_pause and the countdown never runs: the flash becomes
+// permanent for the life of the process. v0.5.0 (#122) added
+// Widget::reset_transient(), which Dialog::draw() calls at its per-showing
+// boundary BEFORE anything paints, and Button implements by zeroing the flash.
+//
+// ⚠ What the two red arms actually proved, and it corrects the issue. gitea #36
+// assumed v0.4.0 introduces this. It does not — v0.2.2, the pin we ship TODAY,
+// already paints one frame of a wrongly-lit Resume button every time the pause
+// dialog re-opens. v0.4.0 would have made that permanent; v0.5.0 cures both.
+// So the bump does not merely avoid a regression, it fixes a live defect, and
+// that is the one thing this bump buys beyond v0.3.0's draw_image contract.
+//
+// We rely on the boundary rather than forwarding ticks — see the comment at
+// Shell::on_tick's pause gate for why — so these cases pin upstream's BEHAVIOUR
+// in our tree rather than trusting the doc comment that describes it.
+//
+// ⚠ Neither case can go red for ADDING tick_widgets(dt, {&m_pause}); that is
+// harmless and stays green. Only the comment at the call site guards that.
+
+namespace {
+
+// Drive to the first paint of a second showing of the pause dialog, with the
+// Resume button having been activated in the first. Returns showing 1's cells
+// so a case can assert against the same button before it was ever pressed.
+struct PauseSample {
+  termforge::Cell resume, menu;
+};
+
+auto pause_activate_and_reopen(Probe& app) -> PauseSample {
+  enter_game(app);
+  app.step();  // a real game frame for the dialog to composite over — trap 6
+
+  // ── showing 1: the control. Nothing has been activated yet.
+  app.dispatch_event(ch(U'p'));
+  REQUIRE(app.state() == Shell::State::Paused);
+  app.paint_overlay_pass();
+
+  const PauseSample before{button_cell(app, "Resume"),
+                           button_cell(app, "Menu")};
+
+  // ⚠ The sanity guard, and both cases are worthless without it. It proves the
+  // reader returns a real, state-dependent colour rather than one constant for
+  // every cell — Shell::open_pause calls set_default(false), so Resume is
+  // focused and Menu is not, and Button::draw paints those differently. Drop
+  // this and everything below passes against a screen of blank Cells.
+  REQUIRE(before.resume.bg != before.menu.bg);
+
+  // ⚠ ENTER, not 'y'. ConfirmDialog::on_event answers Y/N *before* the focus
+  // ring and calls finish() directly, and Escape goes through on_escape() —
+  // neither ever reaches Button::on_event, so neither arms the flash these
+  // cases are about. Every other pause case in this file uses one of those two
+  // and is structurally blind to it. Enter goes through the ring to the focused
+  // button, which set_default(false) made Resume.
+  app.dispatch_event(key(termforge::Key::Enter));
+  REQUIRE(app.state() == Shell::State::InGame);
+  REQUIRE(app.overlay_count() == 0);
+
+  // Trap 1: the result latch clears on the next draw, so the second showing
+  // needs a frame between it and the answer.
+  app.step();
+
+  // ── showing 2: same dialog, same focus, one activation ago.
+  app.dispatch_event(ch(U'p'));
+  REQUIRE(app.state() == Shell::State::Paused);
+  app.paint_overlay_pass();
+  return before;
+}
+
+}  // namespace
+
+// The contract itself. Red at v0.2.2 AND v0.4.0, green from v0.5.0.
+TEST_CASE("a dialog button is not still lit at the next showing",
+          "[selector][pause][render]") {
+  Probe app;
+  const PauseSample before = pause_activate_and_reopen(app);
+
+  // ⚠ A differential, never a comparison against upstream's pressed palette.
+  // m_pressed_fg/m_pressed_bg are private defaults upstream is free to retheme,
+  // and a case that hardcoded them would fail on a theme change while the
+  // behaviour was still correct. Two showings of the same button in the same
+  // focus state must look the same; what they look like is not our business.
+  REQUIRE(button_cell(app, "Resume").bg == before.resume.bg);
+  REQUIRE(button_cell(app, "Resume").fg == before.resume.fg);
+
+  // And the unpressed neighbour did not move either, which distinguishes "the
+  // flash was cleared" from "the whole dialog is being drawn in one colour".
+  REQUIRE(button_cell(app, "Menu").bg == before.menu.bg);
+}
+
+// The duration, which is a different claim. Green at v0.2.2 — draw() cleared
+// the flag right after painting with it, so the stale flash cost exactly one
+// frame — and red at v0.4.0, where nothing clears it at all. This is the case
+// that says v0.4.0 changed the SEVERITY rather than introducing the bug, and
+// without it the two red arms above are indistinguishable.
+TEST_CASE("a stale press flash does not outlive one paint",
+          "[selector][pause][render]") {
+  Probe app;
+  const PauseSample before = pause_activate_and_reopen(app);
+
+  app.paint_overlay_pass();  // the second paint of the same showing
+  REQUIRE(button_cell(app, "Resume").bg == before.resume.bg);
 }
 
 TEST_CASE("the pause dialog's Menu answer returns to the selector",
