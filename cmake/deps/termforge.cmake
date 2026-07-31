@@ -24,7 +24,7 @@
 # HTTPS, not SSH: github.com has no key on the dev container or on CI runners.
 # git.gobha.me is the SSH-only forge; github.com is not.
 
-# 0.2.2, not 0.2 — and the patch level here is load-bearing, not pedantry.
+# 0.6.0, not 0.6 — and the patch level here is load-bearing, not pedantry.
 #
 # termforge's package version file is SameMinorVersion: it accepts a candidate
 # whose major.minor match AND whose version is >= the one requested. Asking for
@@ -67,15 +67,31 @@
 # scrollbar — so this is now the SECOND time that class changed size under us.
 # Treat "ListWidget grew a member" as the expected case, not the surprise.
 #
-# ⚠ Crossing 0.1 → 0.2 makes SameMinorVersion cut the other way, and it is worth
+# ⚠ v0.4.0 is the THIRD time, and it is the one that would not have been found
+# by looking at the widgets we name. Button lost a bool and gained two
+# std::chrono::duration<double>, so sizeof(Button) grew — and we do not hold a
+# Button. We hold ConfirmDialog m_pause, which holds two of them, so
+# sizeof(Shell) changed through a class our source never mentions. Grepping for
+# the widget types in shell.hpp is NOT sufficient to audit this floor; the
+# transitive members count, and they are only visible in upstream's headers.
+#
+# ⚠ And v0.4.0/v0.5.0 changed the vtable by INSERTION, not append. Widget's new
+# on_tick and reset_transient land at slots 3 and 4, ahead of pixel_regions,
+# draw_pixels, hit_test, hit_test_tree, set_focused and focusable — six slots
+# shift. A mixed-version consumer does not get a missing symbol it could
+# diagnose; it gets hit_test dispatched into draw_pixels. "Two virtuals were
+# added" reads as benign and is not.
+#
+# ⚠ Crossing a minor makes SameMinorVersion cut the other way, and it is worth
 # saying out loud because it is the reason all three files move in ONE commit:
-# asking for 0.2.2 no longer accepts any 0.1.x at all (which is what we want —
-# the wheel semantics differ, see below), but by the same rule anything still
-# asking for 0.1.15 silently stops matching a 0.2.x install. The three places
-# are cmake/deps/termforge.cmake (here), cmake/project-config.cmake.in, and
+# asking for 0.6.0 no longer accepts any 0.2.x at all (which is what we want —
+# the ABI differs, see above), but by the same rule anything still asking for
+# 0.2.2 silently stops matching a 0.6.x install. The three places are
+# cmake/deps/termforge.cmake (here), cmake/project-config.cmake.in, and
 # STATUS.md. Two of them are consumer-visible; a half-done bump is a package
-# that resolves on the developer's machine and nowhere else.
-find_package(termforge 0.2.2 QUIET CONFIG)
+# that resolves on the developer's machine and nowhere else. This bump crosses
+# four minors at once (0.2 → 0.6), so the rule applies four times over.
+find_package(termforge 0.6.0 QUIET CONFIG)
 
 if (termforge_FOUND)
   message(STATUS "termforge: ${termforge_VERSION} via find_package")
@@ -167,16 +183,89 @@ else ()
   #            STATUS.md lists as Epic 6's (Tetris) blocker: hold-to-move stops
   #            being OS auto-repeat guesswork.
   #
+  #  ── gitea #36 moves the pin v0.2.2 → v0.6.0. Six tags, not the four the
+  #     issue describes; it was written when upstream was at v0.5.1. ──
+  #
+  #   v0.3.0 — draw_image(Rect cells, …), preferred_pixel_extent(), draw_pixels
+  #            returns a borrowed const Image* and takes an Extent, and a new
+  #            struct Extent separates pixels from cells (#83/#84). Breaking
+  #            ONLY for a TerminalDriver implementor or a draw_pixels override.
+  #            We are neither — nothing in src/, include/ or test/ derives from
+  #            a termforge type except Shell : App — so it misses entirely.
+  #            ⚠ It is also the tag gitea #39 (art pipeline) is blocked on: at
+  #            v0.2.2 draw_image was handed an Image's PIXEL dims and used them
+  #            as a CELL count, so an atlas rendered as one flat colour per
+  #            cell. Generating art before this tag was generating art we could
+  #            not draw. That is what this bump buys, and it is the only thing
+  #            it buys.
+  #
+  #  v0.4.0 + v0.5.0 — ⚠ READ THESE AS ONE. Taken apart they are a regression
+  #            and an unrelated feature; taken together they are inert, and the
+  #            reason the pin may cross both at once.
+  #            v0.4.0 (#69) made Widget::on_tick(dt) the home of animation, and
+  #            Button's press flash became a WALL-CLOCK countdown ticked there —
+  #            where at v0.2.2 Button::draw() cleared m_pressed after one frame
+  #            and needed no tick at all. App keeps no widget registry and
+  #            Shell::on_tick forwards only to m_game, so nothing ticks our
+  #            ConfirmDialog m_pause. It closes itself on activation, so the
+  #            flash is armed and the overlay popped in the same dispatch and
+  #            never renders — and m_flash_left would then stay above zero FOR
+  #            THE REST OF THE PROCESS. The next pause opens with the button you
+  #            last pressed lit, permanently. No compile error, no failing test.
+  #            v0.5.0 (#122) added Widget::reset_transient(), which Dialog::draw
+  #            calls at its per-showing boundary and Button implements by
+  #            zeroing the flash. That is precisely the cure.
+  #            ⚠ So gitea #36's table is wrong on BOTH rows — it says v0.4.0
+  #            bites only "if we ever hold" a ProgressBar or Button, and that
+  #            v0.5.0 does not reach us. And the audit it prescribes — grep for
+  #            those two type names — comes back CLEAN, because the Buttons are
+  #            inside ConfirmDialog and our source never names them. See the ABI
+  #            note above: the same blind spot, twice.
+  #            ⚠ We do NOT forward ticks to m_pause. See the comment in
+  #            src/lib/arcade/shell.cpp at the on_tick pause gate for why, and
+  #            test/11selector for the case that pins the behaviour we are
+  #            relying on instead of relying on upstream's doc comment.
+  #
+  #   v0.5.1 — container overloads for route_mouse/tick_widgets, and route_mouse
+  #            now skips null entries (#123). Our one call site,
+  #            route_mouse(*mouse, {&m_list}) in shell.cpp, passes a braced list
+  #            of one non-null pointer: the initializer_list overload still
+  #            exists and still wins, so this is additive and inert here.
+  #   v0.5.2 — Screen::fill_rect clips through Rect::intersect instead of
+  #            computing x + w in int, which wrapped for a rect starting near
+  #            INT_MAX and silently dropped a rect that covered the screen
+  #            (#102). Our three call sites (twenty48.cpp, snake.cpp) pass small
+  #            in-bounds values, so the new arithmetic is identical for every
+  #            input we produce. A latent-overflow fix we cannot reach.
+  #   v0.6.0 — TabBar (#22), which we do not use, and MarkGlyphs grew
+  #            arrow_left/arrow_right (‹ ›) so all()'s extent went 9 → 11 and
+  #            sizeof(MarkGlyphs) changed. We call mark_glyphs() in
+  #            options_screen.cpp and read .selector BY NAME, never all() and
+  #            never an aggregate initialiser, so the growth is source- and
+  #            behaviour-compatible. ⚠ The options screen's cycler hardcodes
+  #            "<" and ">", which is exactly what the new fields are for —
+  #            correct at the ASCII tier and wrong above it. Its own issue, not
+  #            this bump's cargo, on the v0.1.16 precedent above.
+  #
   # Pin a tag, not a SHA: the find_package path above is version-gated, so both
   # acquisition paths should describe the same thing in the same vocabulary.
   #
-  # ⚠ This variable is also the red-verify seam. `cmake -B build-oldpin
-  # -DTERMFORGE_TAG=v0.1.15` builds the suite against the PREVIOUS pin —
-  # find_package(0.2.2) misses, FetchContent takes the override — which is how
-  # test/11selector's wheel cases were shown to fail before this bump rather
-  # than passing vacuously after it.
+  # ⚠ This variable is also the red-verify seam, and #36 is where the reflex
+  # from #24 — "build against the PREVIOUS pin" — gives the wrong answer.
+  # v0.2.2 is GREEN for the flash case: that is the tag where draw() cleared the
+  # flag, i.e. the tag where the bug does not exist yet. The defect lives only
+  # in v0.4.0 and v0.4.1, between the tag that armed it and the tag that cured
+  # it, so the seam is:
+  #
+  #   cmake -B build-oldpin -DTERMFORGE_TAG=v0.4.0 -DCMAKE_CXX_FLAGS=-Werror
+  #
+  # find_package(0.6.0) misses a 0.4.x, so FetchContent takes the override.
+  # Run the v0.2.2 arm too — a red-verify that only shows the new case failing
+  # somewhere does not distinguish "this pins a real defect" from "this pins the
+  # old pin". Both arms are the evidence. TERMFORGE_URI above accepts a local
+  # path, so neither arm needs the network.
   if (NOT TERMFORGE_TAG)
-    set(TERMFORGE_TAG v0.2.2)
+    set(TERMFORGE_TAG v0.6.0)
   endif ()
 
   # termforge's own options already default to PROJECT_IS_TOP_LEVEL, so as a
