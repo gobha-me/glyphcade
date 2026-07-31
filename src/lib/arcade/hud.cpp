@@ -22,9 +22,19 @@ auto draw_status_row(termforge::Screen& screen, int y,
   //
   // It stays because that upstream clamp is NOT in write_text's documented
   // contract — the header promises clipping at the RIGHT edge and says nothing
-  // about a negative x — and gitea #36 moves the pin v0.2.2 -> v0.5.1 next. A
-  // guard whose only defence is an unwritten implementation detail of the
-  // version we happen to be pinned to is exactly what a bump removes silently.
+  // about a negative x. A guard whose only defence is an unwritten
+  // implementation detail of the version we happen to be pinned to is exactly
+  // what a bump removes silently.
+  //
+  // ⚠ gitea #36 was named here as the event to re-check this against, and it
+  // has now happened: the pin crossed six tags to v0.6.0 (not the v0.5.1 this
+  // comment used to predict). Re-checked at that bump, and BOTH halves still
+  // hold — `screen.cpp` still does `start_x = x < 0 ? 0 : x`, byte-identical to
+  // v0.2.2's, and `screen.hpp` still promises only the right edge. So the guard
+  // is still unkillable, still undefended by the contract, and still kept. Four
+  // minor versions of the dependency is the strongest evidence available that
+  // this is de-facto stable and de-jure unpromised, which is precisely the
+  // regime a local guard is for.
   const int word_x =
       std::max(0, screen.cols() - static_cast<int>(word.size()));
   screen.write_text(word_x, y, word, word_fg, bg);
