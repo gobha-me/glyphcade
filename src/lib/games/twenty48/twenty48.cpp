@@ -1,11 +1,13 @@
 #include <termgame/games/twenty48/twenty48.hpp>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <string>
 
 #include <termforge/widgets/theme.hpp>
 
+#include <termgame/arcade/hud.hpp>
 #include <termgame/games/twenty48/glyphs.hpp>
 
 namespace termgame {
@@ -310,7 +312,6 @@ auto Twenty48::draw_status(termforge::Screen& screen) -> void {
     case twenty48::State::Playing:
       break;
   }
-  const int word_x = std::max(0, screen.cols() - static_cast<int>(word.size()));
 
   // ⚠ THE BUDGET is what stops the two halves of this row colliding, and it is
   // the load-bearing part. Screen::write_text clips at the screen edge but NOT
@@ -329,29 +330,23 @@ auto Twenty48::draw_status(termforge::Screen& screen) -> void {
   // wrong, and the word must win: at the bottom tier it is the ONLY carrier of
   // win and loss, whereas a clipped counter is merely ugly. So this is a chosen
   // failure mode, not a second guard — do not read it as one.
-  std::string left;
-  const int budget = word_x - 2;  // one blank column between the two
-  // ⚠ The ORDER of this list is the priority order, because the loop below
-  // appends until a field does not fit and then stops. "record" goes last on
-  // purpose: it is the least urgent thing on the row, and at this game's own
-  // 29-column minimum the budget is 20 and "moves" is ALREADY being dropped, so a
-  // fourth field is only ever visible on a wide terminal.
+  // ⚠ The budget arithmetic that used to live here is hud::draw_status_row.
+  // Extracted for COVERAGE, not tidiness: killing the "delete the budget"
+  // mutation needs a sweep of widths narrower than this game's own floor, and
+  // writing that four times is why it went green in two consecutive epics.
+  // test/33options sweeps it once, against the helper.
   //
-  // ⚠ And it is labelled "record", not "best", because "best" is already spent on
-  // the live maximum tile one field to the left — and because test/23's
-  // whole-fields check keys off find(label), so a label that is a substring of
-  // another would make that assertion match the wrong field.
-  for (const std::string& field :
-       {"score " + num(m_board.score()), "best " + num(m_board.best_tile()),
-        "moves " + num(m_board.moves()), "record " + num(best_score())}) {
-    const std::string sep = left.empty() ? "" : "   ";
-    if (static_cast<int>(left.size() + sep.size() + field.size()) > budget) {
-      break;
-    }
-    left += sep + field;
-  }
-  screen.write_text(0, m_layout.status_y, left, termforge::theme::kFg, bg);
-  screen.write_text(word_x, m_layout.status_y, word, fg, bg);
+  // ⚠ The ORDER of this list is still the priority order -- the helper appends
+  // until a field does not fit and then stops -- and no label may be a
+  // substring of another, because the whole-fields checks key off find(label).
+  const std::array<std::string, 4> fields{
+      "score " + num(m_board.score()),
+      "best " + num(m_board.best_tile()),
+      "moves " + num(m_board.moves()),
+      "record " + num(best_score()),
+  };
+  hud::draw_status_row(screen, m_layout.status_y, fields, word,
+                       termforge::theme::kFg, fg, bg);
 }
 
 auto Twenty48::draw_hints(termforge::Screen& screen) -> void {

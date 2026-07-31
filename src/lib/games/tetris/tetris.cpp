@@ -1,11 +1,14 @@
 #include <termgame/games/tetris/tetris.hpp>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <string>
 #include <string_view>
 
 #include <termforge/widgets/theme.hpp>
+
+#include <termgame/arcade/hud.hpp>
 
 namespace termgame {
 
@@ -375,8 +378,6 @@ auto Tetris::draw_status(termforge::Screen& screen) -> void {
   // red "game over" is an invisible game over.
   const std::string word =
       m_board.state() == tetris::State::ToppedOut ? "TOPPED OUT" : "PLAYING";
-  const int word_x = std::max(0, screen.cols() - static_cast<int>(word.size()));
-  screen.write_text(word_x, m_layout.status_y, word, fg, bg);
 
   // ⚠ THE BUDGET is what stops the two halves of this row colliding, and it is
   // the load-bearing part: Screen::write_text clips at the screen edge but NOT
@@ -393,20 +394,25 @@ auto Tetris::draw_status(termforge::Screen& screen) -> void {
   // ⚠ No label here may be a substring of another. The whole-fields check keys
   // off find(label), so "line" alongside "lines" would match the wrong field
   // and pass while the row was broken.
-  std::string left;
-  const int budget = word_x - 2;
-  for (const std::string& field :
-       {"score " + num(m_board.score()), "lines " + num(m_board.lines()),
-        "level " + num(m_board.level()),
-        "start " + std::string(level_label(m_board.start_level())),
-        "record " + num(best_score()), "longest " + num(best_lines())}) {
-    const std::string sep = left.empty() ? "" : "   ";
-    if (static_cast<int>(left.size() + sep.size() + field.size()) > budget) {
-      break;
-    }
-    left += sep + field;
-  }
-  screen.write_text(0, m_layout.status_y, left, fg, bg);
+  // ⚠ The budget arithmetic that used to live here is hud::draw_status_row.
+  // Extracted for COVERAGE, not tidiness: killing the "delete the budget"
+  // mutation needs a sweep of widths narrower than this game's own floor, and
+  // writing that four times is why it went green in two consecutive epics.
+  // test/33options sweeps it once, against the helper.
+  //
+  // ⚠ The ORDER of this list is still the priority order -- the helper appends
+  // until a field does not fit and then stops -- and no label may be a
+  // substring of another, because the whole-fields checks key off find(label).
+  const std::array<std::string, 6> fields{
+      "score " + num(m_board.score()),
+      "lines " + num(m_board.lines()),
+      "level " + num(m_board.level()),
+      "start " + std::string(level_label(m_board.start_level())),
+      "record " + num(best_score()),
+      "longest " + num(best_lines()),
+  };
+  hud::draw_status_row(screen, m_layout.status_y, fields, word,
+                       fg, fg, bg);
 }
 
 auto Tetris::draw_well(termforge::Screen& screen) -> void {

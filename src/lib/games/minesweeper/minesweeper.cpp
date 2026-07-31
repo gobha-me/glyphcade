@@ -1,12 +1,14 @@
 #include <termgame/games/minesweeper/minesweeper.hpp>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <string>
 #include <variant>
 
 #include <termforge/widgets/theme.hpp>
 
+#include <termgame/arcade/hud.hpp>
 #include <termgame/games/minesweeper/glyphs.hpp>
 
 namespace termgame {
@@ -396,7 +398,6 @@ auto Minesweeper::draw_status(termforge::Screen& screen) -> void {
       word = "PLAYING";
       break;
   }
-  const int word_x = std::max(0, screen.cols() - static_cast<int>(word.size()));
 
   // ⚠ THIS BUDGET IS 2048's, adopted here rather than re-argued — the reasoning
   // is at the top of twenty48.cpp's draw_status() and it applies unchanged:
@@ -409,20 +410,23 @@ auto Minesweeper::draw_status(termforge::Screen& screen) -> void {
   // collide — so adding a fourth field here would have made "YOU WIN" disappear
   // on a narrow terminal, which is the one thing on this row that must survive.
   // The word now wins by construction instead of by luck about widths.
-  std::string left;
-  const int budget = word_x - 2;  // one blank column between the two
-  for (const std::string& field :
-       {"MINES " + pad3(m_board.mines_remaining()),
-        "TIME " + pad3(m_board.seconds()), std::string(m_board.name()),
-        "BEST " + best_time()}) {
-    const std::string sep = left.empty() ? "" : "   ";
-    if (static_cast<int>(left.size() + sep.size() + field.size()) > budget) {
-      break;
-    }
-    left += sep + field;
-  }
-  screen.write_text(0, m_layout.status_y, left, termforge::theme::kFg, bg);
-  screen.write_text(word_x, m_layout.status_y, word, fg, bg);
+  // ⚠ The budget arithmetic that used to live here is hud::draw_status_row.
+  // Extracted for COVERAGE, not tidiness: killing the "delete the budget"
+  // mutation needs a sweep of widths narrower than this game's own floor, and
+  // writing that four times is why it went green in two consecutive epics.
+  // test/33options sweeps it once, against the helper.
+  //
+  // ⚠ The ORDER of this list is still the priority order -- the helper appends
+  // until a field does not fit and then stops -- and no label may be a
+  // substring of another, because the whole-fields checks key off find(label).
+  const std::array<std::string, 4> fields{
+      "MINES " + pad3(m_board.mines_remaining()),
+      "TIME " + pad3(m_board.seconds()),
+      std::string(m_board.name()),
+      "BEST " + best_time(),
+  };
+  hud::draw_status_row(screen, m_layout.status_y, fields, word,
+                       termforge::theme::kFg, fg, bg);
 }
 
 // ⚠ "---" for no record, NOT "000", and the asymmetry with 2048's `record 0` is
