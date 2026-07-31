@@ -33,11 +33,19 @@
 #include <termforge/widgets/frame.hpp>
 
 #include <termgame/arcade/game.hpp>
+#include <termgame/arcade/options_screen.hpp>
 #include <termgame/games/tetris/board.hpp>
 #include <termgame/games/tetris/glyphs.hpp>
 #include <termgame/games/tetris/layout.hpp>
 
 namespace termgame {
+
+// ⚠ Namespace scope, not inline in kMeta. See arcade/game_meta.hpp.
+inline constexpr OptionSpec kTetrisOptions[]{
+    {.label = "Start level",
+     .choices = tetris::kStartLevelNames,
+     .default_index = 0},
+};
 
 class Tetris final : public Game {
  public:
@@ -57,6 +65,10 @@ class Tetris final : public Game {
       .icon = "\U0001F9F1",
       // The first non-Legacy declaration in the repo. See the header note.
       .keyboard = termforge::KeyboardMode::Enhanced,
+      // ⚠ AFTER .keyboard, because designated initialisers must follow
+      // declaration order and `options` is declared last in GameMeta. Tetris is
+      // the game that made that ordering matter.
+      .options = kTetrisOptions,
   };
 
   Tetris();
@@ -97,6 +109,9 @@ class Tetris final : public Game {
   auto draw_piece_box(termforge::Screen& screen, int x, int y,
                       const tetris::Piece* p) -> void;
 
+  // The pre-start screen (gitea #38). A member the game consults, not a Shell
+  // state — see arcade/options_screen.hpp.
+  OptionsScreen m_options{};
   GameContext* m_ctx{nullptr};
   tetris::Board m_board;
   tetris::Layout m_layout{};

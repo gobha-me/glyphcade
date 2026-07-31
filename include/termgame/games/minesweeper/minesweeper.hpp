@@ -37,10 +37,23 @@
 #include <termgame/arcade/context.hpp>
 #include <termgame/arcade/game.hpp>
 #include <termgame/arcade/game_meta.hpp>
+#include <termgame/arcade/options_screen.hpp>
 #include <termgame/games/minesweeper/board.hpp>
 #include <termgame/games/minesweeper/layout.hpp>
 
 namespace termgame {
+
+// ⚠ Namespace scope, not inline in kMeta. OptionSpec::choices is a span, and a
+// choices array written inside the initialiser below would be a temporary the
+// span outlives — compiling cleanly and dangling for the whole run. See
+// OptionSpec in arcade/game_meta.hpp.
+inline constexpr OptionSpec kMinesweeperOptions[]{
+    {.label = "Level",
+     .choices = minesweeper::kLevelNames,
+     // Easy, which is exactly what the constructor already picked. The screen
+     // changes WHEN you choose, not what you get by default.
+     .default_index = 0},
+};
 
 class Minesweeper final : public Game {
  public:
@@ -56,6 +69,7 @@ class Minesweeper final : public Game {
       // no variation selector, so measured width and drawn width agree. The
       // registry static_asserts on this via icon_is_safe().
       .icon = "\U0001F4A3",
+      .options = kMinesweeperOptions,
   };
 
   Minesweeper();
@@ -138,6 +152,10 @@ class Minesweeper final : public Game {
   auto draw_too_small(termforge::Screen& screen) -> void;
 
   GameContext* m_ctx{nullptr};
+  // The pre-start screen (gitea #38). A member the game consults, NOT a Shell
+  // state: Shell::state() is InGame from the moment Enter is pressed in the
+  // menu, which is why entering a game still means what it did.
+  OptionsScreen m_options{};
   minesweeper::Level m_level{minesweeper::Level::Easy};
   minesweeper::Board m_board;
   minesweeper::Coord m_cursor{};
