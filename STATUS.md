@@ -2,9 +2,10 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-07-31** (gitea #44 — the pause dialog joins the border
-tier; plus the first maintainer feel report, see
-[Feel and the container](#feel-and-the-container))
+**Last updated: 2026-07-31** (gitea #45 — the options cycler joins the glyph
+tier, and the suite renders above the ASCII tier for the first time; before it
+#44 — the pause dialog joins the border tier; plus the first maintainer feel
+report, see [Feel and the container](#feel-and-the-container))
 
 ---
 
@@ -288,6 +289,47 @@ Several `15minesweeper-ui` cases steer with
 test**. With the options screen up the arrows move a cycler instead of the
 cursor, the predicate never becomes true, and `ctest` span for six minutes before
 it was killed. Same family as Epic 7's mutation-harness hang.
+
+### The cycler joins the glyph tier (gitea #45)
+
+The cycler drew a literal `<` and `>` at every tier. termforge v0.6.0 — ours
+since #36 — put `arrow_left`/`arrow_right` in `MarkGlyphs`, so it now draws `‹`
+and `›` where the terminal can and the same `<`/`>` where it cannot. Four lines
+in `draw_cycler`.
+
+⚠ **The old code was correct at the ASCII tier and only wrong above it**, which
+is why the pty evidence is two-sided: at the colour tier `›` goes **0 → 1** and
+`Easy >` goes **1 → 0**; at the bare tier the capture is unchanged, `Easy >`
+still 1 and zero high bytes. A one-sided capture cannot tell "the fix landed"
+from "the screen stopped drawing".
+
+**`test/33options` is now the only place in the repo that renders above the
+ASCII tier.** Every other suite goes through `test_run_frames`, which is nailed
+to a `FallbackDriver` whose `capabilities()` is an all-false literal — that is
+gitea **#48**, and this issue routed around it rather than waiting: `OptionsScreen`
+takes a `GameContext*`, `set_border_style` is public plumbing, and the screen is
+directly constructible. Before #45, `draw_cycler`'s and `draw_list`'s non-ASCII
+branch had **never been executed by a test**.
+
+⚠ **The width arithmetic needed no change, and that is the finding.** `‹ › ▸`
+are three bytes and **one column** each (termforge's `kWide` table starts at
+U+2E80), so the layout is identical at both tiers and only the byte count moves.
+The comment at the `truncate_to_width` call used to justify itself with "may be a
+two-column glyph", which is false for U+25B8; it now says multi-byte.
+
+⚠ **`substr(0, cols)` is not caught by asserting whole UTF-8 per cell.** The
+obvious guess — that substr leaves half a glyph in a cell — is wrong, because
+`write_text` **sanitizes** and the orphaned bytes are silently dropped. What
+substr actually costs is **columns**: the Unicode row renders shorter than the
+ASCII row on the same screen. Only a case at a width that actually truncates
+kills it, and it survived a 4x90 sweep before that was understood.
+
+⚠ **`can_right` was half-tested since #38.** `can_right = true` survived every
+case, because no fixture had ever put a value on its **last** choice — the left
+end was covered only because "Walls" happens to start there. Older than #45; the
+glyph swap is just what made it visible.
+
+Seven mutations, two survivors, both findings, both now killed.
 
 ### ⚠ Three minesweeper cases assumed a cursor at (0,0), and one was vacuous
 
