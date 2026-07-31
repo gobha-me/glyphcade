@@ -199,28 +199,41 @@ else ()
   #            not draw. That is what this bump buys, and it is the only thing
   #            it buys.
   #
-  #  v0.4.0 + v0.5.0 — ⚠ READ THESE AS ONE. Taken apart they are a regression
-  #            and an unrelated feature; taken together they are inert, and the
-  #            reason the pin may cross both at once.
-  #            v0.4.0 (#69) made Widget::on_tick(dt) the home of animation, and
-  #            Button's press flash became a WALL-CLOCK countdown ticked there —
-  #            where at v0.2.2 Button::draw() cleared m_pressed after one frame
-  #            and needed no tick at all. App keeps no widget registry and
-  #            Shell::on_tick forwards only to m_game, so nothing ticks our
-  #            ConfirmDialog m_pause. It closes itself on activation, so the
-  #            flash is armed and the overlay popped in the same dispatch and
-  #            never renders — and m_flash_left would then stay above zero FOR
-  #            THE REST OF THE PROCESS. The next pause opens with the button you
-  #            last pressed lit, permanently. No compile error, no failing test.
+  #  v0.4.0 + v0.5.0 — ⚠ READ THESE AS ONE. Apart, one deepens a bug we already
+  #            ship and the other looks like an unrelated feature. Together they
+  #            FIX it, which is why the pin crosses both at once.
+  #            The bug first: activating a ConfirmDialog's button arms a press
+  #            flash and closes the dialog in the SAME dispatch, so the flash
+  #            never renders in the showing that armed it. What clears it
+  #            afterwards is what moved across these tags — measured, not read
+  #            off the release notes:
+  #
+  #              pin      1st paint of the next showing   2nd paint
+  #              v0.2.2   LIT                             clear
+  #              v0.4.0   LIT                             LIT
+  #              v0.6.0   clear                           clear
+  #
+  #            ⚠ So v0.4.0 did NOT introduce this. At v0.2.2 — the pin we are
+  #            moving off — Button::draw() cleared the flag AFTER painting with
+  #            it, so every re-opening of the pause dialog shows one frame of a
+  #            wrongly-lit Resume button. Confirmed in a pty: the pressed
+  #            background 48;2;128;64;255 appears once on the old binary and
+  #            zero times on the new one, same keystrokes, same controls.
+  #            v0.4.0 (#69) made the flash a WALL-CLOCK countdown in
+  #            Widget::on_tick. App keeps no widget registry and Shell::on_tick
+  #            forwards only to m_game, so nothing ticks m_pause and the
+  #            countdown never runs: one frame becomes permanent, for the life
+  #            of the process. No compile error, no failing test.
   #            v0.5.0 (#122) added Widget::reset_transient(), which Dialog::draw
-  #            calls at its per-showing boundary and Button implements by
-  #            zeroing the flash. That is precisely the cure.
+  #            calls at its per-showing boundary BEFORE anything paints, and
+  #            Button implements by zeroing the flash. That cures both.
   #            ⚠ So gitea #36's table is wrong on BOTH rows — it says v0.4.0
   #            bites only "if we ever hold" a ProgressBar or Button, and that
   #            v0.5.0 does not reach us. And the audit it prescribes — grep for
   #            those two type names — comes back CLEAN, because the Buttons are
   #            inside ConfirmDialog and our source never names them. See the ABI
-  #            note above: the same blind spot, twice.
+  #            note above: the same blind spot, twice. This is also the one
+  #            place the bump is not merely inert: it fixes a live defect.
   #            ⚠ We do NOT forward ticks to m_pause. See the comment in
   #            src/lib/arcade/shell.cpp at the on_tick pause gate for why, and
   #            test/11selector for the case that pins the behaviour we are
@@ -250,20 +263,32 @@ else ()
   # Pin a tag, not a SHA: the find_package path above is version-gated, so both
   # acquisition paths should describe the same thing in the same vocabulary.
   #
-  # ⚠ This variable is also the red-verify seam, and #36 is where the reflex
-  # from #24 — "build against the PREVIOUS pin" — gives the wrong answer.
-  # v0.2.2 is GREEN for the flash case: that is the tag where draw() cleared the
-  # flag, i.e. the tag where the bug does not exist yet. The defect lives only
-  # in v0.4.0 and v0.4.1, between the tag that armed it and the tag that cured
-  # it, so the seam is:
+  # ⚠ This variable is also the red-verify seam, and #36 wanted TWO arms rather
+  # than the one #24 needed. Run both:
   #
-  #   cmake -B build-oldpin -DTERMFORGE_TAG=v0.4.0 -DCMAKE_CXX_FLAGS=-Werror
+  #   cmake -B build-oldpin  -DTERMFORGE_TAG=v0.4.0 -DCMAKE_CXX_FLAGS=-Werror
+  #   cmake -B build-prevpin -DTERMFORGE_TAG=v0.2.2 -DCMAKE_CXX_FLAGS=-Werror
   #
-  # find_package(0.6.0) misses a 0.4.x, so FetchContent takes the override.
-  # Run the v0.2.2 arm too — a red-verify that only shows the new case failing
-  # somewhere does not distinguish "this pins a real defect" from "this pins the
-  # old pin". Both arms are the evidence. TERMFORGE_URI above accepts a local
-  # path, so neither arm needs the network.
+  # find_package(0.6.0) misses any 0.2.x or 0.4.x, so FetchContent takes the
+  # override in both. TERMFORGE_URI above accepts a LOCAL PATH, so neither arm
+  # needs the network — point it at an existing _deps/termforge-src clone.
+  #
+  # ⚠ And what the second arm found is why it is not optional. The prediction —
+  # written into this file before the arms were run — was that v0.2.2 would be
+  # GREEN, on the reasoning that v0.4.0 introduced the stale press flash. It is
+  # RED. At v0.2.2 draw() cleared the flag AFTER painting with it, so the flash
+  # is stale for exactly one frame; v0.4.0 made it permanent; v0.5.0 cures both.
+  # The defect is one we SHIP TODAY, not one the bump would have introduced.
+  #
+  #   pin      next-showing   outlive-one-paint   (test/11selector)
+  #   v0.2.2   RED            GREEN
+  #   v0.4.0   RED            RED
+  #   v0.6.0   GREEN          GREEN
+  #
+  # A single arm cannot separate those three columns, and a single test case
+  # cannot either — a REQUIRE aborts its case, so the two claims are two cases
+  # on purpose. Anyone re-deriving this later: run both arms before believing a
+  # per-tag table, including this one.
   if (NOT TERMFORGE_TAG)
     set(TERMFORGE_TAG v0.6.0)
   endif ()

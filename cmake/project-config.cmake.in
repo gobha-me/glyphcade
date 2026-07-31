@@ -103,7 +103,7 @@ endif ()
 # scratch prefix and greps the generated targets file; it never calls
 # find_package(term-game), so a wrong version here is invisible to CI and shows
 # up only in a consumer's tree. Verified by hand at bump time against a
-# throwaway consumer project. That gap is its own issue.
+# throwaway consumer project. That gap is gitea #46.
 include(CMakeFindDependencyMacro)
 find_dependency(termforge 0.6.0)
 
