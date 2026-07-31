@@ -1,12 +1,14 @@
 #include <termgame/games/snake/snake.hpp>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <string>
 #include <string_view>
 
 #include <termforge/widgets/theme.hpp>
 
+#include <termgame/arcade/hud.hpp>
 #include <termgame/games/snake/glyphs.hpp>
 
 namespace termgame {
@@ -108,6 +110,10 @@ auto Snake::start(GameContext& ctx) -> void {
   // Nothing is reset here, deliberately: the Shell builds a fresh Game per menu
   // entry, so freshness is structural rather than something start() has to
   // remember. See arcade/game.hpp.
+
+  // gitea #38: ask which level and which walls before the snake starts moving,
+  // rather than starting on Normal/Solid and making 1/2/3/m throw the run away.
+  m_options.open(kMeta.title, kMeta.options, &ctx);
 }
 
 auto Snake::new_game(Level level, Walls walls) -> void {
@@ -137,7 +143,23 @@ auto Snake::steer(Dir d) -> bool {
 }
 
 auto Snake::tick(std::chrono::duration<double> dt) -> void {
+  // ⚠ ABOVE the gate. m_ticks is a diagnostic that counts every tick the Shell
+  // routed here, not a measure of simulated time — test/13tick's routing
+  // assertions read it, and gating it would make them measure the options
+  // screen instead of the Shell's tick routing.
   ++m_ticks;
+
+  // ⚠ THE GATE, and Snake is the game where its absence is visible. The snake
+  // steps several times a second with no input at all, so without this it is
+  // slithering behind the pre-start screen and can hit a wall — ending a run
+  // the player has not begun — before they have chosen anything.
+  //
+  // ⚠ Every enter_snake() helper dismisses the screen before its first step(),
+  // so deleting this line leaves the whole suite green. The case that catches
+  // it must tick with the screen OPEN, and must tick far enough to cross the
+  // step interval: a one-tick version passes against the mutant.
+  if (m_options.is_open()) return;
+
   const snake::TickResult r = m_board.tick(dt);
   announce(r);
   if (r.eaten > 0) {
@@ -205,6 +227,21 @@ auto Snake::best_score() const -> int {
 }
 
 auto Snake::on_event(const termforge::Event& ev) -> bool {
+  if (m_options.is_open()) {
+    switch (m_options.on_event(ev)) {
+      case OptionsScreen::Reply::Ignored:
+        return false;  // Escape and 'p' stay the Shell's
+      case OptionsScreen::Reply::Consumed:
+        return true;
+      case OptionsScreen::Reply::Dismissed:
+        // ⚠ Unconditional: accepting the defaults and choosing Hard/Wrap take
+        // the same path, so there is no branch for a mutation to delete.
+        new_game(static_cast<Level>(m_options.selected(0)),
+                 static_cast<Walls>(m_options.selected(1)));
+        return true;
+    }
+  }
+
   if (const auto* key = std::get_if<termforge::KeyEvent>(&ev)) {
     return handle_key(*key);
   }
@@ -300,6 +337,14 @@ auto Snake::handle_key(const termforge::KeyEvent& key) -> bool {
 }
 
 auto Snake::draw(termforge::Screen& screen) -> void {
+  // ⚠ Same arm as draw_too_small(): the pre-start screen owns the whole Screen,
+  // and returning keeps the status and hint rows off it — they describe a run
+  // that has not started.
+  if (m_options.is_open()) {
+    m_options.draw(screen);
+    return;
+  }
+
   // ONE Layout per frame. See layout.hpp.
   m_layout = snake::compute_layout(screen.cols(), screen.rows());
 
@@ -340,7 +385,6 @@ auto Snake::draw_status(termforge::Screen& screen) -> void {
     case snake::State::Running:
       break;
   }
-  const int word_x = std::max(0, screen.cols() - static_cast<int>(word.size()));
 
   // ⚠ THE BUDGET is what stops the two halves of this row colliding, and it is
   // the load-bearing part — Screen::write_text clips at the screen edge but NOT
@@ -355,23 +399,24 @@ auto Snake::draw_status(termforge::Screen& screen) -> void {
   // keys off find(label), so "len" alongside "level" would make that assertion
   // match the wrong field and pass while the row was broken. That is why the
   // second field is spelled "length".
-  std::string left;
-  const int budget = word_x - 2;  // one blank column between the two
-  // The ORDER is the priority order: the loop appends until a field does not fit
-  // and then stops. "record" goes last for the same reason it does in 2048.
-  for (const std::string& field :
-       {"score " + num(m_board.score()), "length " + num(m_board.length()),
-        "level " + std::string(level_label(m_board.level())),
-        "walls " + std::string(walls_label(m_board.walls())),
-        "record " + num(best_score())}) {
-    const std::string sep = left.empty() ? "" : "   ";
-    if (static_cast<int>(left.size() + sep.size() + field.size()) > budget) {
-      break;
-    }
-    left += sep + field;
-  }
-  screen.write_text(0, m_layout.status_y, left, termforge::theme::kFg, bg);
-  screen.write_text(word_x, m_layout.status_y, word, fg, bg);
+  // ⚠ The budget arithmetic that used to live here is hud::draw_status_row.
+  // Extracted for COVERAGE, not tidiness: killing the "delete the budget"
+  // mutation needs a sweep of widths narrower than this game's own floor, and
+  // writing that four times is why it went green in two consecutive epics.
+  // test/33options sweeps it once, against the helper.
+  //
+  // ⚠ The ORDER of this list is still the priority order -- the helper appends
+  // until a field does not fit and then stops -- and no label may be a
+  // substring of another, because the whole-fields checks key off find(label).
+  const std::array<std::string, 5> fields{
+      "score " + num(m_board.score()),
+      "length " + num(m_board.length()),
+      "level " + std::string(level_label(m_board.level())),
+      "walls " + std::string(walls_label(m_board.walls())),
+      "record " + num(best_score()),
+  };
+  hud::draw_status_row(screen, m_layout.status_y, fields, word,
+                       termforge::theme::kFg, fg, bg);
 }
 
 auto Snake::draw_hints(termforge::Screen& screen) -> void {

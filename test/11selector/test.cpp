@@ -207,6 +207,21 @@ auto enter_game(Probe& app) -> void {
   while (app.selector_index() < index) app.dispatch_event(key(termforge::Key::Down));
   app.dispatch_event(key(termforge::Key::Enter));
   REQUIRE(app.state() == Shell::State::InGame);
+  // ⚠ A SECOND Enter, and it goes AFTER the REQUIRE above, not before. The
+  // REQUIRE is what proves the Shell entered on the FIRST Enter; moving it below
+  // this line would make the case pass even if entering had come to need two.
+  //
+  // gitea #38: entering a game now opens its pre-start options screen, so a
+  // suite that wants a BOARD has to say so. This is the change telling the truth
+  // about itself, not a regression -- and the per-suite cases below assert the
+  // screen is there before this dismisses it.
+  //
+  // ⚠ Leaving this out does not produce a red test, it produces a HANG. Several
+  // cases here steer with `while (cursor().row < N) dispatch(Down)`, which is
+  // bounded by the code under test: with the options screen up the arrows move a
+  // cycler instead of the cursor, the predicate never becomes true, and the
+  // suite spins forever.
+  app.dispatch_event(key(termforge::Key::Enter));
 }
 
 }  // namespace
@@ -1056,3 +1071,102 @@ TEST_CASE("the detail pane's scrollbar is 7-bit too", "[selector][render]") {
   }
 }
 
+// ── The detail pane advertises a game's settings (gitea #38) ────────────────
+//
+// ⚠ THIS IS THE HALF A GAME-SIDE-ONLY FIX WOULD HAVE LEFT STANDING. #38 names
+// two defects: the options are in the wrong place in time, AND the one screen
+// you see before pressing Enter never mentions they exist. Snake's description
+// says "Three difficulties" and nothing says how to choose one. The schema is
+// read by the Shell for exactly this, and by the game for the screen itself --
+// one source, so the menu cannot advertise an option the game does not have.
+
+TEST_CASE("the detail pane names each game's options", "[selector][options]") {
+  Probe app;
+  app.step(1, 80, 24);
+
+  const auto pane_text = [&app]() {
+    std::string all;
+    for (int y = 0; y < 24; ++y) all += row_text(app, y) + "\n";
+    return all;
+  };
+
+  // Minesweeper is index 0 and declares a Level with three named choices.
+  {
+    const std::string all = pane_text();
+    INFO(all);
+    CHECK(all.find("options:") != std::string::npos);
+    CHECK(all.find("Level") != std::string::npos);
+    CHECK(all.find("Easy") != std::string::npos);
+    CHECK(all.find("Hard") != std::string::npos);
+  }
+
+  // ⚠ 2048 is next, declares nothing, and the pane must say nothing extra.
+  // Without this the case would pass against a Shell that printed an "options:"
+  // header unconditionally -- an empty promise is worse than silence.
+  app.dispatch_event(key(termforge::Key::Down));
+  app.step(1, 80, 24);
+  {
+    const std::string all = pane_text();
+    INFO(all);
+    REQUIRE(all.find("2048") != std::string::npos);  // we really did move
+    CHECK(all.find("options:") == std::string::npos);
+  }
+
+  // Snake declares two, and both must be named.
+  app.dispatch_event(key(termforge::Key::Down));
+  app.step(1, 80, 24);
+  {
+    const std::string all = pane_text();
+    INFO(all);
+    CHECK(all.find("options:") != std::string::npos);
+    CHECK(all.find("Level") != std::string::npos);
+    CHECK(all.find("Walls") != std::string::npos);
+    CHECK(all.find("Solid") != std::string::npos);
+    CHECK(all.find("Wrap") != std::string::npos);
+  }
+}
+
+TEST_CASE("a long choice list is advertised by COUNT, not by joining",
+          "[selector][options]") {
+  // ⚠ Sokoban declares twenty level names. Joined, that is five wrapped rows of
+  // a pane which is dropped entirely below 48 columns and shares what it has
+  // with the description -- so past kInlineChoiceMax the pane states how many
+  // there are, which is the part a player is deciding on.
+  //
+  // ⚠ Both arms need a case. With only Sokoban over the cap, inverting the
+  // comparison still passes for the other four games.
+  Probe app;
+  app.step(1, 80, 24);
+  const int index = game_index("sokoban");
+  REQUIRE(index >= 0);
+  while (app.selector_index() < index) {
+    app.dispatch_event(key(termforge::Key::Down));
+  }
+  app.step(1, 80, 24);
+
+  std::string all;
+  for (int y = 0; y < 24; ++y) all += row_text(app, y) + "\n";
+  INFO(all);
+  CHECK(all.find("options:") != std::string::npos);
+  CHECK(all.find("to choose from") != std::string::npos);
+}
+
+TEST_CASE("the options lines stay 7-bit at every pane width",
+          "[selector][options][render]") {
+  // The same sweep the description already gets, extended to the new lines.
+  // An em dash in an option label is static_asserted away at compile time
+  // (test/33options), but the punctuation the Shell itself adds -- the "/"
+  // separators and the "options:" header -- is written here, not there.
+  for (int rows : {8, 9, 10, 12, 20}) {
+    for (int cols : {48, 60, 80, 120}) {
+      INFO("size: " << cols << "x" << rows);
+      Probe app;
+      app.step(2, cols, rows);
+      for (int i = 0; i < 5; ++i) {
+        REQUIRE(all_seven_bit(app));
+        app.dispatch_event(key(termforge::Key::Down));
+        app.step(1, cols, rows);
+      }
+    }
+  }
+}

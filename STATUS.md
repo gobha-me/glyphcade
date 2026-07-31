@@ -2,11 +2,20 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-07-30** (gitea #8 — Epic 7, Sokoban)
+**Last updated: 2026-07-31** (gitea #38 — the pre-start options screen)
 
 ---
 
 ## Where the project actually is
+
+**Games now ask before they start.** gitea
+[#38](https://git.gobha.me/xcaliber/term-game/issues/38) — pressing Enter on a
+game used to start it immediately on its first setting, with the options as a
+row of text along the bottom of a game already running, where using one
+*restarted the game you just started*. Four of the five games now show a
+pre-start screen instead; 2048, which has no settings, goes straight in and is
+byte-for-byte unchanged. See "What the options screen is" below.
+
 
 **Epic 3 has landed. There is a game.** The binary opens a selector, you pick
 Minesweeper, and you play it — mouse or keyboard, three difficulties, a timer
@@ -181,6 +190,144 @@ have no workarounds" while carrying one would be the kind of claim this file
 exists to prevent.
 
 ---
+
+## What the options screen is (gitea #38)
+
+**The shape overrules the issue's own recommendation, which invited that.** #38
+offered a shared core helper *or* a declarative `GameMeta` + Shell renderer. What
+landed is the schema from the second and the renderer from the first, because
+the issue names **two** defects and shape A only fixes one — the detail pane, the
+one screen you see *before* pressing Enter, never mentioned the settings existed.
+The argument is a comment on the issue.
+
+- `GameMeta` grows `std::span<const OptionSpec> options`, and **stays a literal
+  type** — the property `game_meta.hpp` says is load-bearing, so the registry
+  array is still `constexpr` and the new rules are `static_assert`s.
+- **The Shell only READS it**, to advertise settings in the detail pane.
+  `Shell::State` is still `{Selector, InGame, Paused}`, `game.hpp` is untouched,
+  `enter_selected_game` is untouched.
+- **The game draws its own screen**, via `OptionsScreen` in `term-game_core`, in
+  the same arm where it already draws `draw_too_small()`. "A running game owns
+  the whole Screen" stays true.
+- One schema, two consumers — which is what stops the menu advertising an option
+  the game does not have.
+
+`state()` is `InGame` from the first Enter, so **~110 existing test call sites
+needed no edit**. Six `enter_*` helpers gained one line each (six, not the four
+the issue predicted: `test/11selector` and `test/13tick` carry their own).
+
+### ⚠ Leaving that helper edit out is a HANG, not a red test
+
+Several `15minesweeper-ui` cases steer with
+`while (cursor().row < N) dispatch(Down)` — a loop **bounded by the code under
+test**. With the options screen up the arrows move a cycler instead of the
+cursor, the predicate never becomes true, and `ctest` span for six minutes before
+it was killed. Same family as Epic 7's mutation-harness hang.
+
+### ⚠ Three minesweeper cases assumed a cursor at (0,0), and one was vacuous
+
+Dismissal goes through `new_game()`, which recentres the cursor exactly as
+`1`/`2`/`3` always did. Two cases then walked past their target and failed
+loudly. The third — *"chording with no flags is silent"* — **was passing for the
+wrong reason**: (4,4) is an unrevealed mine, so `c` was being refused for "the
+cell is not revealed" rather than for "the flags do not add up", and the guard
+under test was never reached. All four walks are now bidirectional and assert
+where they landed.
+
+### `preselect()` is why a default is not always `default_index`
+
+Sokoban's default is "the first level you have not solved" — a function of the
+score store, not a constant, so it cannot be `constexpr` and `GameMeta` cannot
+hold it. `default_index` therefore means **what the selector advertises** and
+`preselect()` means **what the game starts on**. Without the split either the
+pane lies or the schema stops being constexpr.
+
+⚠ `Sokoban::options()` is a test seam because `index()` **cannot** witness
+`preselect()`: `start()` calls `load(start_at)` before opening the picker, so
+the game is already on the right level whether or not the picker agrees.
+
+### The list mode, and why Sokoban shipped in the same change
+
+Twenty choices is past `kInlineChoiceMax`, so Sokoban renders a windowed
+vertical list rather than a row of `< value >` cyclers, and the detail pane
+prints the **count** instead of joining twenty names into five wrapped rows.
+Shipped alongside the other three rather than after them: four cyclers first
+would have baked in a cycler-shaped API for Epic 8 to fight — the
+"comes out Solitaire-shaped" failure #38 exists to prevent.
+
+### One budgeted status row instead of four, and the numbers that justify it
+
+The four hand-rolled budget loops are now `hud::draw_status_row`. Measured at one
+site instead of four:
+
+| mutation | suites red |
+|---|---|
+| budget effectively removed | **5** — all four games *and* `test/33options` |
+| budget off by one (`>` → `>=`) | **1** — `test/33options` only |
+
+The second row is the argument. **No game suite can see the off-by-one** — it
+costs one column, and they vary the *screen* while their fields stay the same
+length. Killing it needs exact arithmetic (a 14-char field against a 14-column
+budget), which before this change would have had to be written four times. That
+is why `tetris.cpp` recorded this mutation going green in two consecutive epics.
+
+⚠ **The hint cascades were NOT converted**, deliberately: of five copies only
+two are mechanical. Minesweeper has a `finished()` arm above its tiers, Sokoban
+has two nested cascades, and Tetris builds a `std::string` for its `HoldSupport`
+suffix so it needs a second overload. Filed as its own issue.
+
+### One mutation survives on purpose
+
+`max(0, ...)` on `word_x` in `hud.cpp` is unobservable at every width —
+termforge's `write_text` already does `start_x = x < 0 ? 0 : x` — so no test can
+kill it and none was contorted into pretending to. It stays because that clamp is
+**not in `write_text`'s documented contract** and #36 moves the pin next.
+Documented at the site as unkillable-by-design.
+
+### ⚠ A claim of ours was wrong, and mutation testing is what said so
+
+`Tetris::start()` was commented as needing `m_options.open()` **after**
+`m_board.reset(..., support)`, on the reasoning that `new_game()` reads
+`hold_support()` back off the board and would otherwise carry the constructor's
+`Discrete` through, losing DAS on a kitty terminal. Swapping the two lines is
+green **even on the Held arm**: `open()` never touches the board, and both calls
+are in `start()`, so the reset has always happened before any dismissal can. The
+comment now says the order does *not* matter and what would actually break.
+
+That correction was only possible because the Held arm became reachable at all:
+`GameContext::set_capabilities` is public, so `test/28tetris-ui` now hands a
+`Tetris` a hand-built context with `kitty_keyboard` set instead of going through
+the Shell. Under `test_run_frames` that arm had **never once executed**.
+
+### What is verified, and what is not
+
+Six configurations green — GCC, GCC without audio, Clang, TSan, ASan, UBSan, 30
+suites each, `-Werror` throughout.
+
+Verified in a pty at both tiers. The decisive check: driving
+Enter → Right → Enter into Minesweeper puts **`MEDIUM`** in the status row and
+**never `EASY`** — the board that started is the one that was chosen. The
+**control** ran too: 2048, which declares nothing, goes straight to a board with
+no options screen at any point.
+
+⚠ Two pty greps were vacuous before they were fixed, both worth knowing about.
+`Level`/`Medium` matched the **detail pane**, not the options screen — the two
+are only separable because the status row shouts `MEDIUM` while the pane says
+`Medium`. And `MINES` did not appear at all: the diffing renderer painted it over
+`Mines`(weeper), so only the four differing cells were emitted and the stream
+contains `INES`. **Adjacency in a stripped `script(1)` capture is not screen
+adjacency.**
+
+⚠ **The `KeyboardMode::Enhanced` release path is NOT verified and cannot be
+here.** Tetris asks for `Enhanced`, and the Shell sets the tier inside
+`enter_selected_game` — before the Enter that entered the game comes back up — so
+on a kitty-protocol terminal the *release* of that keystroke reaches the options
+screen and, without the guard, dismisses it before a frame is drawn.
+`FallbackDriver` reports all-false capabilities and `script(1)` is not a kitty
+terminal. Its only coverage is a **synthesised** `KeyAction::Release` unit case.
+Needs a real kitty/foot/ghostty terminal, the same position the SFX bank has been
+in since Epic 2.
+
 
 ## Upstream has moved four tags past our pin, and it changes nothing here
 

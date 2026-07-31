@@ -60,6 +60,19 @@ struct Preset {
 
 inline constexpr Level kLevels[]{Level::Easy, Level::Medium, Level::Hard};
 
+// The pre-start screen's choice labels (gitea #38). Mixed case, unlike
+// preset().name — that one is the status row's outcome-adjacent WORD and is
+// shouted on purpose; this is a thing you pick from a menu.
+//
+// ⚠ INDEX-ALIGNED WITH kLevels, and Minesweeper casts the chosen index straight
+// back to Level. The static_assert is what makes that cast safe: without it,
+// adding a fourth level and forgetting a name here would leave the screen
+// offering three choices for four levels and silently starting the wrong one.
+inline constexpr std::string_view kLevelNames[]{"Easy", "Medium", "Hard"};
+static_assert(std::size(kLevelNames) == std::size(kLevels),
+              "every minesweeper::Level needs a name on the options screen, "
+              "in the enum's own order — the chosen index is cast to Level");
+
 enum class Mark : std::uint8_t { None, Flag, Question };
 
 // Ready means "no mines have been placed yet". It is a state rather than the

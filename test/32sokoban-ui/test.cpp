@@ -79,6 +79,10 @@ auto enter_sokoban(Probe& app, int cols = 80, int rows = 24) -> void {
   }
   app.dispatch_event(key(termforge::Key::Enter));
   REQUIRE(app.state() == Shell::State::InGame);
+  // ⚠ A second Enter, AFTER the REQUIRE (which is what proves the Shell entered
+  // on the FIRST one). gitea #38: entering Sokoban now opens its twenty-level
+  // picker, so a suite that wants a BOARD has to say so.
+  app.dispatch_event(key(termforge::Key::Enter));
   app.step(1, cols, rows);
 }
 
@@ -743,4 +747,148 @@ TEST_CASE("sokoban asks for the Legacy keyboard tier", "[sokoban][meta]") {
   // CONTROL for test/28tetris-ui's pty recipe.
   REQUIRE(Sokoban::kMeta.keyboard == termforge::KeyboardMode::Legacy);
   REQUIRE(Sokoban::kMeta.slug == "sokoban");
+}
+
+// ── The pre-start level picker (gitea #38) ─────────────────────────────────
+//
+// ⚠ Sokoban is the ONLY consumer of OptionsScreen's list mode: twenty choices,
+// one past kInlineChoiceMax, so the screen renders a windowed vertical list
+// instead of a `< value >` cycler. It is the case that proves the schema
+// generalises past three-choice difficulty pickers -- which is why it shipped
+// alongside the other three rather than after them.
+
+namespace {
+// Enter Sokoban and STOP on the picker, which enter_sokoban() dismisses.
+auto enter_to_picker(Probe& app, int cols = 80, int rows = 24) -> Sokoban* {
+  app.step(1, cols, rows);
+  const int index = sokoban_index();
+  REQUIRE(index >= 0);
+  while (app.selector_index() < index) {
+    app.dispatch_event(key(termforge::Key::Down));
+  }
+  app.dispatch_event(key(termforge::Key::Enter));
+  REQUIRE(app.state() == Shell::State::InGame);
+  app.step(1, cols, rows);
+  Sokoban* g = game_of(app);
+  REQUIRE(g != nullptr);
+  return g;
+}
+}  // namespace
+
+TEST_CASE("entering sokoban shows the level picker, not the room",
+          "[sokoban][options]") {
+  Probe app;
+  enter_to_picker(app);
+  std::string all;
+  for (int y = 0; y < 24; ++y) all += row_text(app, y) + "\n";
+  INFO(all);
+  CHECK(all.find("Level") != std::string::npos);
+  CHECK(all.find("Enter start") != std::string::npos);
+  // Several level names, i.e. a LIST -- not one value with arrows either side.
+  CHECK(all.find(kLevelNames[0]) != std::string::npos);
+  CHECK(all.find(kLevelNames[1]) != std::string::npos);
+  CHECK(all.find(kLevelNames[2]) != std::string::npos);
+  CHECK(all_seven_bit(app));
+}
+
+TEST_CASE("the picker opens ON the resume level, not on level one",
+          "[sokoban][options]") {
+  // ⚠ THE preselect() CASE, and it must assert on the CURSOR rather than on
+  // index(). start() calls load(start_at) before opening the picker, so
+  // index() is already correct whether or not preselect() ran -- deleting
+  // preselect() leaves every index()-based assertion in this suite green while
+  // the picker silently opens on the wrong row.
+  //
+  // Solve level 0 first so the resume level is 1 rather than 0, or "opens on
+  // the resume level" and "opens on the first row" are the same assertion.
+  Probe app;
+  enter_sokoban(app);
+  Sokoban* g = game_of(app);
+  REQUIRE(g != nullptr);
+  REQUIRE(g->index() == 0);
+  // Level 1 is solvable in three moves right -- the same solve the resume case
+  // above uses.
+  g->load(0);
+  app.step();
+  for (int i = 0; i < 3; ++i) app.dispatch_event(key(termforge::Key::Right));
+  app.step();
+  REQUIRE(app.scores().get("sokoban", "best_moves_01") == 3);
+
+  app.dispatch_event(key(termforge::Key::Escape));
+  app.step(1, 80, 24);
+  REQUIRE(app.state() == Shell::State::Selector);
+
+  Sokoban* again = enter_to_picker(app);
+  CHECK(again->index() == 1);            // the game resumed, as before
+  CHECK(again->options().selected(0) == 1);  // AND the picker agrees
+}
+
+TEST_CASE("picking a level is what gets loaded", "[sokoban][options]") {
+  Probe app;
+  Sokoban* g = enter_to_picker(app);
+  REQUIRE(g->options().selected(0) == 0);
+
+  // Down moves the CHOICE in list mode, because the rows are the choices.
+  app.dispatch_event(key(termforge::Key::Down));
+  app.dispatch_event(key(termforge::Key::Down));
+  app.dispatch_event(key(termforge::Key::Down));
+  app.dispatch_event(key(termforge::Key::Enter));
+  app.step(1, 80, 24);
+
+  Sokoban* live = game_of(app);
+  REQUIRE(live != nullptr);
+  CHECK(live->index() == 3);
+  // The picker and the loaded level agree on which level index 3 is.
+  CHECK(kLevelNames[3] == pack()[3].name);
+}
+
+TEST_CASE("dismissing the picker untouched keeps the resume level",
+          "[sokoban][options]") {
+  // ⚠ The pair of the case above. A game that ignored selected() and always
+  // loaded 0 would pass this one alone, because the resume level IS 0 here.
+  Probe app;
+  enter_sokoban(app);
+  Sokoban* g = game_of(app);
+  REQUIRE(g != nullptr);
+  CHECK(g->index() == 0);
+}
+
+TEST_CASE("the picker scrolls to keep the last level reachable",
+          "[sokoban][options]") {
+  // Twenty levels do not fit twenty-four rows minus chrome, so the window has
+  // to move. Without scrolling the last levels are unreachable and the picker
+  // is worse than the [ ] keys it was meant to improve on.
+  Probe app;
+  enter_to_picker(app, 80, 12);
+  for (int i = 0; i < level_count() - 1; ++i) {
+    app.dispatch_event(key(termforge::Key::Down));
+  }
+  Sokoban* g = game_of(app);
+  REQUIRE(g != nullptr);
+  REQUIRE(g->options().selected(0) == level_count() - 1);
+  app.step(1, 80, 12);
+
+  std::string all;
+  for (int y = 0; y < 12; ++y) all += row_text(app, y) + "\n";
+  INFO(all);
+  CHECK(all.find(kLevelNames[level_count() - 1]) != std::string::npos);
+  CHECK(all.find(kLevelNames[0]) == std::string::npos);
+  CHECK(all_seven_bit(app));
+}
+
+TEST_CASE("the picker survives the Shell's own floor", "[sokoban][options]") {
+  // 20x8 -- smaller than Sokoban's playfield floor, so this is a different
+  // question from "the room does not fit".
+  Probe app;
+  enter_to_picker(app, 20, 8);
+  CHECK(all_seven_bit(app));
+  CHECK(row_text(app, 7).find("Enter start") != std::string::npos);
+}
+
+TEST_CASE("Escape from the picker goes back to the menu", "[sokoban][options]") {
+  Probe app;
+  enter_to_picker(app);
+  app.dispatch_event(key(termforge::Key::Escape));
+  app.step(1, 80, 24);
+  CHECK(app.state() == Shell::State::Selector);
 }

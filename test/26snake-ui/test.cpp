@@ -83,6 +83,21 @@ auto enter_snake(Probe& app, int cols = 80, int rows = 24) -> void {
   }
   app.dispatch_event(key(termforge::Key::Enter));
   REQUIRE(app.state() == Shell::State::InGame);
+  // ⚠ A SECOND Enter, and it goes AFTER the REQUIRE above, not before. The
+  // REQUIRE is what proves the Shell entered on the FIRST Enter; moving it below
+  // this line would make the case pass even if entering had come to need two.
+  //
+  // gitea #38: entering a game now opens its pre-start options screen, so a
+  // suite that wants a BOARD has to say so. This is the change telling the truth
+  // about itself, not a regression -- and the per-suite cases below assert the
+  // screen is there before this dismisses it.
+  //
+  // ⚠ Leaving this out does not produce a red test, it produces a HANG. Several
+  // cases here steer with `while (cursor().row < N) dispatch(Down)`, which is
+  // bounded by the code under test: with the options screen up the arrows move a
+  // cycler instead of the cursor, the predicate never becomes true, and the
+  // suite spins forever.
+  app.dispatch_event(key(termforge::Key::Enter));
   app.step(1, cols, rows);
 }
 
@@ -601,4 +616,139 @@ TEST_CASE("the record survives a restart and does not follow the score down",
   app.dispatch_event(ch(U'n'));
   REQUIRE(g->board().score() == 0);
   REQUIRE(app.scores().get("snake", "best_score_normal_solid") == 100);
+}
+
+// ── The pre-start options screen (gitea #38) ────────────────────────────────
+
+TEST_CASE("entering snake shows the options screen, not the field",
+          "[snake][options]") {
+  // ⚠ enter_snake() is NOT used here: it dismisses the screen, which is exactly
+  // what this case needs to observe. Everything below the helper's second Enter
+  // is what the other twenty cases test; this is what the helper skips past.
+  Probe app;
+  app.step(1, 80, 24);
+  const int index = snake_index();
+  REQUIRE(index >= 0);
+  while (app.selector_index() < index) {
+    app.dispatch_event(key(termforge::Key::Down));
+  }
+  app.dispatch_event(key(termforge::Key::Enter));
+  REQUIRE(app.state() == Shell::State::InGame);
+  app.step(1, 80, 24);
+
+  // The settings, and how to leave. Not a board.
+  std::string all;
+  for (int y = 0; y < 24; ++y) all += row_text(app, y) + "\n";
+  INFO(all);
+  CHECK(all.find("Level") != std::string::npos);
+  CHECK(all.find("Walls") != std::string::npos);
+  CHECK(all.find("Enter start") != std::string::npos);
+  // The status row's outcome word belongs to a run in progress.
+  CHECK(all.find("PLAYING") == std::string::npos);
+  CHECK(all_seven_bit(app));
+}
+
+TEST_CASE("the board does not move while the options screen is up",
+          "[snake][options]") {
+  // ⚠ THE GATE IN Snake::tick, and it needs its own case because every
+  // enter_snake() dismisses before the first step(). Delete the gate and the
+  // rest of this suite stays green.
+  //
+  // ⚠ Snake::tick is called DIRECTLY rather than driven through app.step().
+  // Probe sets frame_ms(0), so 240 frames pass almost no real time and the
+  // Shell's accumulator yields a handful of ticks -- nowhere near Snake's step
+  // interval, so a step()-driven version of this case would pass against the
+  // mutant for the wrong reason. It measured 4 ticks when it wanted 100.
+  Probe app;
+  app.step(1, 80, 24);
+  const int index = snake_index();
+  REQUIRE(index >= 0);
+  while (app.selector_index() < index) {
+    app.dispatch_event(key(termforge::Key::Down));
+  }
+  app.dispatch_event(key(termforge::Key::Enter));
+  app.step(1, 80, 24);
+
+  Snake* g = game_of(app);
+  REQUIRE(g != nullptr);
+  const auto head_before = g->board().head();
+
+  // ⚠ Far ENOUGH. Snake's step interval is hundreds of milliseconds, so a small
+  // dt passes against the mutant and proves nothing. Two seconds is several
+  // steps at every difficulty.
+  for (int i = 0; i < 120; ++i) {
+    g->tick(std::chrono::duration<double>{1.0 / 60.0});
+  }
+  CHECK(g->board().head() == head_before);
+  CHECK(g->board().state() == State::Running);
+  CHECK(g->ticks() == 120);  // the ticks ARRIVED; the gate is why they did nothing
+
+  // ⚠ THE CONTROL. Without it this case passes against a Snake whose board
+  // cannot move at all -- a broken tick(), a frozen board, a wrong fixture.
+  // Dismiss, tick the same amount, and the head must move.
+  app.dispatch_event(key(termforge::Key::Enter));
+  Snake* live = game_of(app);
+  REQUIRE(live != nullptr);
+  const auto head_after_start = live->board().head();
+  for (int i = 0; i < 120; ++i) {
+    live->tick(std::chrono::duration<double>{1.0 / 60.0});
+  }
+  CHECK(live->board().head() != head_after_start);
+}
+
+TEST_CASE("the chosen level and walls are what the run starts on",
+          "[snake][options]") {
+  Probe app;
+  app.step(1, 80, 24);
+  const int index = snake_index();
+  while (app.selector_index() < index) {
+    app.dispatch_event(key(termforge::Key::Down));
+  }
+  app.dispatch_event(key(termforge::Key::Enter));
+  app.step(1, 80, 24);
+
+  // Level -> Hard (index 2, from the default Normal at 1), then down a row and
+  // Walls -> Wrap.
+  app.dispatch_event(key(termforge::Key::Right));
+  app.dispatch_event(key(termforge::Key::Down));
+  app.dispatch_event(key(termforge::Key::Right));
+  app.dispatch_event(key(termforge::Key::Enter));
+  app.step(1, 80, 24);
+
+  Snake* g = game_of(app);
+  REQUIRE(g != nullptr);
+  CHECK(g->board().level() == Level::Hard);
+  CHECK(g->board().walls() == Walls::Wrap);
+}
+
+TEST_CASE("accepting the defaults starts on Normal and Solid",
+          "[snake][options]") {
+  // ⚠ The PAIR of the case above, and neither is sufficient alone. A game that
+  // ignored selected() and always applied the schema default would pass this
+  // one; a game that applied selected() correctly passes both.
+  Probe app;
+  enter_snake(app);
+  Snake* g = game_of(app);
+  REQUIRE(g != nullptr);
+  CHECK(g->board().level() == Level::Normal);
+  CHECK(g->board().walls() == Walls::Solid);
+}
+
+TEST_CASE("Escape from the options screen goes back to the menu",
+          "[snake][options]") {
+  // The screen must not be a trap. OptionsScreen returns Ignored for Escape so
+  // the game returns false and the Shell's quit-to-menu still fires.
+  Probe app;
+  app.step(1, 80, 24);
+  const int index = snake_index();
+  while (app.selector_index() < index) {
+    app.dispatch_event(key(termforge::Key::Down));
+  }
+  app.dispatch_event(key(termforge::Key::Enter));
+  REQUIRE(app.state() == Shell::State::InGame);
+  app.step(1, 80, 24);
+
+  app.dispatch_event(key(termforge::Key::Escape));
+  app.step(1, 80, 24);
+  CHECK(app.state() == Shell::State::Selector);
 }

@@ -105,6 +105,21 @@ auto enter_game(TickProbe& app) -> void {
   while (app.selector_index() < index) app.dispatch_event(key(termforge::Key::Down));
   app.dispatch_event(key(termforge::Key::Enter));
   REQUIRE(app.state() == Shell::State::InGame);
+  // ⚠ A SECOND Enter, and it goes AFTER the REQUIRE above, not before. The
+  // REQUIRE is what proves the Shell entered on the FIRST Enter; moving it below
+  // this line would make the case pass even if entering had come to need two.
+  //
+  // gitea #38: entering a game now opens its pre-start options screen, so a
+  // suite that wants a BOARD has to say so. This is the change telling the truth
+  // about itself, not a regression -- and the per-suite cases below assert the
+  // screen is there before this dismisses it.
+  //
+  // ⚠ Leaving this out does not produce a red test, it produces a HANG. Several
+  // cases here steer with `while (cursor().row < N) dispatch(Down)`, which is
+  // bounded by the code under test: with the options screen up the arrows move a
+  // cycler instead of the cursor, the predicate never becomes true, and the
+  // suite spins forever.
+  app.dispatch_event(key(termforge::Key::Enter));
 }
 
 // One frame of 100ms at 60Hz is exactly six tick periods.

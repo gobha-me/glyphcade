@@ -38,12 +38,27 @@
 #include <termforge/widgets/map_widget.hpp>
 
 #include <termgame/arcade/game.hpp>
+#include <termgame/arcade/options_screen.hpp>
 #include <termgame/games/sokoban/board.hpp>
 #include <termgame/games/sokoban/glyphs.hpp>
 #include <termgame/games/sokoban/layout.hpp>
 #include <termgame/games/sokoban/levels.hpp>
 
 namespace termgame {
+
+// ⚠ ONE option with twenty choices, which makes Sokoban the only game that
+// renders as a windowed LIST rather than a row of `< value >` cyclers. That is
+// the case worth having: a schema proved only against three-choice cyclers
+// would have baked in a cycler-shaped API for Epic 8 to fight.
+//
+// ⚠ default_index is 0, and it is NOT what the game starts on. Sokoban's real
+// default is "the first level you have not solved", which is a function of the
+// score store and cannot be constexpr — start() computes it and calls
+// preselect(). default_index is what the SELECTOR advertises, before any game
+// exists to ask. See OptionsScreen::preselect.
+inline constexpr OptionSpec kSokobanOptions[]{
+    {.label = "Level", .choices = sokoban::kLevelNames, .default_index = 0},
+};
 
 class Sokoban final : public Game {
  public:
@@ -61,6 +76,7 @@ class Sokoban final : public Game {
       // Nothing here needs key releases: a Sokoban move is one discrete step
       // per press, so Legacy is not a fallback, it is the right tier.
       .keyboard = termforge::KeyboardMode::Legacy,
+      .options = kSokobanOptions,
   };
 
   Sokoban();
@@ -81,6 +97,14 @@ class Sokoban final : public Game {
     return m_layout;
   }
   [[nodiscard]] auto index() const noexcept -> int { return m_index; }
+  // ⚠ Exposed because index() CANNOT witness preselect(). start() calls
+  // load(start_at) before opening the picker, so the game is already on the
+  // resume level whether or not the picker's cursor agrees -- deleting
+  // preselect() leaves every index()-based assertion green while the picker
+  // opens on the wrong row.
+  [[nodiscard]] auto options() const noexcept -> const OptionsScreen& {
+    return m_options;
+  }
   [[nodiscard]] auto map() const noexcept -> const termforge::MapWidget& {
     return m_map;
   }
@@ -109,6 +133,8 @@ class Sokoban final : public Game {
   auto draw_too_small(termforge::Screen& screen) -> void;
   auto draw_broken(termforge::Screen& screen) -> void;
 
+  // The pre-start level picker (gitea #38).
+  OptionsScreen m_options{};
   GameContext* m_ctx{nullptr};
   std::optional<sokoban::Board> m_board;
   int m_index{0};
