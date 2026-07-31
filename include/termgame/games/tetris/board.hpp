@@ -170,6 +170,13 @@ enum class StartLevel : std::uint8_t { One, Five, Ten };
 inline constexpr StartLevel kStartLevels[]{StartLevel::One, StartLevel::Five,
                                            StartLevel::Ten};
 
+// ⚠ Index-aligned with kStartLevels; Tetris::start() casts the chosen index
+// back to StartLevel. See minesweeper/board.hpp's kLevelNames for why the
+// static_assert is not decoration.
+inline constexpr std::string_view kStartLevelNames[]{"1", "5", "10"};
+static_assert(std::size(kStartLevelNames) == std::size(kStartLevels),
+              "every tetris::StartLevel needs an options-screen name");
+
 [[nodiscard]] constexpr auto start_level_value(StartLevel s) noexcept -> int {
   switch (s) {
     case StartLevel::One: return 1;

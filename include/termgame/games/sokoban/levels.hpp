@@ -42,6 +42,7 @@
 // level from its own code. GENERATE FROM CODE, NOT FROM PROSE — this is the
 // second epic in a row where the reference's documentation was the wrong half.
 
+#include <array>
 #include <span>
 #include <string_view>
 
@@ -335,5 +336,26 @@ inline constexpr PackEntry kPack[] = {
 [[nodiscard]] constexpr auto level_count() noexcept -> int {
   return static_cast<int>(pack().size());
 }
+
+// The pre-start picker's choice labels (gitea #38), one per level, in pack
+// order.
+//
+// ⚠ Built rather than typed. OptionSpec::choices is a span<const string_view>
+// and a PackEntry is not a string_view, so a span over kPack cannot be
+// reinterpreted as one — but the names are already string_views into string
+// literals, so an immediately-invoked constexpr lambda lifts them into a real
+// array with static storage duration and zero duplication. Typing them a second
+// time would be twenty chances for the picker to disagree with the level it
+// loads.
+inline constexpr auto kLevelNames = [] {
+  std::array<std::string_view, std::size(detail::kPack)> names{};
+  for (std::size_t i = 0; i < names.size(); ++i) names[i] = detail::kPack[i].name;
+  return names;
+}();
+static_assert(kLevelNames.size() == static_cast<std::size_t>(level_count()),
+              "the picker must offer exactly as many levels as the pack has");
+static_assert(kLevelNames.front() == detail::kPack[0].name,
+              "kLevelNames must be in PACK ORDER — the chosen index is passed "
+              "straight to Sokoban::load()");
 
 }  // namespace termgame::sokoban

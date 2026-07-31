@@ -94,6 +94,21 @@ auto enter_game(Probe& app, int cols = 80, int rows = 24) -> Minesweeper* {
   }
   app.dispatch_event(key(termforge::Key::Enter));
   REQUIRE(app.state() == Shell::State::InGame);
+  // ⚠ A SECOND Enter, and it goes AFTER the REQUIRE above, not before. The
+  // REQUIRE is what proves the Shell entered on the FIRST Enter; moving it below
+  // this line would make the case pass even if entering had come to need two.
+  //
+  // gitea #38: entering a game now opens its pre-start options screen, so a
+  // suite that wants a BOARD has to say so. This is the change telling the truth
+  // about itself, not a regression -- and the per-suite cases below assert the
+  // screen is there before this dismisses it.
+  //
+  // ⚠ Leaving this out does not produce a red test, it produces a HANG. Several
+  // cases here steer with `while (cursor().row < N) dispatch(Down)`, which is
+  // bounded by the code under test: with the options screen up the arrows move a
+  // cycler instead of the cursor, the predicate never becomes true, and the
+  // suite spins forever.
+  app.dispatch_event(key(termforge::Key::Enter));
   app.step(1, cols, rows);  // one frame so the layout exists for hit-testing
   Minesweeper* g = game_of(app);
   REQUIRE(g != nullptr);
@@ -696,9 +711,18 @@ TEST_CASE("stepping on a mine plays explode and lose",
   app.dispatch_event(ch(U' '));
 
   // Now walk onto (4,4) and open it.
+  //
+  // ⚠ BIDIRECTIONAL, like the by_keys walk earlier in this file. gitea #38
+  // made the entry cursor start CENTRED rather than at (0,0) -- dismissing the
+  // options screen goes through new_game(), which recentres exactly as 1/2/3
+  // always did -- so a one-directional walk can now start PAST its target and
+  // spin forever. These loops are bounded by the code under test; make them
+  // converge from either side rather than assume where the cursor begins.
   Minesweeper* live = game_of(app);
   REQUIRE(live != nullptr);
+  while (live->cursor().row > 4) app.dispatch_event(key(termforge::Key::Up));
   while (live->cursor().row < 4) app.dispatch_event(key(termforge::Key::Down));
+  while (live->cursor().col > 4) app.dispatch_event(key(termforge::Key::Left));
   while (live->cursor().col < 4) app.dispatch_event(key(termforge::Key::Right));
   REQUIRE(live->cursor().row == 4);
   REQUIRE(live->cursor().col == 4);
@@ -804,17 +828,23 @@ TEST_CASE("the mark cycle sounds flag, then click, then click",
   const Coord mines[]{{0, 0}, {4, 4}, {8, 8}};
   g->board().load_mines(mines);
 
+  // ⚠ A BASELINE, not zero. gitea #38: dismissing the pre-start options screen
+  // starts the game through new_game(), which clicks -- so entering a game is
+  // no longer silent, and a case that hardcodes 0 is really asserting how many
+  // sounds ENTRY makes. Deltas say what this case is actually about.
+  const auto base_click = app.audio().play_count(SfxId::Click);
+
   app.dispatch_event(ch(U'f'));  // None -> Flag
   REQUIRE(app.audio().play_count(SfxId::Flag) == 1);
-  REQUIRE(app.audio().play_count(SfxId::Click) == 0);
+  REQUIRE(app.audio().play_count(SfxId::Click) == base_click);
 
   app.dispatch_event(ch(U'f'));  // Flag -> Question
   REQUIRE(app.audio().play_count(SfxId::Flag) == 1);
-  REQUIRE(app.audio().play_count(SfxId::Click) == 1);
+  REQUIRE(app.audio().play_count(SfxId::Click) == base_click + 1);
 
   app.dispatch_event(ch(U'f'));  // Question -> None
   REQUIRE(app.audio().play_count(SfxId::Flag) == 1);
-  REQUIRE(app.audio().play_count(SfxId::Click) == 2);
+  REQUIRE(app.audio().play_count(SfxId::Click) == base_click + 2);
 }
 
 TEST_CASE("a chord with the wrong flag count is silent",
@@ -834,8 +864,19 @@ TEST_CASE("a chord with the wrong flag count is silent",
 
   Minesweeper* live = game_of(app);
   REQUIRE(live != nullptr);
+  // ⚠ BIDIRECTIONAL, and this case was passing for the WRONG REASON without it.
+  // The entry cursor now starts centred at (4,4), which is a MINE and is
+  // unrevealed — so a downward-only walk left the cursor there, and 'c' was
+  // being refused for "the cell is not revealed" instead of for "the flags do
+  // not add up". Same assertions, green, testing something else entirely.
+  while (live->cursor().row > 1) app.dispatch_event(key(termforge::Key::Up));
   while (live->cursor().row < 1) app.dispatch_event(key(termforge::Key::Down));
+  while (live->cursor().col > 1) app.dispatch_event(key(termforge::Key::Left));
   while (live->cursor().col < 1) app.dispatch_event(key(termforge::Key::Right));
+  // Pin it, so this cannot quietly go back to chording the wrong cell.
+  REQUIRE(live->cursor().row == 1);
+  REQUIRE(live->cursor().col == 1);
+  REQUIRE(live->board().at({.row = 1, .col = 1}).revealed);
 
   const auto before = app.audio().play_count(SfxId::Reveal);
   app.dispatch_event(ch(U'c'));  // no flags placed: refused
@@ -888,10 +929,17 @@ TEST_CASE("starting a new game clicks", "[minesweeper][audio]") {
   const Coord mines[]{{0, 0}, {4, 4}, {8, 8}};
   g->board().load_mines(mines);
 
+  // ⚠ A baseline, for the reason above: entry itself now clicks once, because
+  // dismissing the options screen IS a new_game(). That is the same sound for
+  // the same reason, which is the point -- 1/2/3, 'n' and "start the game you
+  // just configured" are one operation with one acknowledgement.
+  const auto base_click = app.audio().play_count(SfxId::Click);
+  REQUIRE(base_click == 1U);  // and entry made exactly one, not zero or two
+
   app.dispatch_event(ch(U'2'));
-  REQUIRE(app.audio().play_count(SfxId::Click) == 1);
+  REQUIRE(app.audio().play_count(SfxId::Click) == base_click + 1);
   app.dispatch_event(ch(U'n'));
-  REQUIRE(app.audio().play_count(SfxId::Click) == 2);
+  REQUIRE(app.audio().play_count(SfxId::Click) == base_click + 2);
 }
 
 TEST_CASE("a right click flags, like the keyboard", "[minesweeper][audio]") {
@@ -911,11 +959,16 @@ TEST_CASE("a right click flags, like the keyboard", "[minesweeper][audio]") {
   const int x = l.glyph_x(at.col);
   const int y = l.row_y(at.row);
 
+  const auto base_click = app.audio().play_count(SfxId::Click);
+
   app.dispatch_event(click(x, y, 2));
   REQUIRE(app.audio().play_count(SfxId::Flag) == 1);
 
   app.dispatch_event(click(x, y, 2));  // -> Question
-  REQUIRE(app.audio().play_count(SfxId::Click) == 1);
+  // ⚠ base + 1, not 1: entry itself clicks once now, because dismissing the
+  // pre-start options screen starts the game through new_game(). See the mark
+  // cycle case above.
+  REQUIRE(app.audio().play_count(SfxId::Click) == base_click + 1);
 }
 
 TEST_CASE("marking a revealed cell is silent", "[minesweeper][audio]") {
@@ -939,8 +992,18 @@ TEST_CASE("marking a revealed cell is silent", "[minesweeper][audio]") {
 
   Minesweeper* live = game_of(app);
   REQUIRE(live != nullptr);
+  // ⚠ BIDIRECTIONAL, and this case is why it matters rather than being tidy.
+  // The entry cursor now starts CENTRED (dismissing the options screen goes
+  // through new_game(), which recentres exactly as 1/2/3 always did), so a
+  // downward-only walk leaves the cursor at (4,4) — and then 'f' marks a cell
+  // that is NOT the revealed one, the guard under test is never reached, and
+  // the case fails for a reason that has nothing to do with what it is about.
+  while (live->cursor().row > 1) app.dispatch_event(key(termforge::Key::Up));
   while (live->cursor().row < 1) app.dispatch_event(key(termforge::Key::Down));
+  while (live->cursor().col > 1) app.dispatch_event(key(termforge::Key::Left));
   while (live->cursor().col < 1) app.dispatch_event(key(termforge::Key::Right));
+  REQUIRE(live->cursor().row == 1);
+  REQUIRE(live->cursor().col == 1);
   REQUIRE(live->board().at({.row = 1, .col = 1}).revealed);
 
   const auto clicks = app.audio().play_count(SfxId::Click);
@@ -1190,4 +1253,99 @@ TEST_CASE("the outcome word survives a fourth status field on a narrow board",
       }
     }
   }
+}
+
+// ── The pre-start options screen (gitea #38) ────────────────────────────────
+
+TEST_CASE("entering minesweeper shows the options screen, not the board",
+          "[minesweeper][options]") {
+  Probe app;
+  app.step(1, 80, 24);
+  const int index = minesweeper_index();
+  REQUIRE(index >= 0);
+  while (app.selector_index() < index) {
+    app.dispatch_event(key(termforge::Key::Down));
+  }
+  app.dispatch_event(key(termforge::Key::Enter));
+  REQUIRE(app.state() == Shell::State::InGame);
+  app.step(1, 80, 24);
+
+  std::string all;
+  for (int y = 0; y < 24; ++y) all += row_text(app, y) + "\n";
+  INFO(all);
+  CHECK(all.find("Level") != std::string::npos);
+  CHECK(all.find("Easy") != std::string::npos);
+  CHECK(all.find("Enter start") != std::string::npos);
+  // MINES is the status row's counter label, and belongs to a board in play.
+  CHECK(all.find("MINES") == std::string::npos);
+  CHECK(all_seven_bit(app));
+}
+
+TEST_CASE("the chosen level is the board you get", "[minesweeper][options]") {
+  Probe app;
+  app.step(1, 80, 24);
+  const int index = minesweeper_index();
+  while (app.selector_index() < index) {
+    app.dispatch_event(key(termforge::Key::Down));
+  }
+  app.dispatch_event(key(termforge::Key::Enter));
+  app.step(1, 80, 24);
+
+  app.dispatch_event(key(termforge::Key::Right));  // Easy -> Medium
+  app.dispatch_event(key(termforge::Key::Right));  // Medium -> Hard
+  app.dispatch_event(key(termforge::Key::Enter));
+  app.step(1, 80, 24);
+
+  Minesweeper* g = game_of(app);
+  REQUIRE(g != nullptr);
+  // Hard is 16 rows x 30 columns / 99 mines.
+  CHECK(g->board().rows() == 16);
+  CHECK(g->board().cols() == 30);
+  CHECK(g->board().total_mines() == 99);
+}
+
+TEST_CASE("accepting the default gives an Easy board",
+          "[minesweeper][options]") {
+  // ⚠ The pair of the case above -- a game that ignored selected() and always
+  // applied default_index passes this one on its own.
+  Probe app;
+  Minesweeper* g = enter_game(app);
+  REQUIRE(g != nullptr);
+  CHECK(g->board().rows() == 9);
+  CHECK(g->board().cols() == 9);
+  CHECK(g->board().total_mines() == 10);
+}
+
+TEST_CASE("Escape from the options screen goes back to the menu",
+          "[minesweeper][options]") {
+  Probe app;
+  app.step(1, 80, 24);
+  const int index = minesweeper_index();
+  while (app.selector_index() < index) {
+    app.dispatch_event(key(termforge::Key::Down));
+  }
+  app.dispatch_event(key(termforge::Key::Enter));
+  REQUIRE(app.state() == Shell::State::InGame);
+  app.step(1, 80, 24);
+  app.dispatch_event(key(termforge::Key::Escape));
+  app.step(1, 80, 24);
+  CHECK(app.state() == Shell::State::Selector);
+}
+
+TEST_CASE("the options screen survives the Shell's own floor",
+          "[minesweeper][options]") {
+  // ⚠ 20x8 is Shell::kMinCols x kMinRows -- smaller than minesweeper's own
+  // playfield floor, so "the board does not fit" and "the options do not fit"
+  // are different questions. The hint row must survive; the game is unreachable
+  // without it.
+  Probe app;
+  app.step(1, 20, 8);
+  const int index = minesweeper_index();
+  while (app.selector_index() < index) {
+    app.dispatch_event(key(termforge::Key::Down));
+  }
+  app.dispatch_event(key(termforge::Key::Enter));
+  app.step(1, 20, 8);
+  CHECK(all_seven_bit(app));
+  CHECK(row_text(app, 7).find("Enter start") != std::string::npos);
 }

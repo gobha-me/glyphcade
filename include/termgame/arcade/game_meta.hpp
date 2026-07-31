@@ -17,12 +17,46 @@
 // GameMeta pointing at a std::string is a dangling read the moment that string
 // goes out of scope, and nothing here can detect it.
 
+#include <cstddef>
+#include <span>
 #include <string_view>
 
 #include <termforge/core/types.hpp>
 #include <termforge/widgets/detail/width.hpp>
 
 namespace termgame {
+
+// One player-facing setting, chosen on the pre-start screen before the game's
+// first frame. See arcade/options_screen.hpp for who draws it, and the
+// `options` field below for why the Shell also reads it.
+//
+// ⚠ THE STORAGE RULE ABOVE APPLIES HERE TOO, and `choices` has one more way to
+// go wrong than a plain string_view field does. It must point at an array with
+// STATIC storage duration — an `inline constexpr std::string_view kFoo[]` at
+// namespace scope, or a `static constexpr` member. Writing the array inline in
+// the kMeta initialiser compiles and dangles: the array is a temporary whose
+// lifetime ends at the end of that full-expression, and the span outlives it by
+// the whole program. -Wdangling does not see through a span, so nothing here
+// diagnoses it.
+struct OptionSpec {
+  std::string_view label;                     // "Level", "Walls" — ASCII
+  std::span<const std::string_view> choices;  // {"Easy", "Medium", "Hard"}
+  int default_index{0};                       // index into `choices`
+};
+
+// The most options one game may declare. OptionsScreen holds a fixed array of
+// this size so it allocates nothing on the render path, and all_games.cpp
+// static_asserts that no registered game exceeds it.
+inline constexpr std::size_t kMaxGameOptions = 4;
+
+// Past this many choices, an option is too wide to be a one-row `< value >`
+// cycler and renders as a windowed vertical list instead — twenty presses to
+// reach Sokoban's level 20 is not a chooser. Two consequences, both enforced
+// elsewhere: such an option consumes every row, so all_games.cpp forbids it
+// sharing a screen with another; and the selector's detail pane prints the
+// COUNT rather than the joined list, because twenty names is five wrapped rows
+// of a pane that only has 48 columns to begin with.
+inline constexpr std::size_t kInlineChoiceMax = 6;
 
 struct GameMeta {
   std::string_view slug;         // stable id, kebab-case: "minesweeper"
@@ -56,6 +90,28 @@ struct GameMeta {
   // that asks for Enhanced must still work when the answer is no; every game is
   // playable at the bottom tier, and that rule has no keyboard exemption.
   termforge::KeyboardMode keyboard{termforge::KeyboardMode::Legacy};
+
+  // The settings this game asks about before its first frame, or empty for
+  // none. gitea #38.
+  //
+  // ⚠ THE SHELL ONLY READS THIS. It advertises the labels and choices in the
+  // selector's detail pane (Shell::refresh_detail) and does nothing else with
+  // them: there is no new Shell::State, and arcade/game.hpp is unchanged. The
+  // screen itself is drawn by the GAME, in its own draw(), in exactly the arm
+  // where it already draws draw_too_small(). Two consumers, one schema — which
+  // is the point, because it is what stops the menu advertising an option the
+  // game does not have.
+  //
+  // ⚠ EMPTY IS THE CHEAP CASE ON PURPOSE. 2048 has no settings: it declares
+  // nothing, gets no screen, holds no OptionsScreen member, and its translation
+  // units are byte-identical to what they were before this field existed. A
+  // mechanism that taxed the game with nothing to ask would be the wrong
+  // mechanism.
+  //
+  // ⚠ DECLARED LAST, and that is not arbitrary. Designated initialisers must
+  // follow declaration order, so a field added above `keyboard` would force an
+  // edit to Tetris's kMeta, which already sets it. Add the next one here too.
+  std::span<const OptionSpec> options{};
 };
 
 // Columns the selector reserves for an icon, so a game without one still lines
@@ -129,10 +185,64 @@ inline constexpr int kIconCols = 2;
   return true;
 }
 
+[[nodiscard]] constexpr auto option_text_is_ascii(const OptionSpec& o) noexcept
+    -> bool {
+  if (!text_is_seven_bit(o.label)) return false;
+  for (const std::string_view choice : o.choices) {
+    if (!text_is_seven_bit(choice)) return false;
+  }
+  return true;
+}
+
 [[nodiscard]] constexpr auto meta_text_is_ascii(const GameMeta& m) noexcept
     -> bool {
+  // ⚠ Option text is the newest place an em dash can reach a bare terminal, and
+  // it is a worse place than the description was. The description is prose you
+  // skim once; an option label is on screen at the exact moment the player is
+  // choosing, AND the same bytes are printed a second time by the detail pane
+  // on the selector. Both surfaces, one check.
+  //
+  // ⚠ No registered game has non-ASCII option text, so nothing that runs can
+  // witness this loop — delete it and every test stays green. Its only witness
+  // is the compile-time NEGATIVE case in test/33options, which is therefore not
+  // optional coverage.
+  for (const OptionSpec& o : m.options) {
+    if (!option_text_is_ascii(o)) return false;
+  }
   return text_is_seven_bit(m.slug) && text_is_seven_bit(m.title) &&
          text_is_seven_bit(m.description) && text_is_seven_bit(m.tag);
+}
+
+// Five ways an options schema can be wrong, all decidable at compile time and
+// none visible at the call site. Four produce a bad frame; the default_index
+// one is an out-of-range read on the FIRST frame the game draws.
+//
+// ⚠ It lives HERE, next to icon_is_safe() and meta_text_is_ascii(), rather than
+// in all_games.cpp beside the static_assert that calls it — and that placement
+// is the point. Every clause below is unfalsifiable by the games in the
+// registry: correct schemas cannot witness a check for incorrect ones, so a
+// predicate reachable only from the registry is a predicate no test can ever
+// prove still works. Public and per-meta, test/33options static_asserts a
+// NEGATIVE for each clause. If you add a clause, add its negative there too.
+[[nodiscard]] constexpr auto options_are_well_formed(const GameMeta& m) noexcept
+    -> bool {
+  if (m.options.size() > kMaxGameOptions) return false;
+  bool has_list = false;
+  for (const OptionSpec& o : m.options) {
+    if (o.label.empty()) return false;    // an unlabelled row
+    if (o.choices.empty()) return false;  // a row with nothing to pick
+    if (o.default_index < 0 ||
+        o.default_index >= static_cast<int>(o.choices.size())) {
+      return false;  // reads past the end before the player touches anything
+    }
+    for (const std::string_view choice : o.choices) {
+      if (choice.empty()) return false;  // a blank the cursor can land on
+    }
+    if (o.choices.size() > kInlineChoiceMax) has_list = true;
+  }
+  // A list-rendered option needs every row on the screen, so it cannot share
+  // one. See kInlineChoiceMax above.
+  return !has_list || m.options.size() == 1;
 }
 
 }  // namespace termgame
