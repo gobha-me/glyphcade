@@ -609,6 +609,33 @@ auto Shell::refresh_detail() -> void {
   m_detail.append("");
   m_detail.append("tag:  " + std::string(meta.tag));
   m_detail.append("slug: " + std::string(meta.slug));
+
+  if (meta.options.empty()) return;
+
+  // ⚠ READ-ONLY, and that is the whole of the Shell's involvement with gitea
+  // #38. It never constructs an OptionsScreen and never learns which choice is
+  // live — that belongs to the game, and the game does not exist yet while the
+  // menu is up. All this does is stop the pane implying a game has no settings
+  // when it has three, which was the half of the defect a game-side-only fix
+  // would have left standing.
+  m_detail.append("");
+  m_detail.append("options: press Enter to choose");
+  for (const OptionSpec& o : meta.options) {
+    std::string line = "  " + std::string(o.label) + ": ";
+    // ⚠ A cap, not a taste call. Sokoban declares twenty level names; joined,
+    // that is five wrapped rows of a pane which is dropped entirely below 48
+    // columns and shares what it has with the description. Past the cap the
+    // count is the part a player is actually deciding on.
+    if (o.choices.size() > kInlineChoiceMax) {
+      line += std::to_string(o.choices.size()) + " to choose from";
+    } else {
+      for (std::size_t i = 0; i < o.choices.size(); ++i) {
+        if (i > 0) line += " / ";
+        line += std::string(o.choices[i]);
+      }
+    }
+    m_detail.append(line);
+  }
 }
 
 auto Shell::draw_selector(termforge::Screen& screen) -> void {

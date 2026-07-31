@@ -85,12 +85,28 @@ static_assert(icons_are_safe(),
               "a registered game's icon is not exactly one two-column "
               "grapheme — see icon_is_safe() in arcade/game_meta.hpp");
 
+// The per-meta predicate is options_are_well_formed() in arcade/game_meta.hpp,
+// deliberately not inlined here — see the note at its definition for why a
+// check the registry cannot falsify must live somewhere a test can reach.
+constexpr auto all_options_are_well_formed() -> bool {
+  for (const auto& entry : kGames) {
+    if (!options_are_well_formed(entry.meta)) return false;
+  }
+  return true;
+}
+
 static_assert(metadata_is_ascii(),
               "a registered game's slug, title, description or tag contains a "
               "non-ASCII byte — the selector prints all four on the no-colour "
               "tier, which by definition cannot render them. An em dash in a "
               "description is the usual culprit; see meta_text_is_ascii() in "
               "arcade/game_meta.hpp.");
+
+static_assert(all_options_are_well_formed(),
+              "a registered game's options schema is malformed: an empty label "
+              "or choice, a default_index outside its own choices, more than "
+              "kMaxGameOptions options, or a long-list option sharing a screen "
+              "with another. See OptionSpec in arcade/game_meta.hpp.");
 
 }  // namespace
 
