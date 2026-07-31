@@ -533,7 +533,9 @@ rather than the fact that it was derived.** At the ASCII tier
 driver's `capabilities()` is an all-false literal, so `TERM=` in a ctest
 environment does nothing. The only seam that would work is a private virtual
 capability probe on `Shell` — real production code, and out of scope for a
-focused fix. Filed as its own issue; it would unlock the `▸` marker, the
+focused fix. Filed as
+[#48](https://git.gobha.me/xcaliber/term-game/issues/48); it would unlock the
+`▸` marker, the
 `↑↓ select` hint row, the *absence* of the colour notice, and the notice-ordering
 contract as well, all of which are pty-only today. Trap 3 in `test/11selector`
 records the limit at the site.
