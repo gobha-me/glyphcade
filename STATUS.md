@@ -2,10 +2,12 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-07-31** (gitea #45 — the options cycler joins the glyph
-tier, and the suite renders above the ASCII tier for the first time; before it
-#44 — the pause dialog joins the border tier; plus the first maintainer feel
-report, see [Feel and the container](#feel-and-the-container))
+**Last updated: 2026-07-31** (gitea #46 — the exported package is now *resolved*
+by a ctest rather than read as text, closing the one gap in the install story;
+before it #45 — the options cycler joins the glyph tier, and the suite renders
+above the ASCII tier for the first time; #44 — the pause dialog joins the border
+tier; plus the first maintainer feel report, see
+[Feel and the container](#feel-and-the-container))
 
 ---
 
@@ -254,6 +256,141 @@ without it. **Deletion condition: termforge
 accessor. Commented at the site, and item 2 of the feedback below. Saying "we
 have no workarounds" while carrying one would be the kind of claim this file
 exists to prevent.
+
+---
+
+## The exported package is now resolved, not just read (gitea #46)
+
+`cmake/project-config.cmake.in` carries the consumer-side termforge floor,
+`find_dependency(termforge 0.6.0)`. Until now **nothing in `ctest` executed that
+line.** `cmake/check_export.cmake` installs to a scratch prefix and greps the
+generated `term-gameTargets*.cmake` for rtaudio tokens — as *text*. It never
+calls `find_package(term-game)`, so the generated `term-gameConfig.cmake` was
+written, inspected, and never run.
+
+That made a wrong floor invisible from both sides at once: the in-tree build
+takes the FetchContent path and never reads that file, and CI only builds
+in-tree. It broke exclusively in a stranger's tree — the failure
+`cmake/deps/termforge.cmake` names in its own words, a package that "resolves on
+the developer's machine and nowhere else". The floor has moved four times
+(0.1 → 0.1.10 → 0.1.15 → 0.2.2 → 0.6.0), and every time correctness rested on
+somebody remembering to edit a second file.
+
+**`cmake/check_consumer.cmake`**, ctest name **`consumer-resolves`**, installs to
+its own scratch prefix, generates a throwaway consumer into the build tree and
+*configures* it against the prefix. Configure only — `find_package` is the whole
+assertion, nothing is compiled. One `cmake --install` is enough for both
+packages because `termforge_INSTALL` follows `${PROJECT_NAME}_INSTALL`, so it
+needs no network and no second install step. It runs in **1.3 s**.
+
+### The two lines that are the entire point
+
+Red-verified by putting a stale `0.2.2` floor in `project-config.cmake.in` and
+reconfiguring. Both tests were run, and both results matter:
+
+```
+6: -- export is rtaudio-free: CLEAN
+1/2 Test #6: audio-export-clean ...............   Passed    0.76 sec
+7:   Could not find a configuration file for package "termforge" that is
+1/1 Test #7: consumer-resolves ................***Failed   14.30 sec
+```
+
+A package **no consumer on earth can resolve**, reported `CLEAN` by the check
+that was supposed to be watching the export. The new one goes red and carries
+the consumer's own diagnosis into the failure message.
+
+### The generated consumer is generated because a committed one gets eaten
+
+The obvious shape — a three-line `CMakeLists.txt` under `test/` — does not work.
+`test/CMakeLists.txt` globs `test/*` and `add_subdirectory()`s any directory
+holding a `CMakeLists.txt`, so a committed `test/consumer/` would be pulled into
+**our** build and run `find_package(term-game)` at our own configure time. It is
+written with a bracket argument (`[==[ … ]==]`, no substitution at all) and the
+project name arrives as `-DCHECK_PROJECT=` on the consumer's command line, so
+the text needs no `\$` escaping — where one dropped backslash writes an *empty*
+marker rather than a missing one, which is precisely the vacuous pass this check
+must be incapable of.
+
+### Resolution is not enough on its own, and the extra assertions are not padding
+
+Three of the four extra checks were red-verified individually:
+
+| arm | what was broken | what fired |
+|---|---|---|
+| R1 | floor `0.2.2` vs a 0.6.0 install | resolution — consumer exits 1 |
+| R2 | floor stripped to `find_dependency(termforge)` | **the regex branch** — consumer configures *fine* |
+| R3 | consumer pointed at an empty prefix | resolution, proving `RESULT_VARIABLE` is checked |
+| R4 | a real package installed at a *second* prefix | the `_DIR`-inside-scratch-prefix guard |
+
+**R4 is the one that matters most in the long run.** Nothing stops somebody
+running `cmake --install build` into `/usr/local` once; from then on the
+consumer would resolve *that* forever, and the test would pass no matter what
+the source tree said. Asserting `term-game_DIR` starts with the scratch prefix —
+and that the reported version equals this build's — is what distinguishes
+"resolved the package we just built" from "resolved a package". `EXPECT_VERSION`
+also catches the shallow-clone case where `git describe` degrades to `0.0.0` and
+the package stays perfectly resolvable.
+
+⚠ **R2 is the only thing the version comparison independently buys, and the
+comment says so.** termforge's version file is `SameMinorVersion`, so a
+*successful* `find_dependency(termforge X.Y.Z)` already implies the resolved
+major.minor is `X.Y` — the comparison cannot fire while resolution passes. Both
+half-bump directions are caught by resolution alone. What it uniquely catches is
+the line being deleted or de-versioned, which resolution can *never* notice
+because it then always succeeds. A text-vs-text check against the pin in
+`cmake/deps/termforge.cmake` would therefore add nothing, and was deliberately
+not written.
+
+### ⚠ Two traps in re-running the red arms
+
+**Editing the `.in` is not enough.** `configure_package_config_file()` runs at
+*configure* time and `check_consumer.cmake` only *installs*, so editing
+`project-config.cmake.in` and going straight to `ctest` leaves
+`build/term-gameConfig.cmake` at the old value and the arm is a **false green**.
+Reconfigure with `cmake -B build`, then `grep find_dependency
+build/term-gameConfig.cmake` to confirm the edit actually arrived, before
+believing any result.
+
+**A leftover consumer cache is the other false green.** `consumer-check-bin`
+holds `term-game_DIR` and `termforge_DIR` as resolved cache entries; the script
+wipes all three scratch directories on entry for that reason. On *failure* it
+leaves them behind on purpose — same stance as `check_export.cmake`.
+
+### The suite's first RESOURCE_LOCK
+
+`audio-export-clean` and `consumer-resolves` both run `cmake --install` on the
+same build tree, and `cmake --install` finishes by writing one
+`install_manifest.txt` into it. Their scratch prefixes do not collide, but that
+manifest is a shared write, and two concurrent installs race on it under
+`ctest -j`. It would rarely fail outright — which is worse: the failure mode is
+one unreproducible CI red per quarter. `RESOURCE_LOCK install-tree` serialises
+the two. The label names nothing real; it is plain mutual exclusion.
+
+### What is verified, and what is not
+
+Six configurations green — GCC, GCC without audio, Clang, ASan, UBSan, TSan —
+**31 suites** each, up from 30, `-Werror` throughout. The green arm resolves
+`term-game 0.16.0` with `termforge 0.6.0` against the scratch prefix. No C++
+changed; the whole issue is CMake.
+
+⚠ **Nothing compiles or links against the installed package** — the consumer
+configures only, which is what the issue asked for and is enough to execute the
+floor. A broken `INTERFACE` include path or a missing archive would still
+survive. That is the honest remaining gap in `cmake/install.cmake`'s
+"three acquisition modes" claim.
+
+⚠ **`consumer-resolves` is conditionally registered**, on `${PROJECT_NAME}_INSTALL`,
+exactly like `audio-export-clean`. In a configuration without install rules it
+is not there at all — **absent means skipped, not passing**, and the configure
+log says which. `ctest -N` is the check.
+
+⚠ **`termforge_DIR` is forwarded to the consumer, and only when real.** On a
+machine where `find_package(termforge 0.6.0 QUIET CONFIG)` *succeeds*, the
+FetchContent branch in `cmake/deps/termforge.cmake` never runs, `termforge_INSTALL`
+is never set, and nothing puts `lib/cmake/termforge/` into the scratch prefix.
+Here it is legitimately `termforge_DIR-NOTFOUND` and the script ignores that
+spelling. Without the forwarding, that machine would see a red test with a
+diagnosis pointing at the floor, which is the wrong answer.
 
 ---
 
@@ -534,12 +671,10 @@ adjacency. Four controls now run, including that the button's *focused*
 background does render, which is what shows the grep can match a Button's own
 colour at all.
 
-⚠ **`find_dependency(termforge 0.6.0)` is exercised by nothing in `ctest`.**
-`cmake/check_export.cmake` installs to a scratch prefix and greps the generated
-targets file; it never calls `find_package(term-game)`. Checked by hand here — a
-throwaway consumer against the install tree resolves term-game 0.13.0 and
-termforge 0.6.0 — and that gap is gitea
-[#46](https://git.gobha.me/xcaliber/term-game/issues/46).
+✅ **`find_dependency(termforge 0.6.0)` used to be exercised by nothing in
+`ctest`.** That was gitea
+[#46](https://git.gobha.me/xcaliber/term-game/issues/46), closed by the
+`consumer-resolves` check below.
 
 ### The pause dialog was the one widget the tier never reached — fixed
 

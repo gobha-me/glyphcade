@@ -32,6 +32,15 @@
 # is the artefact a consumer actually resolves, which makes this the only check
 # that tests the thing that breaks rather than a proxy for it.
 #
+# ⚠ "The only check" is scoped to gitea #13's question. This script judges the
+# CONTENT of the exported targets and nothing else — it reads them as TEXT and
+# never calls find_package, so it cannot tell whether the package resolves at
+# all. A stale floor in cmake/project-config.cmake.in makes the installed
+# package unresolvable by anyone while this script still prints CLEAN; that was
+# gitea #46, and its guard is the sibling cmake/check_consumer.cmake (ctest
+# consumer-resolves). Neither check subsumes the other. If you are here because
+# a consumer cannot use the package, this is probably not the file you want.
+#
 # It is most meaningful in the arm where audio is ON — the default in the dev
 # container — because that is the only configuration where there is an rtaudio
 # target available to leak in the first place.
