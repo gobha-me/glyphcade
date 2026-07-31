@@ -309,6 +309,33 @@ expect `┤` or `│` to move at the colour tier — `Rounded` shares both with
 `Single`, and only the corners differ. A check written against those would read
 as a failed fix.
 
+⚠ **A glyph that IMPROVES at one tier must be shown not to change at the
+other**, and one `\r` is enough to reach it. gitea #45 swapped the options
+cycler's `<`/`>` for `‹`/`›` above the ASCII tier, where the old code was
+correct and had to stay so:
+
+```bash
+{ sleep 3; printf '\r'; sleep 3; printf '\033'; sleep 1; printf '\033';
+  sleep 2; } | \
+  TERM=xterm-256color COLORTERM=truecolor timeout 30 \
+  script -q -c "$PWD/build/src/bin/term-game" /tmp/cycler.raw
+```
+
+On the stripped text, `grep -ac 'Level:'` and `grep -ac '╭'` must both be ≥ 1
+first — Minesweeper's own option label and the rounded family — or a glyph count
+of zero just means nothing drew. Then `grep -ac '›'` goes **0 → 1** against the
+old binary and `grep -ao 'Easy >' | wc -l` goes **1 → 0**. Re-run with
+`env -u TERM -u COLORTERM` and **both** numbers must be unchanged (`Easy >`
+still 1, `LC_ALL=C grep -acP '[\x80-\xff]'` still 0).
+
+⚠ **Use `grep -a`.** A pty capture contains NUL bytes — 22 lines' worth in the
+run above — and grep classifies such a file as binary, printing `Binary file
+matches` *instead of a count*. It does not do this reliably: GNU grep decides
+from the first buffer, so whether a bare `grep -c` returns the right number or
+nothing at all depends on where the NULs happen to land. It returned the right
+number on the capture above and nothing on a three-line probe with an early NUL.
+An intermittently-silent count is worse than a wrong one, so pass `-a` always.
+
 **The throw path is automated** — `ctest -R pty-restore -V`, or by hand
 `cmake/pty_restore.sh build/test/pty-restore-probe`. It drives a
 deliberately-throwing binary through the same harness and asserts one `?1049h`,
