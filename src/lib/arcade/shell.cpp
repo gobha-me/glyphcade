@@ -471,6 +471,24 @@ auto Shell::open_pause() -> void {
   // showings, so without this the second pause opens with "Menu" focused and
   // Enter drops the player out of the game they just paused.
   m_pause.set_default(false);
+  // Same reason, second cause (gitea #44). Dialog owns its Frame privately and
+  // that Frame defaults to BorderStyle::Single — a family sync_capabilities()
+  // NEVER chooses, its two answers being Ascii and Rounded. So without this the
+  // pause dialog is the one widget the tier never reaches: box drawing on a
+  // terminal that just reported no colour, and ┌ where everything else draws ╭
+  // on one that did. It covers the ring AND the title delimiters, which
+  // Frame::draw takes from the same border_glyphs table — which is in turn why
+  // the ConfirmDialog's two Buttons need nothing, having no glyph table at all.
+  //
+  // ⚠ Here and not in sync_capabilities(). rebuild_list() sits there because it
+  // CANNOT be done per frame (set_items resets the scroll offset); it is the
+  // exception, not the pattern. Every other tier-derived style in this codebase
+  // is re-pushed at the moment of use — draw_selector does it four times a
+  // frame. And this reads m_ctx, never driver(), so it is safe at any time,
+  // whereas a one-shot at probe time could never reach an overlay built after
+  // the first frame. The next dialog someone adds copies these lines, not that
+  // function.
+  m_pause.set_border_style(m_ctx.border_style());
   push_overlay(m_pause);
 }
 
