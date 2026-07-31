@@ -75,7 +75,17 @@ endif ()
 # find_package(term-game) breaks, on someone else's machine. See
 # cmake/check_export.cmake for why a PRIVATE link is not a defence.
 #
-# Gated on _INSTALL because there is nothing to inspect without install rules.
+# Its sibling, the gitea #46 guard: install to a scratch prefix and CONFIGURE a
+# generated throwaway consumer against it, so the floor in
+# cmake/project-config.cmake.in is executed rather than merely written. Neither
+# check subsumes the other — audio-export-clean judges the CONTENT of the
+# exported targets, consumer-resolves judges whether the package RESOLVES at
+# all. A stale floor makes the second red while the first still says CLEAN,
+# which is exactly the hole #46 was filed about.
+#
+# Both are gated on _INSTALL because there is nothing to install, inspect or
+# resolve without install rules. One block rather than two with the same
+# condition: two near-identical else() branches drift apart.
 if (${PROJECT_NAME}_INSTALL AND TARGET ${PROJECT_NAME}::lib)
   message(STATUS "Configuring test setup audio-export-clean")
   add_test(
@@ -85,11 +95,40 @@ if (${PROJECT_NAME}_INSTALL AND TARGET ${PROJECT_NAME}::lib)
             -DPROJECT=${PROJECT_NAME}
             -P ${PROJECT_SOURCE_DIR}/cmake/check_export.cmake
   )
+
+  message(STATUS "Configuring test setup consumer-resolves")
+  # EXPECT_VERSION pins the check to THIS build — without it a stray system
+  # install could answer the consumer's find_package and the test would pass
+  # forever. termforge_DIR is forwarded so the check still works on a machine
+  # where termforge was found rather than fetched; it is legitimately
+  # <name>-NOTFOUND here, and check_consumer.cmake ignores that spelling.
+  add_test(
+    NAME consumer-resolves
+    COMMAND ${CMAKE_COMMAND}
+            -DBUILD_DIR=${PROJECT_BINARY_DIR}
+            -DPROJECT=${PROJECT_NAME}
+            -DEXPECT_VERSION=${PROJECT_VERSION}
+            -DTERMFORGE_DIR=${termforge_DIR}
+            -P ${PROJECT_SOURCE_DIR}/cmake/check_consumer.cmake
+  )
+
+  # Both scripts run `cmake --install ${PROJECT_BINARY_DIR}`, which finishes by
+  # writing ${CMAKE_BINARY_DIR}/install_manifest.txt. Their scratch PREFIXES do
+  # not collide, but that one manifest is a shared write in the build tree, and
+  # two concurrent installs race on it under `ctest -j`. It would rarely fail
+  # outright — which is worse, because the failure mode is one unreproducible
+  # red per quarter rather than something you can sit down and debug.
+  #
+  # RESOURCE_LOCK is plain mutual exclusion by label; the string names nothing
+  # real. This is the only lock in the suite, and it serialises two tests.
+  set_tests_properties(audio-export-clean consumer-resolves
+    PROPERTIES RESOURCE_LOCK install-tree)
 else ()
   message(STATUS
-    "audio-export-clean not configured — ${PROJECT_NAME}_INSTALL is off, so "
-    "there is no exported package to inspect. gitea #13's guard is ABSENT in "
-    "this configuration, not passing.")
+    "audio-export-clean and consumer-resolves not configured — "
+    "${PROJECT_NAME}_INSTALL is off, so there is no exported package to inspect "
+    "and nothing installed for a consumer to resolve. gitea #13's and #46's "
+    "guards are ABSENT in this configuration, not passing.")
 endif ()
 
 file(GLOB TEST_DIRS ${CMAKE_CURRENT_LIST_DIR}/*)
