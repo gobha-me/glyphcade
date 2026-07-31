@@ -326,8 +326,15 @@ first — Minesweeper's own option label and the rounded family — or a glyph c
 of zero just means nothing drew. Then `grep -ac '›'` goes **0 → 1** against the
 old binary and `grep -ao 'Easy >' | wc -l` goes **1 → 0**. Re-run with
 `env -u TERM -u COLORTERM` and **both** numbers must be unchanged (`Easy >`
-still 1, `LC_ALL=C grep -acP '[\x80-\xff]'` still 0). ⚠ `grep -a`, not `grep`:
-a pty capture is binary to grep and a bare `grep -c` silently reports nothing.
+still 1, `LC_ALL=C grep -acP '[\x80-\xff]'` still 0).
+
+⚠ **Use `grep -a`.** A pty capture contains NUL bytes — 22 lines' worth in the
+run above — and grep classifies such a file as binary, printing `Binary file
+matches` *instead of a count*. It does not do this reliably: GNU grep decides
+from the first buffer, so whether a bare `grep -c` returns the right number or
+nothing at all depends on where the NULs happen to land. It returned the right
+number on the capture above and nothing on a three-line probe with an early NUL.
+An intermittently-silent count is worse than a wrong one, so pass `-a` always.
 
 **The throw path is automated** — `ctest -R pty-restore -V`, or by hand
 `cmake/pty_restore.sh build/test/pty-restore-probe`. It drives a
