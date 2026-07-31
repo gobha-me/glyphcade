@@ -11,13 +11,25 @@
 # acquisition modes.
 #
 # ⚠ This used to claim "See example/consumer/ for all three, exercised." There is
-# no example/ directory in this repo and there never has been, so nothing
-# automated proves the installed package actually resolves — the closest thing is
-# the audio-export-clean ctest, which only greps the Targets file for rtaudio. The
-# residual risk is bounded rather than absent: the "target not in any export set"
-# case fails loudly at generate time, and termforge::lib is the only external
-# name any exported target references. Treat consumption as unverified until
-# something exercises it.
+# no example/ directory in this repo and there never has been, and for a long
+# while nothing automated proved the installed package actually resolves — the
+# closest thing was the audio-export-clean ctest, which only greps the Targets
+# file for rtaudio.
+#
+# gitea #46 closed that. The **consumer-resolves** ctest
+# (cmake/check_consumer.cmake) installs to a scratch prefix and CONFIGURES a
+# generated throwaway consumer against it, so `find_package(<project> REQUIRED)`
+# and the find_dependency line in cmake/project-config.cmake.in are executed on
+# every run rather than merely written. The INSTALL acquisition mode above is
+# now covered; add_subdirectory() and FetchContent are covered by the in-tree
+# build itself.
+#
+# What is still unexercised is narrower and worth naming: nothing COMPILES or
+# LINKS against the installed package — the consumer configures only. So a
+# broken INTERFACE include path or a missing archive would survive. The residual
+# risk stays bounded for the reasons it always was: the "target not in any
+# export set" case fails loudly at generate time, and termforge::lib is the only
+# external name any exported target references.
 #
 # Included from the root CMakeLists behind ${PROJECT_NAME}_INSTALL, which
 # defaults to PROJECT_IS_TOP_LEVEL: an embedded copy of this project must not

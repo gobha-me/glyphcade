@@ -222,10 +222,13 @@ runs in enforce mode and must print `CLEAN`. If it reports Class-B failures righ
 after you add files, `git add` them first: it reads `git ls-files`, so untracked
 files look like missing ones.
 
-Check `ctest -N` lists **`pty-restore`**. It is gated on `find_program(script)`,
-so on a box without `script(1)` it silently is not there — and a green run
-without it has not checked the one thing only a pty can show. Absent means
-skipped, not passed; the configure log says which.
+Check `ctest -N` lists **`pty-restore`**, **`audio-export-clean`** and
+**`consumer-resolves`**. All three are conditionally registered — `pty-restore`
+on `find_program(script)`, the other two on `${PROJECT_NAME}_INSTALL` — so on a
+box or in a configuration that lacks the gate they silently are not there, and a
+green run without them has not checked what only they can show: the one thing a
+pty reveals, and whether the installed package is resolvable by anybody at all.
+**Absent means skipped, not passed**; the configure log says which.
 
 ### Checking the terminal itself, without a human
 
