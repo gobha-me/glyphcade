@@ -1126,6 +1126,31 @@ TEST_CASE("the detail pane names each game's options", "[selector][options]") {
   }
 }
 
+TEST_CASE("a long choice list is advertised by COUNT, not by joining",
+          "[selector][options]") {
+  // ⚠ Sokoban declares twenty level names. Joined, that is five wrapped rows of
+  // a pane which is dropped entirely below 48 columns and shares what it has
+  // with the description -- so past kInlineChoiceMax the pane states how many
+  // there are, which is the part a player is deciding on.
+  //
+  // ⚠ Both arms need a case. With only Sokoban over the cap, inverting the
+  // comparison still passes for the other four games.
+  Probe app;
+  app.step(1, 80, 24);
+  const int index = game_index("sokoban");
+  REQUIRE(index >= 0);
+  while (app.selector_index() < index) {
+    app.dispatch_event(key(termforge::Key::Down));
+  }
+  app.step(1, 80, 24);
+
+  std::string all;
+  for (int y = 0; y < 24; ++y) all += row_text(app, y) + "\n";
+  INFO(all);
+  CHECK(all.find("options:") != std::string::npos);
+  CHECK(all.find("to choose from") != std::string::npos);
+}
+
 TEST_CASE("the options lines stay 7-bit at every pane width",
           "[selector][options][render]") {
   // The same sweep the description already gets, extended to the new lines.
