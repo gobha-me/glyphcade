@@ -40,8 +40,11 @@
 
 #include <termforge/core/screen.hpp>
 #include <termforge/core/types.hpp>
+#include <termforge/widgets/detail/width.hpp>
+#include <termforge/widgets/glyphs.hpp>
 #include <termforge/widgets/theme.hpp>
 
+#include <termgame/arcade/context.hpp>
 #include <termgame/arcade/game_meta.hpp>
 #include <termgame/arcade/hud.hpp>
 #include <termgame/arcade/options_screen.hpp>
@@ -51,6 +54,7 @@ namespace {
 
 namespace hud = termgame::hud;
 
+using termgame::GameContext;
 using termgame::GameMeta;
 using termgame::kInlineChoiceMax;
 using termgame::kMaxGameOptions;
@@ -448,6 +452,67 @@ auto opened(std::span<const OptionSpec> opts) -> OptionsScreen {
   return s;
 }
 
+// The same, on a chosen glyph tier — and the ONLY way this suite reaches the
+// Unicode one.
+//
+// ⚠ Through a Shell there is no way at all: test_run_frames installs a
+// FallbackDriver whose capabilities() is an all-false literal, so the Shell
+// always syncs to BorderStyle::Ascii and TERM= in the ctest environment changes
+// nothing. That blind spot is gitea #48. GameContext::set_border_style is
+// public plumbing, so an OptionsScreen tested in isolation can pick the tier the
+// Shell would have probed — the same trick test/28tetris-ui plays on the
+// capabilities axis to reach its kitty_keyboard arm.
+//
+// ⚠ THE CONTEXT IS THE CALLER'S, and that is not a style choice. open() stores
+// it as a POINTER; a helper that owned a GameContext and returned the screen by
+// value would leave m_ctx dangling, which crashes under ASan rather than
+// failing as a red test.
+auto opened_at(std::span<const OptionSpec> opts, GameContext& ctx,
+               termforge::BorderStyle style) -> OptionsScreen {
+  ctx.set_border_style(style);
+  OptionsScreen s;
+  s.open("Snake", opts, &ctx);
+  return s;
+}
+
+// One cell, as text. ⚠ NOT row_text(...)[x] — at the Unicode tier a cell holds
+// three bytes, so byte offsets into the row stop being column numbers at the
+// first multi-byte glyph. Every tier assertion below indexes CELLS.
+auto cell_text(const termforge::Screen& screen, int x, int y) -> std::string {
+  const std::string& t = screen.at(x, y).text;
+  return t.empty() ? " " : t;
+}
+
+// Is every cell a WHOLE UTF-8 sequence? A cell holding a lone continuation byte
+// means something cut a glyph in half — the exact failure substr(0, cols) would
+// produce where truncate_to_width does not.
+auto cells_are_whole_utf8(const termforge::Screen& screen) -> bool {
+  for (int y = 0; y < screen.rows(); ++y) {
+    for (int x = 0; x < screen.cols(); ++x) {
+      const std::string& t = screen.at(x, y).text;
+      if (t.empty()) continue;
+      const auto lead = static_cast<unsigned char>(t[0]);
+      std::size_t need = 0;
+      if ((lead & 0x80U) == 0x00U) {
+        need = 1;
+      } else if ((lead & 0xE0U) == 0xC0U) {
+        need = 2;
+      } else if ((lead & 0xF0U) == 0xE0U) {
+        need = 3;
+      } else if ((lead & 0xF8U) == 0xF0U) {
+        need = 4;
+      } else {
+        return false;  // a continuation byte leading a cell
+      }
+      if (t.size() != need) return false;
+      for (std::size_t i = 1; i < need; ++i) {
+        if ((static_cast<unsigned char>(t[i]) & 0xC0U) != 0x80U) return false;
+      }
+    }
+  }
+  return true;
+}
+
 // The whole screen as one string, for "does this text appear anywhere" checks.
 auto screen_text(const termforge::Screen& screen) -> std::string {
   std::string out;
@@ -766,4 +831,245 @@ TEST_CASE("selected() and preselect() are total over any index") {
   CHECK(closed.selected(0) == 0);
   closed.preselect(0, 3);  // must not write into an empty span's array
   CHECK(closed.selected(0) == 0);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// The cycler's glyph tier — gitea #45
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠ EVERY CASE BELOW THIS LINE IS THE FIRST OF ITS KIND IN THE REPO. Nothing
+// else anywhere renders at the Unicode tier: every other suite goes through
+// test_run_frames, which is nailed to the fallback driver. So these cases are
+// not "more coverage of the same thing" — before them, draw_cycler's and
+// draw_list's non-ASCII branch had never been executed by a test at all, and a
+// mutation confined to it could not be killed.
+
+namespace {
+
+// Column arithmetic for kTwoOptions, spelled out because the assertions index
+// cells and there is no other way to say WHICH `>` is meant at the ASCII tier.
+//
+//   col:  0    1  2..6    7  8   9   10  11..    ..  n
+//         mark ' ' label  ':' ' ' <   ' ' value  ' ' >
+//
+// kHeaderRows is 2 (title, blank), so option i is at y == 2 + i.
+constexpr int kLevelY = 2;     // "Level: < Normal >", default index 1 of 3
+constexpr int kWallsY = 3;     // "Walls:   Solid >",   default index 0 of 2
+constexpr int kArrowLeftX = 9;   // 1 mark + 1 space + 5 label + ':' + ' '
+constexpr int kValueX = 11;
+constexpr int kLevelRightX = kValueX + 6 + 1;  // "Normal" then a space
+constexpr int kWallsRightX = kValueX + 5 + 1;  // "Solid"  then a space
+
+}  // namespace
+
+TEST_CASE("the cycler arrows come from the tier: Unicode") {
+  // v0.6.0 (gitea #36's pin) put arrow_left/arrow_right in MarkGlyphs. Before
+  // #45 draw_cycler hardcoded the ASCII forms, so THIS is the case that was red
+  // first — a terminal drawing ▸, ▾ and rounded borders got a bare < and > in
+  // the one place the suite otherwise uses a proper glyph.
+  GameContext ctx;
+  auto s = opened_at(kTwoOptions, ctx, termforge::BorderStyle::Rounded);
+  termforge::Screen screen(80, 8);
+  s.draw(screen);
+  INFO(screen_text(screen));
+  CHECK(cell_text(screen, kArrowLeftX, kLevelY) == "‹");   // ‹
+  CHECK(cell_text(screen, kLevelRightX, kLevelY) == "›");  // ›
+  // ⚠ The two above are only meaningful if the arithmetic lands where it claims
+  // to. Without this the case passes just as well against a row that is one
+  // column off and happens to have arrows on both sides of the mistake.
+  CHECK(cell_text(screen, kValueX, kLevelY) == "N");
+  CHECK(cell_text(screen, 0, kLevelY) == "▸");  // ▸, the selector mark
+}
+
+TEST_CASE("the cycler arrows come from the tier: ASCII") {
+  // ⚠ BY COLUMN, NEVER BY row.find('>'). kAsciiMarks gives ">" for BOTH
+  // selector and arrow_right — upstream says so out loud at glyphs.hpp and
+  // notes that termforge #22's own tests assert the marker by column for this
+  // reason. At this tier the row genuinely contains two '>' for two different
+  // reasons, and a search finds the SELECTOR at column 0 first.
+  GameContext ctx;
+  auto s = opened_at(kTwoOptions, ctx, termforge::BorderStyle::Ascii);
+  termforge::Screen screen(80, 8);
+  s.draw(screen);
+  INFO(screen_text(screen));
+  CHECK(cell_text(screen, kArrowLeftX, kLevelY) == "<");
+  CHECK(cell_text(screen, kLevelRightX, kLevelY) == ">");
+  // The collision itself, asserted rather than left as a comment: both of these
+  // are '>' and they are not the same glyph.
+  CHECK(cell_text(screen, 0, kLevelY) == ">");
+  CHECK(cell_text(screen, kValueX, kLevelY) == "N");
+}
+
+TEST_CASE("a null context is the ASCII tier, not a third tier") {
+  // The default every existing case in this file runs at. It has to keep
+  // agreeing with an explicitly-Ascii context, or opened() and opened_at() are
+  // testing two different programs.
+  auto s = opened(kTwoOptions);
+  termforge::Screen screen(80, 8);
+  s.draw(screen);
+  CHECK(cell_text(screen, kArrowLeftX, kLevelY) == "<");
+  CHECK(cell_text(screen, kLevelRightX, kLevelY) == ">");
+}
+
+TEST_CASE("the tier moved at all: the 7-bit sweep as a two-sided control") {
+  // ⚠ Without this, "the Unicode arm draws ‹" could be passing on a screen that
+  // never left the floor — the assertion would be wrong about WHY it holds and
+  // nothing would say so. Same shape as test/11selector's scrollbar case, which
+  // pairs all_seven_bit() with a positive glyph control.
+  GameContext uni;
+  auto u = opened_at(kTwoOptions, uni, termforge::BorderStyle::Rounded);
+  termforge::Screen su(80, 8);
+  u.draw(su);
+  CHECK_FALSE(all_seven_bit(su));
+
+  GameContext asc;
+  auto a = opened_at(kTwoOptions, asc, termforge::BorderStyle::Ascii);
+  termforge::Screen sa(80, 8);
+  a.draw(sa);
+  CHECK(all_seven_bit(sa));
+}
+
+TEST_CASE("the two tiers differ in BYTES and agree in COLUMNS") {
+  // This is the width-arithmetic check gitea #45 asked for, and its answer is
+  // that no code change was needed: ‹ › and ▸ are three bytes each and ONE
+  // column each (termforge's kWide table starts at U+2E80), so the layout is
+  // tier-independent while the byte length is not.
+  //
+  // ⚠ It is also the case that dies if anyone ever "simplifies"
+  // truncate_to_width to substr(0, cols) — that swap is invisible at the ASCII
+  // tier, where the two numbers are equal, and this is the only place the suite
+  // has them differ.
+  GameContext uni;
+  GameContext asc;
+  auto u = opened_at(kTwoOptions, uni, termforge::BorderStyle::Rounded);
+  auto a = opened_at(kTwoOptions, asc, termforge::BorderStyle::Ascii);
+  termforge::Screen su(80, 8);
+  termforge::Screen sa(80, 8);
+  u.draw(su);
+  a.draw(sa);
+
+  // Column for column, the ONLY cells allowed to differ are the three marks.
+  for (int x = 0; x < 80; ++x) {
+    if (x == 0 || x == kArrowLeftX || x == kLevelRightX) continue;
+    INFO("x: " << x);
+    REQUIRE(cell_text(su, x, kLevelY) == cell_text(sa, x, kLevelY));
+  }
+
+  const std::string urow = row_text(su, kLevelY);
+  const std::string arow = row_text(sa, kLevelY);
+  INFO("unicode: [" << urow << "] ascii: [" << arow << "]");
+  CHECK(termforge::detail::display_width(urow) ==
+        termforge::detail::display_width(arow));
+  CHECK(urow.size() > arow.size());  // 3 bytes per mark, not 1
+}
+
+TEST_CASE("a truncated row loses the same COLUMNS at either tier") {
+  // ⚠ THE ONLY CASE THAT KILLS substr(0, cols), AND THE ONE ABOVE DOES NOT.
+  // Found by mutation, not by reasoning, and the reasoning it corrects is worth
+  // keeping: the obvious guess is that substr leaves a half-glyph in a cell, so
+  // a sweep asserting whole UTF-8 per cell would catch it. It does not.
+  // write_text SANITIZES — the orphaned bytes are dropped, every cell stays
+  // well formed, and the damage is entirely invisible at cell granularity.
+  //
+  // What substr actually costs is COLUMNS. Truncating 25 bytes of Unicode row
+  // to `cols` BYTES yields fewer than `cols` columns, so the Unicode tier
+  // silently renders a shorter row than the ASCII tier on the same screen — and
+  // at 80 columns, where the case above runs, nothing truncates at all and the
+  // two helpers are indistinguishable.
+  //
+  // ⚠ So this case must run at widths that actually cut. It sweeps from 1 up
+  // past the full row rather than picking one, because which width first
+  // straddles a multi-byte glyph is arithmetic nobody should have to redo when
+  // a label changes.
+  for (int cols = 1; cols <= 30; ++cols) {
+    INFO("cols: " << cols);
+    GameContext uni;
+    GameContext asc;
+    auto u = opened_at(kTwoOptions, uni, termforge::BorderStyle::Rounded);
+    auto a = opened_at(kTwoOptions, asc, termforge::BorderStyle::Ascii);
+    termforge::Screen su(cols, 8);
+    termforge::Screen sa(cols, 8);
+    u.draw(su);
+    a.draw(sa);
+    const std::string urow = row_text(su, kLevelY);
+    const std::string arow = row_text(sa, kLevelY);
+    INFO("unicode: [" << urow << "] ascii: [" << arow << "]");
+    REQUIRE(termforge::detail::display_width(urow) ==
+            termforge::detail::display_width(arow));
+  }
+}
+
+TEST_CASE("an arrow with nowhere to go is a blank, at BOTH tiers") {
+  // "Walls" defaults to index 0 of two, so there is nothing to its left. The
+  // guard predates #45; what is new is that a blank must stay a blank when the
+  // glyph beside it changes. A mutant that drops the can_left test puts a ‹ on
+  // a value that cannot go left, and the row stops saying "this is the end".
+  struct Arm {
+    termforge::BorderStyle style;
+    std::string_view right;
+  };
+  for (const Arm arm : {Arm{termforge::BorderStyle::Rounded, "›"},
+                        Arm{termforge::BorderStyle::Ascii, ">"}}) {
+    GameContext ctx;
+    auto s = opened_at(kTwoOptions, ctx, arm.style);
+    termforge::Screen screen(80, 8);
+    s.draw(screen);
+    INFO(screen_text(screen));
+    REQUIRE(cell_text(screen, kArrowLeftX, kWallsY) == " ");
+    REQUIRE(cell_text(screen, kWallsRightX, kWallsY) == arm.right);
+  }
+}
+
+TEST_CASE("an arrow with nowhere to go is a blank at the RIGHT end too") {
+  // ⚠ Found by mutation: `can_right = true` survived everything above, and the
+  // reason is the fixture, not the assertion. kTwoOptions defaults "Level" to 1
+  // of 3 and "Walls" to 0 of 2 — so SOMETHING can always go right, and no case
+  // had ever drawn a value sitting on its last choice. The left end was covered
+  // only because "Walls" happens to start there.
+  //
+  // This is older than #45 (the guard has been half-tested since #38); the
+  // glyph swap is just what made it visible.
+  struct Arm {
+    termforge::BorderStyle style;
+    std::string_view left;
+  };
+  for (const Arm arm : {Arm{termforge::BorderStyle::Rounded, "‹"},
+                        Arm{termforge::BorderStyle::Ascii, "<"}}) {
+    GameContext ctx;
+    auto s = opened_at(kTwoOptions, ctx, arm.style);
+    send(s, key(termforge::Key::Right));  // 1 of 3 -> 2 of 3, the last
+    REQUIRE(s.selected(0) == 2);
+    termforge::Screen screen(80, 8);
+    s.draw(screen);
+    INFO(screen_text(screen));
+    REQUIRE(cell_text(screen, kArrowLeftX, kLevelY) == arm.left);
+    // "Hard" is four columns where "Normal" was six, so the right arrow moves.
+    REQUIRE(cell_text(screen, kValueX + 4 + 1, kLevelY) == " ");
+  }
+}
+
+TEST_CASE("the Unicode tier survives every size, without splitting a glyph") {
+  // The Unicode-tier twin of "draw survives every size from the Shell floor
+  // up", and the half that matters more: truncation there cuts a row whose
+  // glyphs are three bytes wide. A cell holding one byte of a ‹ is a mojibake
+  // smear on a real terminal and a perfectly green test everywhere else.
+  //
+  // The list arm is here too — draw_list's selector is ▸ at this tier, and it
+  // had never been drawn by a test either.
+  for (int cols = 4; cols <= 90; cols += 3) {
+    for (int rows = 2; rows <= 26; rows += 2) {
+      INFO("size: " << cols << "x" << rows);
+      GameContext ctx;
+      auto s = opened_at(kTwoOptions, ctx, termforge::BorderStyle::Rounded);
+      termforge::Screen screen(cols, rows);
+      REQUIRE_NOTHROW(s.draw(screen));
+      REQUIRE(cells_are_whole_utf8(screen));
+
+      GameContext lctx;
+      auto list = opened_at(kListOption, lctx, termforge::BorderStyle::Rounded);
+      termforge::Screen screen2(cols, rows);
+      REQUIRE_NOTHROW(list.draw(screen2));
+      REQUIRE(cells_are_whole_utf8(screen2));
+    }
+  }
 }

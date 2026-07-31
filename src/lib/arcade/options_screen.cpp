@@ -191,15 +191,22 @@ auto OptionsScreen::draw_cycler(termforge::Screen& screen, std::size_t i, int y,
   row += " ";
   row += std::string(opt.label);
   row += ": ";
-  row += can_left ? "<" : " ";
+  row += can_left ? marks.arrow_left : std::string_view{" "};
   row += " ";
   row += std::string(value);
   row += " ";
-  row += can_right ? ">" : " ";
+  row += can_right ? marks.arrow_right : std::string_view{" "};
 
-  // ⚠ truncate_to_width, not substr: `mark` may be a two-column glyph at the
-  // Unicode tier, so byte length and column count are different numbers. This
-  // is the same sanctioned helper icon_is_safe() uses.
+  // ⚠ truncate_to_width, not substr: `mark` and both arrows are MULTI-BYTE at
+  // the Unicode tier — ‹ › and ▸ are three bytes each — so byte length and
+  // column count are different numbers. This is the same sanctioned helper
+  // icon_is_safe() uses.
+  //
+  // ⚠ Multi-byte, not multi-column: all three are ONE column wide by
+  // termforge's own table (kWide starts at U+2E80), so the layout is the same
+  // at both tiers and only the byte count moves. That is precisely why
+  // substr(0, cols) here would be invisible at the ASCII tier and cut a glyph
+  // in half above it. test/33options pins both halves of that.
   screen.write_text(0, y, termforge::detail::truncate_to_width(row, cols), fg,
                     bg);
 }
