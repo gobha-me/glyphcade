@@ -164,6 +164,10 @@ class Shell : public termforge::App {
   // ⚠ A MEMBER, not a local. push_overlay stores a raw pointer and does not
   // own the widget; a dialog constructed on the stack of the function that
   // pushes it dangles the moment that function returns.
+  //
+  // ⚠ Being a member is also why its per-showing state is set at the push site
+  // rather than here: the constructor may not touch driver(), so it cannot know
+  // the border tier, and focus persists between showings. See open_pause().
   termforge::ConfirmDialog m_pause{"Paused", ""};
 };
 
