@@ -121,7 +121,19 @@ auto Sokoban::start(GameContext& ctx) -> void {
   // that is derived cannot go stale.
   int resume = 0;
   while (resume < sokoban::level_count() && best_moves(resume) > 0) ++resume;
-  load(resume >= sokoban::level_count() ? 0 : resume);
+  const int start_at = resume >= sokoban::level_count() ? 0 : resume;
+
+  // ⚠ load() FIRST, before the picker opens. The resume level is what the game
+  // is on while the picker is up, so index() is already correct for anything
+  // that asks — and dismissing without touching anything is then genuinely a
+  // no-op rather than a reload.
+  load(start_at);
+
+  // gitea #38: twenty levels is a list, not three keys. preselect() rather than
+  // default_index because this number comes from the score store and cannot be
+  // constexpr; see the note on kSokobanOptions.
+  m_options.open(kMeta.title, kMeta.options, &ctx);
+  m_options.preselect(0, start_at);
 }
 
 auto Sokoban::load(int index) -> void {
@@ -343,6 +355,20 @@ auto Sokoban::handle_mouse(const termforge::MouseEvent& mouse) -> bool {
 }
 
 auto Sokoban::on_event(const termforge::Event& ev) -> bool {
+  if (m_options.is_open()) {
+    switch (m_options.on_event(ev)) {
+      case OptionsScreen::Reply::Ignored:
+        return false;  // Escape and 'p' stay the Shell's
+      case OptionsScreen::Reply::Consumed:
+        return true;
+      case OptionsScreen::Reply::Dismissed:
+        // Unconditional, like the other three games. load() clamps, so a
+        // selection out of range cannot reach the parser.
+        load(m_options.selected(0));
+        return true;
+    }
+  }
+
   if (const auto* key = std::get_if<termforge::KeyEvent>(&ev)) {
     return handle_key(*key);
   }
@@ -382,6 +408,14 @@ auto Sokoban::solved_count() const -> int {
 // ── Rendering ──────────────────────────────────────────────────────────────
 
 auto Sokoban::draw(termforge::Screen& screen) -> void {
+  // Same arm as draw_broken()/draw_too_small(): the picker owns the whole
+  // Screen. Sokoban is turn-based and has no tick(), so unlike Snake and Tetris
+  // there is nothing to gate -- nothing moves on its own.
+  if (m_options.is_open()) {
+    m_options.draw(screen);
+    return;
+  }
+
   m_layout = sokoban::compute_layout(screen.cols(), screen.rows(),
                                      m_board ? m_board->level().w : 0,
                                      m_board ? m_board->level().h : 0);
