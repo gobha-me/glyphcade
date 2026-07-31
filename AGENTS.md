@@ -284,6 +284,31 @@ Better still where a second binary exists: run the SAME capture against the old
 pin's binary and diff the counts. For #36 that was 1 against 0, which is
 evidence a single arm cannot produce.
 
+⚠ **The same rule holds for glyphs, and there the control is easy to get
+wrong.** gitea #44 checked that the pause dialog stopped painting box-drawing
+characters. Drive it — note the *two* `\r`, because Minesweeper is roster entry
+0 and has a pre-start options screen:
+
+```bash
+{ sleep 3; printf '\r'; sleep 1; printf '\r'; sleep 1; printf 'p'; sleep 3;
+  printf '\033'; sleep 1; printf '\033'; sleep 1; printf '\033'; sleep 2; } | \
+  timeout 40 script -q -c "$PWD/build/src/bin/term-game" /tmp/pause.raw
+```
+
+Then, on the **stripped** text: `grep -c 'Paused'` and `grep -c 'Resume'` must
+both be ≥ 1 *before any glyph count is believed* — they are the Frame's own
+title and a Button label, so they prove the widget under test drew at all.
+`grep -c '┌'` is a good discriminator precisely because **`BorderStyle::Single`
+is a family this application never chooses** (the tier resolves only to `Ascii`
+or `Rounded`), so its only possible source is an unstyled sub-widget. At the
+bare tier finish with `LC_ALL=C grep -cP '[\x80-\xff]'` — the whole-session
+analogue of `all_seven_bit()`. At the colour tier the control is `grep -c '╭'`,
+which must be ≥ 1 *and go up by the fix*: 7 → 8 is the positive half, showing
+the dialog joined the rounded family rather than merely stopping. ⚠ Do not
+expect `┤` or `│` to move at the colour tier — `Rounded` shares both with
+`Single`, and only the corners differ. A check written against those would read
+as a failed fix.
+
 **The throw path is automated** — `ctest -R pty-restore -V`, or by hand
 `cmake/pty_restore.sh build/test/pty-restore-probe`. It drives a
 deliberately-throwing binary through the same harness and asserts one `?1049h`,
