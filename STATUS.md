@@ -2,7 +2,9 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-07-31** (gitea #44 — the pause dialog joins the border tier)
+**Last updated: 2026-07-31** (gitea #44 — the pause dialog joins the border
+tier; plus the first maintainer feel report, see
+[Feel and the container](#feel-and-the-container))
 
 ---
 
@@ -42,10 +44,18 @@ cannot clip, three sinks, and SFX bound into both the selector and Minesweeper.
 gitea [#13](https://git.gobha.me/xcaliber/term-game/issues/13) is decided and
 enforced by a test. See "What Epic 2 built" below.
 
-⚠ **It has never been heard.** Nothing in this container can play a sound. What
-is verified is that it builds in six arms, that the offline path renders what it
-claims to, and that the no-device path degrades correctly — not that the bank
-sounds good, or indeed that a real device works at all.
+⚠ **Nothing in this container can play a sound**, so what is verified *here* is
+that it builds in six arms, that the offline path renders what it claims to, and
+that the no-device path degrades correctly.
+
+**A real device works.** Confirmed by the maintainer on desktop hardware
+2026-07-31 — the clause that used to end this paragraph, "not that a real device
+works at all", is retired. ⚠ **That is the only clause it retires**, and the
+bound is the maintainer's own: roughly **ten seconds, on one game**. Whether the
+bank *sounds good*, and whether each effect is the RIGHT sound across five
+games, is untouched by it and still needs an ear. Do not read "audio works" as
+"the bank is verified" — see [Feel and the container](#feel-and-the-container)
+below for why that distinction keeps mattering.
 
 **Epic 4 has landed. There are two games.** 2048 is registered, playable with
 arrows/hjkl/wasd, one level of undo, and it is the first game with **motion** — a
@@ -57,10 +67,18 @@ assertions in `test/11selector` went live for free, and the case they could neve
 cover — a click on a **non**-selected row, the only gesture that discriminates the
 `State::Selector` guard in the mouse path — is now written.
 
-⚠ What is verified is rules, geometry, rendering and sound-intent. **Feel is
-not**: whether 90 ms of slide and 70 ms of pop are right, whether the board is
-pleasant to play, and whether Slide and Merge sound like anything — all still
-need a human. Nothing in this container can judge any of them.
+**The tween's feel is confirmed.** "2048 feels very smooth" — the maintainer, on
+desktop hardware, 2026-07-31. That closes the one question this game could not
+answer for itself: 90 ms of slide and 70 ms of pop were **designed blind**,
+because the HTML reference has no working slide animation to port, so there was
+no prior art to check them against and nine releases of no way to judge them.
+The constants in `anim.hpp` are now measured, not guessed. ⚠ Which means
+changing them is now a **regression risk** rather than a free tweak — an ease
+curve is still a feel decision, but the linear baseline it would be replacing
+has been played and liked.
+
+⚠ Still not verified: whether the board is pleasant to play, and whether Slide
+and Merge sound like anything. Sound-intent is tested; sound *quality* is not.
 
 **Epic 4's follow-up has landed too: high scores persist** (gitea
 [#14](https://git.gobha.me/xcaliber/term-game/issues/14)). Both games keep a
@@ -93,6 +111,12 @@ why the issue called it the forcing function for termforge
 pinned past it, and this is where that gets checked against a real artifact:
 **91 head repaints in eight seconds with nothing pressed**, i.e. about 11.4 a
 second, against the ~7.5 fps ceiling #58 imposed on an idle loop. Recipe below.
+
+⚠ **That number is a CEILING TEST, not a frame-rate target, and it was measured
+in the container** — which is slower than real hardware. It proves the idle loop
+is no longer capped; it does not describe how the game runs on a desktop. A
+lower figure measured here later is a fact about the container before it is a
+fact about the code. See [Feel and the container](#feel-and-the-container).
 
 ⚠ What is verified is rules, geometry, rendering, the clock and sound-intent.
 **Feel is not**: whether the speed curve is right, whether two-column cells are
@@ -157,6 +181,40 @@ the first game to declare `KeyboardMode::Enhanced`, and this container's termina
 has no kitty keyboard protocol — so every headless case, every pty capture and
 every CI run exercises the **degraded** path. The held path is covered on the
 model, where `HoldSupport` is a parameter, and nowhere else.
+
+### Feel and the container
+
+**Every performance figure in this file was measured in the dev container, and
+the container is slower than the hardware this runs on.** The maintainer's
+report, 2026-07-31: the games feel *fast* on a desktop, and a good part of what
+reads as sluggishness here is the environment rather than the code.
+
+⚠ **So a container measurement is a FLOOR, not a representative number**, and the
+trap is reading one as a regression. The clearest example is already in this
+file: Snake's **91 head repaints in eight seconds** with nothing pressed, the
+artifact that judged termforge #58. That number is evidence the idle loop is not
+capped at ~7.5 fps — which is all it was ever claimed to be. It is **not** a
+frame-rate target, and a future session that measures a lower one here has
+learned something about the container first and about the code second.
+
+⚠ **No timing constant has been changed on the strength of this**, deliberately.
+"It feels fast on the desktop" was given as an observation and explicitly not as
+direction, and it is recorded that way. The tick rate, the DAS/ARR pair, the soft
+drop, the tween — all untouched.
+
+**What this does and does not license.** Feel is judgeable *only* on baremetal,
+so a "feel" caveat elsewhere in this file is retired by the maintainer playing
+the thing, and by nothing else — not by a test, not by a pty capture, not by a
+timing measurement taken here. Two have been retired that way so far: 2048's
+tween, and that a real audio device works at all. ⚠ **Retire them one at a time
+and at the strength given.** "Audio worked" after ten seconds on one game is not
+"the bank is verified", and the temptation to round the second up from the first
+is exactly the error this section exists to prevent.
+
+⚠ Still open, and not spoken to: Snake's speed curve, Minesweeper's click
+latency and cursor responsiveness, Tetris' DAS/ARR/soft-drop trio, Sokoban's
+push feel, and whether any effect in the bank sounds *right*. Do not infer these
+from "it feels fast" — a frame rate is not a feel decision.
 
 **Next move: Epic 8 (Solitaire)**, the flagship and the last of the roster — but
 read the upstream note below before starting it. ⚠ We are now pinned to
