@@ -104,8 +104,14 @@ if (${PROJECT_NAME}_BUILD_LIB)
   # is. Both games call ctx.scores().record(), so scores has to sit below the
   # games exactly as audio does. Its two siblings in arcade/ land in two other
   # targets: all_games.cpp in _roster, shell.cpp in _lib.
+  # ⚠ arcade/hud.cpp and arcade/options_screen.cpp are here for the same reason
+  # scores is: every game may call them (gitea #38's pre-start screen is drawn
+  # BY the game, not by the Shell), so they must sit below the games. They name
+  # Screen and Rgb but no Shell type, so the chain is unchanged.
   add_library(${PROJECT_NAME}_core STATIC
     build_info.cpp
+    arcade/hud.cpp
+    arcade/options_screen.cpp
     arcade/scores.cpp
     audio/engine.cpp
     audio/sink.cpp
