@@ -1,12 +1,14 @@
 #include <termgame/games/snake/snake.hpp>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <string>
 #include <string_view>
 
 #include <termforge/widgets/theme.hpp>
 
+#include <termgame/arcade/hud.hpp>
 #include <termgame/games/snake/glyphs.hpp>
 
 namespace termgame {
@@ -383,7 +385,6 @@ auto Snake::draw_status(termforge::Screen& screen) -> void {
     case snake::State::Running:
       break;
   }
-  const int word_x = std::max(0, screen.cols() - static_cast<int>(word.size()));
 
   // ⚠ THE BUDGET is what stops the two halves of this row colliding, and it is
   // the load-bearing part — Screen::write_text clips at the screen edge but NOT
@@ -398,23 +399,24 @@ auto Snake::draw_status(termforge::Screen& screen) -> void {
   // keys off find(label), so "len" alongside "level" would make that assertion
   // match the wrong field and pass while the row was broken. That is why the
   // second field is spelled "length".
-  std::string left;
-  const int budget = word_x - 2;  // one blank column between the two
-  // The ORDER is the priority order: the loop appends until a field does not fit
-  // and then stops. "record" goes last for the same reason it does in 2048.
-  for (const std::string& field :
-       {"score " + num(m_board.score()), "length " + num(m_board.length()),
-        "level " + std::string(level_label(m_board.level())),
-        "walls " + std::string(walls_label(m_board.walls())),
-        "record " + num(best_score())}) {
-    const std::string sep = left.empty() ? "" : "   ";
-    if (static_cast<int>(left.size() + sep.size() + field.size()) > budget) {
-      break;
-    }
-    left += sep + field;
-  }
-  screen.write_text(0, m_layout.status_y, left, termforge::theme::kFg, bg);
-  screen.write_text(word_x, m_layout.status_y, word, fg, bg);
+  // ⚠ The budget arithmetic that used to live here is hud::draw_status_row.
+  // Extracted for COVERAGE, not tidiness: killing the "delete the budget"
+  // mutation needs a sweep of widths narrower than this game's own floor, and
+  // writing that four times is why it went green in two consecutive epics.
+  // test/33options sweeps it once, against the helper.
+  //
+  // ⚠ The ORDER of this list is still the priority order -- the helper appends
+  // until a field does not fit and then stops -- and no label may be a
+  // substring of another, because the whole-fields checks key off find(label).
+  const std::array<std::string, 5> fields{
+      "score " + num(m_board.score()),
+      "length " + num(m_board.length()),
+      "level " + std::string(level_label(m_board.level())),
+      "walls " + std::string(walls_label(m_board.walls())),
+      "record " + num(best_score()),
+  };
+  hud::draw_status_row(screen, m_layout.status_y, fields, word,
+                       termforge::theme::kFg, fg, bg);
 }
 
 auto Snake::draw_hints(termforge::Screen& screen) -> void {
