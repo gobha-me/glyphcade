@@ -2,10 +2,14 @@
 
 All notable changes to this project.
 
-Versions before `v0.20.0` were developed under the name **term-game** on a
-self-hosted tracker. Their tag messages still say `gitea #NN`, which was true
-when they were written; those issue numbers are not public. See
-[docs/history.md](docs/history.md) for the full development narrative.
+Everything up to and including **v0.19.0** was developed under the name
+**term-game**, on a self-hosted tracker. Those tag messages still say
+`gitea #NN`, which was true when they were written; the numbers are not public.
+See [docs/history.md](docs/history.md) for the full development narrative.
+
+The rename itself is **unreleased** — deliberately. A tag now would create a
+release with no artifacts in it; `#15` (deb/rpm/tgz packaging) is what gives a
+release something to carry.
 
 ## [Unreleased]
 
