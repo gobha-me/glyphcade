@@ -91,7 +91,7 @@ inline constexpr GameMeta kGood{
 static_assert(options_are_well_formed(kGood), "the control must pass");
 static_assert(meta_text_is_ascii(kGood), "the control must pass");
 
-// ── Negative: an unlabelled row ─────────────────────────────────────────────
+// ── Negative: an unlabelled row ──────────────────────────────────────────────
 inline constexpr OptionSpec kUnlabelled[]{
     {.label = "", .choices = kTwo, .default_index = 0}};
 inline constexpr GameMeta kMetaUnlabelled{
@@ -101,7 +101,7 @@ static_assert(!options_are_well_formed(kMetaUnlabelled),
               "an option with no label must be rejected: it renders as a row "
               "of choices with nothing saying what they choose");
 
-// ── Negative: a row with nothing to pick ────────────────────────────────────
+// ── Negative: a row with nothing to pick ─────────────────────────────────────
 // ⚠ `.choices = {}`, not a zero-size array — `std::string_view kNone[]{}` is
 // ill-formed in C++ (a zero-length array is a GNU extension -Werror rejects).
 // A default-constructed span is the real way a game says "nothing to pick",
@@ -115,7 +115,7 @@ static_assert(!options_are_well_formed(kMetaNoChoices),
               "an option with no choices must be rejected: the cursor can land "
               "on it and there is nothing to move to");
 
-// ── Negative: a blank choice ────────────────────────────────────────────────
+// ── Negative: a blank choice ─────────────────────────────────────────────────
 inline constexpr OptionSpec kBlank[]{
     {.label = "Level", .choices = kBlankChoice, .default_index = 0}};
 inline constexpr GameMeta kMetaBlank{
@@ -125,7 +125,7 @@ static_assert(!options_are_well_formed(kMetaBlank),
               "a blank choice must be rejected: it draws as an empty cycler "
               "the player cannot tell from a broken frame");
 
-// ── Negative: default_index past the end ────────────────────────────────────
+// ── Negative: default_index past the end ─────────────────────────────────────
 // ⚠ THE ONE THAT IS AN OUT-OF-RANGE READ rather than a bad-looking row, and it
 // happens on the first frame, before the player has touched anything.
 inline constexpr OptionSpec kDefaultTooHigh[]{
@@ -156,7 +156,7 @@ static_assert(kGoodOptions[0].default_index ==
 static_assert(options_are_well_formed(kGood),
               "the last valid default_index must be ACCEPTED");
 
-// ── Negative: too many options ──────────────────────────────────────────────
+// ── Negative: too many options ───────────────────────────────────────────────
 inline constexpr OptionSpec kFive[]{
     {.label = "a", .choices = kTwo, .default_index = 0},
     {.label = "b", .choices = kTwo, .default_index = 0},
@@ -172,7 +172,7 @@ static_assert(!options_are_well_formed(kMetaFive),
               "more than kMaxGameOptions must be rejected: OptionsScreen's "
               "m_choice is a fixed array of exactly that size");
 
-// ── Negative: a list option sharing a screen ────────────────────────────────
+// ── Negative: a list option sharing a screen ─────────────────────────────────
 inline constexpr OptionSpec kListPlusOne[]{
     {.label = "Level", .choices = kSeven, .default_index = 0},
     {.label = "Walls", .choices = kTwo, .default_index = 0},
@@ -195,7 +195,7 @@ static_assert(options_are_well_formed(kMetaListAlone),
               "rejecting it would make the rule 'no long lists' instead of "
               "'a long list cannot share'");
 
-// ── Negatives: non-ASCII option text ────────────────────────────────────────
+// ── Negatives: non-ASCII option text ─────────────────────────────────────────
 // ⚠ The loop these two witness is the single easiest thing in this change to
 // delete without consequence. No registered game has non-ASCII option text, so
 // nothing that RUNS can tell the difference. See the note at meta_text_is_ascii.
@@ -342,7 +342,7 @@ TEST_CASE("pick_that_fits falls back to the narrowest rather than to nothing") {
 TEST_CASE("pick_that_fits never returns something wider than it was given") {
   // The property the caller actually depends on, swept rather than argued —
   // and the reason it exists at all: a single long string clipped by write_text
-  // ends mid-word, and gitea #15's footer ended mid-NUMBER, which reads as a
+  // ends mid-word, and term-game#15's footer ended mid-NUMBER, which reads as a
   // complete and wrong size.
   const std::string cands[]{
       "Minesweeper needs 21x13; you have 20x8",
@@ -513,7 +513,7 @@ auto opened(std::span<const OptionSpec> opts) -> OptionsScreen {
 // ⚠ Through a Shell there is no way at all: test_run_frames installs a
 // FallbackDriver whose capabilities() is an all-false literal, so the Shell
 // always syncs to BorderStyle::Ascii and TERM= in the ctest environment changes
-// nothing. That blind spot is gitea #48. GameContext::set_border_style is
+// nothing. That blind spot is #11. GameContext::set_border_style is
 // public plumbing, so an OptionsScreen tested in isolation can pick the tier the
 // Shell would have probed — the same trick test/28tetris-ui plays on the
 // capabilities axis to reach its kitty_keyboard arm.
@@ -889,7 +889,7 @@ TEST_CASE("selected() and preselect() are total over any index") {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// The cycler's glyph tier — gitea #45
+// The cycler's glyph tier — term-game#45
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // ⚠ EVERY CASE BELOW THIS LINE IS THE FIRST OF ITS KIND IN THE REPO. Nothing
@@ -918,7 +918,7 @@ constexpr int kWallsRightX = kValueX + 5 + 1;  // "Solid"  then a space
 }  // namespace
 
 TEST_CASE("the cycler arrows come from the tier: Unicode") {
-  // v0.6.0 (gitea #36's pin) put arrow_left/arrow_right in MarkGlyphs. Before
+  // v0.6.0 (term-game#36's pin) put arrow_left/arrow_right in MarkGlyphs. Before
   // #45 draw_cycler hardcoded the ASCII forms, so THIS is the case that was red
   // first — a terminal drawing ▸, ▾ and rounded borders got a bare < and > in
   // the one place the suite otherwise uses a proper glyph.
@@ -985,7 +985,7 @@ TEST_CASE("the tier moved at all: the 7-bit sweep as a two-sided control") {
 }
 
 TEST_CASE("the two tiers differ in BYTES and agree in COLUMNS") {
-  // This is the width-arithmetic check gitea #45 asked for, and its answer is
+  // This is the width-arithmetic check term-game#45 asked for, and its answer is
   // that no code change was needed: ‹ › and ▸ are three bytes each and ONE
   // column each (termforge's kWide table starts at U+2E80), so the layout is
   // tier-independent while the byte length is not.

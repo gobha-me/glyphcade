@@ -18,7 +18,7 @@
 // That is an AGENTS.md hard rule: the build's audio configuration is reported at
 // runtime through glyphcade::build_has_audio(), never compiled into the shape of
 // a public header. RtAudioSink is not declared here at all — it lives in
-// src/audio_backend/, outside the installed headers entirely (gitea #13).
+// src/audio_backend/, outside the installed headers entirely (term-game#13).
 
 #include <cstdint>
 #include <expected>

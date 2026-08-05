@@ -1,4 +1,4 @@
-# ── Minesweeper: one game, one static library ───────────────────────────────
+# ── Minesweeper: one game, one static library ─────────────────────────────────
 # Entered from src/lib/CMakeLists.txt, inside its ${PROJECT_NAME}_BUILD_LIB guard
 # and after ${PROJECT_NAME}_core exists. A game has no standalone configuration,
 # and saying so here beats a wall of undefined symbols later.
@@ -42,7 +42,7 @@ target_link_libraries(${PROJECT_NAME}_game_minesweeper
 # ⚠ NO GLYPHCADE_WITH_AUDIO here, ever, and no rtaudio. A game plays a sound by
 # asking GameContext for the Player; it never learns how the sink is built, or
 # whether it is real. Either line would put a fourth name in front of
-# cmake/check_export.cmake and undo gitea #13.
+# cmake/check_export.cmake and undo term-game#13.
 #
 # ⚠ And NO link to ${PROJECT_NAME}_lib. That is the cycle this split exists to
 # remove, and it is also what stops a game reaching the Shell by accident:

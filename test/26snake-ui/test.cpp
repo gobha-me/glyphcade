@@ -87,7 +87,7 @@ auto enter_snake(Probe& app, int cols = 80, int rows = 24) -> void {
   // REQUIRE is what proves the Shell entered on the FIRST Enter; moving it below
   // this line would make the case pass even if entering had come to need two.
   //
-  // gitea #38: entering a game now opens its pre-start options screen, so a
+  // term-game#38: entering a game now opens its pre-start options screen, so a
   // suite that wants a BOARD has to say so. This is the change telling the truth
   // about itself, not a regression -- and the per-suite cases below assert the
   // screen is there before this dismisses it.
@@ -154,7 +154,7 @@ auto enter_snake(Probe& app, int cols = 80, int rows = 24) -> void {
 
 }  // namespace
 
-// ── Geometry ───────────────────────────────────────────────────────────────
+// ── Geometry ─────────────────────────────────────────────────────────────────
 
 TEST_CASE("the board needs 58x20 and says so in one place", "[snake][layout]") {
   // The constants layout.hpp asserts, restated as a runtime case so the number
@@ -197,7 +197,7 @@ TEST_CASE("a screen one column or one row short does not fit",
   REQUIRE(compute_layout(kNeedCols, kNeedRows).fits);
 }
 
-// ── Rendering ──────────────────────────────────────────────────────────────
+// ── Rendering ────────────────────────────────────────────────────────────────
 
 TEST_CASE("the whole Snake screen is 7-bit at the ASCII tier",
           "[snake][render]") {
@@ -345,7 +345,7 @@ TEST_CASE("the outcome is a word, not a colour", "[snake][render]") {
 
 TEST_CASE("a screen too small for the board says so", "[snake][render]") {
   // The same answer both other games give, and the same open issue behind it:
-  // GameMeta carries no minimum size (gitea #15), so the selector will launch a
+  // GameMeta carries no minimum size (term-game#15), so the selector will launch a
   // board this terminal cannot draw.
   Probe app;
   enter_snake(app, 40, 12);
@@ -360,7 +360,7 @@ TEST_CASE("a screen too small for the board says so", "[snake][render]") {
   REQUIRE(found);
 }
 
-// ── Input ──────────────────────────────────────────────────────────────────
+// ── Input ────────────────────────────────────────────────────────────────────
 
 TEST_CASE("arrows, hjkl and wasd all steer", "[snake][input]") {
   struct Case {
@@ -437,7 +437,7 @@ TEST_CASE("Escape and p are declined, so the Shell still owns them",
           "[snake][input]") {
   // ⚠ A line that must stay ABSENT from snake.cpp. A game that consumed either
   // would strand the player inside it — Escape is quit-to-menu and 'p' is pause,
-  // and gitea #6's "pause" scope item is satisfied by NOT writing one.
+  // and term-game#6's "pause" scope item is satisfied by NOT writing one.
   Probe app;
   enter_snake(app);
 
@@ -477,7 +477,7 @@ TEST_CASE("the wall mode the player chose is the one that runs",
   REQUIRE(g->board().head() == Coord{0, 5});
 }
 
-// ── Sound ──────────────────────────────────────────────────────────────────
+// ── Sound ────────────────────────────────────────────────────────────────────
 //
 // Asserted through Shell::audio().play_count(), which counts INTENT rather than
 // samples — so these cases pass identically on a GLYPHCADE_WITH_AUDIO=OFF build.
@@ -523,7 +523,7 @@ TEST_CASE("eating sounds once, and plain movement does not sound at all",
           "[snake][audio]") {
   // ⚠ The one place Snake's soundscape differs in KIND from the other two games.
   // It steps several times a second with no input at all, so a per-step sound is
-  // not feedback, it is a metronome. gitea #6 asks for "eat, turn, die" and that
+  // not feedback, it is a metronome. term-game#6 asks for "eat, turn, die" and that
   // list is exactly right.
   Probe app;
   enter_snake(app);
@@ -559,7 +559,7 @@ TEST_CASE("dying sounds Lose", "[snake][audio]") {
   REQUIRE(app.audio().play_count(SfxId::Lose) == before + 1);
 }
 
-// ── Persistence ────────────────────────────────────────────────────────────
+// ── Persistence ──────────────────────────────────────────────────────────────
 
 TEST_CASE("the record is keyed by BOTH the difficulty and the wall mode",
           "[snake][scores]") {
@@ -618,7 +618,7 @@ TEST_CASE("the record survives a restart and does not follow the score down",
   REQUIRE(app.scores().get("snake", "best_score_normal_solid") == 100);
 }
 
-// ── The pre-start options screen (gitea #38) ────────────────────────────────
+// ── The pre-start options screen (term-game#38) ──────────────────────────────
 
 TEST_CASE("entering snake shows the options screen, not the field",
           "[snake][options]") {
@@ -679,7 +679,7 @@ TEST_CASE("the board does not move while the options screen is up",
   // clock, so real wall time spent drawing selector frames becomes ticks the
   // Shell's accumulator hands over. On a quiet machine that is zero and the
   // absolute form passed for six releases. It is not a property of the code
-  // under test — gitea #42 added a few string builds to draw_selector and this
+  // under test — term-game#42 added a few string builds to draw_selector and this
   // case went red five runs in six on the loaded TSan build, pointing at Snake
   // for something Snake had no part in. What the case means is that the 120
   // ticks below ARRIVED, so that is what it now measures.

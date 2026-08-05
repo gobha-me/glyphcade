@@ -98,7 +98,7 @@ inline constexpr int kCells = kRows * kCols;
 // How many upcoming pieces the player can see. state.js:10.
 inline constexpr int kPreview = 3;
 
-// ── The clocks ──────────────────────────────────────────────────────────────
+// ── The clocks ───────────────────────────────────────────────────────────────
 
 // state.js:11-13, as a table rather than a runtime pow.
 //
@@ -143,7 +143,7 @@ inline constexpr int kSoftDropMs = 40;
 // state.js:18. Ours advances on dt and actually renders (defect 5).
 inline constexpr int kLineClearMs = 300;
 
-// ── Scoring, state.js:125-138 ───────────────────────────────────────────────
+// ── Scoring, state.js:125-138 ────────────────────────────────────────────────
 
 inline constexpr int kScoreSingle = 100;
 inline constexpr int kScoreDouble = 300;
@@ -159,7 +159,7 @@ inline constexpr int kComboBase = 50;
 inline constexpr int kComboIncrement = 50;
 inline constexpr int kLinesPerLevel = 10;
 
-// ── Difficulty ──────────────────────────────────────────────────────────────
+// ── Difficulty ───────────────────────────────────────────────────────────────
 
 // Every other game in the suite binds 1/2/3 to a difficulty, and Tetris' own
 // difficulty is its level — which advances on its own. So the choice is where
@@ -209,7 +209,7 @@ enum class Shift : std::uint8_t { None, Left, Right };
 // one cell, and the OS's own auto-repeat does the holding.
 enum class HoldSupport : std::uint8_t { Held, Discrete };
 
-// ── A held key, as a clock ──────────────────────────────────────────────────
+// ── A held key, as a clock ───────────────────────────────────────────────────
 
 // Delay then rate: nothing for `delay_ms`, then one event every `rate_ms`.
 //
@@ -253,7 +253,7 @@ class Repeater {
   std::chrono::duration<double> m_accum{0.0};
 };
 
-// ── What a tick did ─────────────────────────────────────────────────────────
+// ── What a tick did ──────────────────────────────────────────────────────────
 
 // Sound and score are a function of what the tick actually did, not of a
 // before/after comparison — Snake's argument, and stronger here: one tick can
@@ -326,7 +326,7 @@ class Board {
   // copy of the truth that a kick can leave stale.
   [[nodiscard]] auto ghost_y() const noexcept -> int;
 
-  // ── Verbs ─────────────────────────────────────────────────────────────────
+  // ── Verbs ──────────────────────────────────────────────────────────────────
   //
   // Each returns whether it changed anything, so a caller can be silent about a
   // refused input. ⚠ A refused move must make no sound; there is no deny blip
@@ -347,7 +347,7 @@ class Board {
   // expiries as the elapsed time has paid for.
   auto tick(std::chrono::duration<double> dt) -> TickResult;
 
-  // ── Test seam ─────────────────────────────────────────────────────────────
+  // ── Test seam ──────────────────────────────────────────────────────────────
   //
   // ⚠ Not a convenience. A wall kick, a T-spin and a lock-delay reset each
   // depend on a specific stack, and a case that had to play its way there would
@@ -379,7 +379,7 @@ class Board {
   // Shift the preview up and refill its tail from the bag.
   auto advance_preview() -> void;
   // ⚠ The ONLY way a piece enters play. spawn(Piece) lets its caller choose,
-  // and gitea #55 was three callers each choosing take_next() — so the preview
+  // and term-game#55 was three callers each choosing take_next() — so the preview
   // and the spawn order were two sequences that were meant to agree and never
   // did. Keeping exactly one caller of spawn() is what makes them the same
   // sequence by construction rather than by convention.

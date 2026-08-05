@@ -45,7 +45,7 @@ using namespace glyphcade::sokoban;
 
 }  // namespace
 
-// ── The parser ──────────────────────────────────────────────────────────────
+// ── The parser ───────────────────────────────────────────────────────────────
 
 TEST_CASE("the seven standard characters all parse", "[sokoban][parse]") {
   // ⚠ Two levels, not one, and the reason is itself the point: `@` and `+` are
@@ -111,7 +111,7 @@ TEST_CASE("an unknown character is refused rather than treated as floor",
 
 TEST_CASE("ragged rows are padded, and the short row's edge is not a hole",
           "[sokoban][parse]") {
-  // ⚠ THE reference movement bug, and the one that matters most for gitea #8's
+  // ⚠ THE reference movement bug, and the one that matters most for term-game#8's
   // "the enormous existing level corpus loads directly": isValid() bounds
   // columns with board[0].length (game.js:213) while render() walks
   // board[r].length (:124). Published .sok files have their trailing spaces
@@ -164,7 +164,7 @@ TEST_CASE("a level that is already solved is won at move zero",
   REQUIRE(b.moves() == 0);
 }
 
-// ── Pushing ─────────────────────────────────────────────────────────────────
+// ── Pushing ──────────────────────────────────────────────────────────────────
 
 TEST_CASE("a step onto floor moves the player and nothing else",
           "[sokoban][push]") {
@@ -251,7 +251,7 @@ TEST_CASE("the level is won only when every crate is seated",
   REQUIRE_FALSE(b.won());  // one seated, one not
 }
 
-// ── Undo ────────────────────────────────────────────────────────────────────
+// ── Undo ─────────────────────────────────────────────────────────────────────
 
 TEST_CASE("undo restores the player, the crate AND both counters",
           "[sokoban][undo]") {
@@ -317,7 +317,7 @@ TEST_CASE("reset returns the start position and empties the history",
   REQUIRE_FALSE(b.undo());
 }
 
-// ── Deadlock ────────────────────────────────────────────────────────────────
+// ── Deadlock ─────────────────────────────────────────────────────────────────
 
 TEST_CASE("pushing a crate into a corner turns the deadlock on",
           "[sokoban][deadlock]") {
@@ -474,7 +474,7 @@ TEST_CASE("a crate free on one axis is never frozen, however many neighbours",
   REQUIRE_FALSE(b.deadlocked());
 }
 
-// ── The bundled pack ────────────────────────────────────────────────────────
+// ── The bundled pack ─────────────────────────────────────────────────────────
 
 TEST_CASE("all twenty bundled levels parse and are well formed",
           "[sokoban][pack]") {

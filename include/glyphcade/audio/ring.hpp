@@ -50,7 +50,7 @@ class SpscRing {
   //
   // Returns false when the ring is full, having discarded `v` and counted it.
   //
-  // ⚠ DIVERGENCE from gitea #3, which specifies "drop the oldest command and
+  // ⚠ DIVERGENCE from term-game#3, which specifies "drop the oldest command and
   // count it". Drop-oldest is not implementable inside the SPSC contract: it
   // means the *producer* advancing m_head, which the consumer also writes, so
   // m_head becomes a CAS target and the consumer has to detect that the slot it

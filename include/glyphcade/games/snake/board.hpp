@@ -12,7 +12,7 @@
 // ── This is the first model in the repo that advances on its own ─────────────
 //
 // Minesweeper's clock only counts; 2048 moves when you press a key. Snake steps
-// whether or not anybody touches anything, which is why gitea #6 called it the
+// whether or not anybody touches anything, which is why term-game#6 called it the
 // forcing function for termforge #58 (an idle loop capped at ~7.5 fps, with the
 // rate varying by input activity). #58 is fixed and we are pinned past it, so
 // the framework hands us honest frames — and everything below is written so that
@@ -37,7 +37,7 @@
 //    one and the remainder survives into the next frame.
 //
 // 2. THE REFERENCE HAS NO DIRECTION QUEUE, only a single-slot `nextDirection`
-//    that a second key overwrites (snake.js:14). That is precisely the bug gitea
+//    that a second key overwrites (snake.js:14). That is precisely the bug
 //    #6 names — a fast double-turn eaten by the tick boundary. Worse,
 //    setDirection validates against `this.direction`, the last APPLIED
 //    direction, so Right -> Up -> Left inside one step validates Left against
@@ -129,7 +129,7 @@ inline constexpr std::string_view kLevelNames[]{"Easy", "Normal", "Hard"};
 static_assert(std::size(kLevelNames) == std::size(kLevels),
               "every snake::Level needs an options-screen name, in enum order");
 
-// gitea #6 asks for "wrap-vs-wall as a mode". The reference has no wrap at all —
+// term-game#6 asks for "wrap-vs-wall as a mode". The reference has no wrap at all —
 // snake.js:117 is unconditionally fatal — so this half is ours, and it is a real
 // player-facing mode rather than a compile-time option, because an unexposed mode
 // is dead code and this repo has just finished deleting the last of that.

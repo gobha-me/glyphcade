@@ -109,7 +109,7 @@ auto enter_game(TickProbe& app) -> void {
   // REQUIRE is what proves the Shell entered on the FIRST Enter; moving it below
   // this line would make the case pass even if entering had come to need two.
   //
-  // gitea #38: entering a game now opens its pre-start options screen, so a
+  // term-game#38: entering a game now opens its pre-start options screen, so a
   // suite that wants a BOARD has to say so. This is the change telling the truth
   // about itself, not a regression -- and the per-suite cases below assert the
   // screen is there before this dismisses it.

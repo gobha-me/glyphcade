@@ -48,7 +48,7 @@ class Shell : public termforge::App {
   // unaffected by Epic 2.
   Shell();
 
-  // ⚠ THE AUDIO INJECTION SEAM, and the reason gitea #13 came out the way it
+  // ⚠ THE AUDIO INJECTION SEAM, and the reason term-game#13 came out the way it
   // did. The Shell owns an engine but does not choose its sink: src/bin hands
   // it a device, a test hands it a WavFileSink, and the RtAudio backend
   // therefore never has to be reachable from this library at all.
@@ -86,7 +86,7 @@ class Shell : public termforge::App {
   // a behaviour change.
   static constexpr int kListPaneMinCols = 24;
 
-  // ⚠ THE SUITE'S FIRST CEILING, and gitea #42 is the whole argument for it.
+  // ⚠ THE SUITE'S FIRST CEILING, and term-game#42 is the whole argument for it.
   // Every game is a fixed rectangle centred in whatever it is given; the
   // selector was the one screen that grew without bound, so a 300-column
   // terminal got a full-width menu and then, one keystroke later, a 58x20 box
@@ -98,7 +98,7 @@ class Shell : public termforge::App {
   //
   // ⚠ COLUMNS ONLY, and the asymmetry is deliberate rather than an omission.
   // Rows past the floor are CAPACITY — more roster visible in a scrolling
-  // list, and for the game gitea #43 is about, more of a pile — while columns
+  // list, and for the game #10 is about, more of a pile — while columns
   // past a measure only stretch a line nobody wanted stretched. There is no
   // kSelectorMaxRows and there should not be one.
   //

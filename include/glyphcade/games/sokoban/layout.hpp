@@ -20,7 +20,7 @@
 // *playable*: below some window you cannot see enough of a room to plan a push,
 // and that is a judgement rather than a consequence.
 //
-// ⚠ That distinction is what gitea #15 was stuck on for six deferrals, and it
+// ⚠ That distinction is what term-game#15 was stuck on for six deferrals, and it
 // is now RESOLVED rather than still outstanding — this comment used to end
 // "#15 is still the wrong shape". A field called `min_cols` alone would have
 // put Minesweeper's 63, a number you can derive, next to Sokoban's 34, which is

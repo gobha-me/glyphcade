@@ -1,4 +1,4 @@
-# ── Library targets ─────────────────────────────────────────────────────────
+# ── Library targets ───────────────────────────────────────────────────────────
 # The shared arcade library: everything glyphcade is, minus a main(). Disable
 # with:
 #   cmake -B build -Dglyphcade_BUILD_LIB=OFF
@@ -14,7 +14,7 @@
 # ${PROJECT_NAME}_lib must also stay STATIC for a second reason now — see the
 # note on ARCH_INDEPENDENT in cmake/install.cmake.)
 #
-# ── Four targets, and the ORDER IS THE DESIGN ───────────────────────────────
+# ── Four targets, and the ORDER IS THE DESIGN ─────────────────────────────────
 # DESIGN.md's "one static library per game" landed here. The layering is not a
 # taste call: it is the only one that resolves in a single left-to-right linker
 # pass, which is what makes it behave identically under GCC's ld and Clang's lld
@@ -76,7 +76,7 @@
 # it, it belongs in core; if it drives the roster or owns the terminal, it
 # belongs in ${PROJECT_NAME}_lib.
 #
-# ── Where the sources live ──────────────────────────────────────────────────
+# ── Where the sources live ────────────────────────────────────────────────────
 # Sources are listed explicitly, never globbed — a glob is not re-evaluated until
 # something else forces a re-configure, so a new file silently is not built.
 # Public headers live under include/glyphcade/.
@@ -94,14 +94,14 @@
 option(${PROJECT_NAME}_BUILD_LIB "Build the compiled library targets" ON)
 
 if (${PROJECT_NAME}_BUILD_LIB)
-  # ── core: the shared services, and the bottom of the link chain ───────────
+  # ── core: the shared services, and the bottom of the link chain ─────────────
   # ⚠ arcade/scores.cpp is in CORE, not in ${PROJECT_NAME}_lib, and the arcade/
   # prefix is not what decides that — the rule above at "The rule for a new file"
   # is. Both games call ctx.scores().record(), so scores has to sit below the
   # games exactly as audio does. Its two siblings in arcade/ land in two other
   # targets: all_games.cpp in _roster, shell.cpp in _lib.
   # ⚠ arcade/hud.cpp and arcade/options_screen.cpp are here for the same reason
-  # scores is: every game may call them (gitea #38's pre-start screen is drawn
+  # scores is: every game may call them (term-game#38's pre-start screen is drawn
   # BY the game, not by the Shell), so they must sit below the games. They name
   # Screen and Rgb but no Shell type, so the chain is unchanged.
   add_library(${PROJECT_NAME}_core STATIC
@@ -114,7 +114,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
     audio/synth.cpp
   )
 
-  # ⚠ The audio sources above link NO rtaudio, and that is the gitea #13
+  # ⚠ The audio sources above link NO rtaudio, and that is the term-game#13
   # decision rather than an omission. Only the abstract AudioSink, NullSink and
   # WavFileSink live here; the RtAudio backend is a separate, never-installed
   # target in src/audio_backend/. Linking PkgConfig::RTAUDIO into this library
@@ -183,7 +183,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
     target_compile_definitions(${PROJECT_NAME}_core PRIVATE GLYPHCADE_WITH_AUDIO)
   endif ()
 
-  # ── the games: one static library each ───────────────────────────────────
+  # ── the games: one static library each ──────────────────────────────────────
   # One add_subdirectory line and one list entry per game, both explicit and both
   # greppable. Not a glob over games/*, for the same reason sources are not
   # globbed: a new directory would not be picked up until something else forced a
@@ -206,7 +206,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
     ${PROJECT_NAME}_game_sokoban
   )
 
-  # ── the roster: the registry table, and nothing else ─────────────────────
+  # ── the roster: the registry table, and nothing else ────────────────────────
   # arcade/all_games.cpp names every game type, so this archive holds an
   # undefined reference to each game's constructor. That is what makes a dropped
   # game object a LINK ERROR rather than a game that quietly vanishes from the
@@ -226,7 +226,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
   # else" is what makes adding a game one entry in the list above.
   target_link_libraries(${PROJECT_NAME}_roster PUBLIC ${_game_targets})
 
-  # ── lib: the arcade application layer, and the top of the chain ──────────
+  # ── lib: the arcade application layer, and the top of the chain ─────────────
   # arcade/shell.cpp is here because it is the only TU that calls all_games();
   # arcade/exception_boundary.cpp is here because it is main()-facing and no game
   # may reach it. Neither is a shared service, so neither belongs in core.

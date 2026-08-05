@@ -80,7 +80,7 @@ auto Minesweeper::start(GameContext& ctx) -> void {
   m_ctx = &ctx;
   m_frame.set_style(ctx.border_style());
 
-  // gitea #38: ask before starting rather than starting on Easy and making the
+  // term-game#38: ask before starting rather than starting on Easy and making the
   // player throw the board away. The constructor already built an Easy board,
   // so the screen is a chance to change that, not a prerequisite for having one
   // — a resize or a stray frame before the first Enter still draws something.
@@ -546,7 +546,7 @@ auto Minesweeper::draw_grid(termforge::Screen& screen) -> void {
   // This one is not a workaround and has no deletion condition: a cursor over a
   // grid of cells is Minesweeper's own affordance, not a missing framework
   // feature. The Shell used to carry a marker that WAS a workaround, and it is
-  // gone (gitea #17) — do not read the two as the same thing and delete this.
+  // gone (term-game#17) — do not read the two as the same thing and delete this.
   //
   // Both brackets land inside the frame by construction: the furthest is
   // gutter_x(cols-1) + 2 == origin_x + 2*cols, which is the trailing column.

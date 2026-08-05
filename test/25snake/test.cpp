@@ -5,7 +5,7 @@
 // prevented, not merely discouraged. Same discipline as test/14minesweeper and
 // test/22twenty48. Rendering and input live in test/26snake-ui.
 //
-// ── Where the expected values come from ─────────────────────────────────────
+// ── Where the expected values come from ──────────────────────────────────────
 //
 // The rules are cross-checked against the HTML-Games reference
 // (snake/js/{snake,food,game}.js) rather than derived from our own
@@ -221,7 +221,7 @@ TEST_CASE("Walls::Solid kills at every edge", "[snake][rules][walls]") {
 
 TEST_CASE("Walls::Wrap carries the head to the far side at every edge",
           "[snake][rules][walls]") {
-  // The half of gitea #6 the reference does not have at all: snake.js:117 is
+  // The half of term-game#6 the reference does not have at all: snake.js:117 is
   // unconditionally fatal and no wrap mode exists there.
   struct Case {
     std::vector<Coord> body;
@@ -262,7 +262,7 @@ TEST_CASE("a wrapped snake still knows which way it is going",
 
 TEST_CASE("two turns inside one step interval both take effect, in order",
           "[snake][input]") {
-  // ⚠ THE BUG gitea #6 NAMES. The reference keeps one slot (snake.js:14), so the
+  // ⚠ THE BUG term-game#6 NAMES. The reference keeps one slot (snake.js:14), so the
   // second key of a fast double-tap overwrites the first and the intermediate
   // turn never happens.
   Board b = fixture(snake_at(10, 5));

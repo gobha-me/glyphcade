@@ -8,7 +8,7 @@
 # at configure time, and the project name comes from the directory name. A fork
 # copies this file verbatim.
 
-# ── Refuse a config with no targets beside it ───────────────────────────────
+# ── Refuse a config with no targets beside it ─────────────────────────────────
 # This file can be found in two places where it does not describe a usable
 # package, and in both the failure without this guard is "include could not find
 # requested file" naming a path the consumer never wrote — which reads like a
@@ -37,7 +37,7 @@ if (NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
   return()
 endif ()
 
-# ── Dependencies this project's exported targets refer to ───────────────────
+# ── Dependencies this project's exported targets refer to ─────────────────────
 # Every dependency named in the installed Targets file has to be found again
 # here, or the consumer gets "The following imported targets are referenced, but
 # are missing: <dep>" — which reads like a broken package rather than a missing
@@ -84,7 +84,7 @@ endif ()
 # floor an ABI floor too, and this is the line that enforces it consumer-side.
 # Two size changes in two minor versions is the base rate, not bad luck.
 #
-# ⚠ gitea #36 makes it three, and the third is the one this comment would have
+# ⚠ term-game#36 makes it three, and the third is the one this comment would have
 # missed. v0.4.0 rebuilt Button's press flash as a duration pair (#69), so
 # sizeof(Button) grew — and Shell holds no Button. It holds a ConfirmDialog,
 # which holds two. So sizeof(Shell) moved through a class our headers never
@@ -99,7 +99,7 @@ endif ()
 # why this line and cmake/deps/termforge.cmake move in the same commit; a
 # half-done bump produces a package that resolves in our tree and nowhere else.
 #
-# This line IS exercised, as of gitea #46 — but read what by, because the two
+# This line IS exercised, as of term-game#46 — but read what by, because the two
 # checks are easy to confuse. cmake/check_export.cmake installs to a scratch
 # prefix and greps the generated targets file as text; it never calls
 # find_package, and a wrong version here stays invisible to it. The check that

@@ -1,7 +1,7 @@
-# ── The audio backend: the one target that links rtaudio ────────────────────
+# ── The audio backend: the one target that links rtaudio ──────────────────────
 #
 # ⚠ NEVER INSTALLED, NEVER EXPORTED, NEVER IN AN install(EXPORT) SET. This is
-# gitea #13's decision, and it is the whole reason this directory exists instead
+# term-game#13's decision, and it is the whole reason this directory exists instead
 # of two more lines in src/lib/CMakeLists.txt.
 #
 # Linking rtaudio into the exported glyphcade_lib would write the imported

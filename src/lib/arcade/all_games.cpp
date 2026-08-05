@@ -46,7 +46,7 @@ constexpr GameEntry kGames[] = {
     {Sokoban::kMeta, &make_game<Sokoban>},
 };
 
-// ── The table checks itself ─────────────────────────────────────────────────
+// ── The table checks itself ──────────────────────────────────────────────────
 // Both of the mistakes below are invisible until a player hits them, and both
 // are decidable at compile time, so they are decided at compile time.
 
@@ -127,7 +127,7 @@ static_assert(all_geometry_is_well_formed(),
 // ⚠ WELL-FORMED IS NOT THE SAME AS DECLARED, and this is the second assert
 // because {0,0} is deliberately LEGAL in the schema — a GameMeta with no floor
 // is well-formed, so the predicate above cannot catch a game that simply forgot
-// one. That is exactly the failure gitea #15 exists to prevent: a sixth game
+// one. That is exactly the failure term-game#15 exists to prevent: a sixth game
 // omits `.geometry`, compiles clean under -Werror in all four configurations,
 // keeps every static_assert green, and ships with meets_floor() true at every
 // size — so the selector silently never warns about it. Registry POLICY is

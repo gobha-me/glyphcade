@@ -49,7 +49,7 @@ constexpr termforge::Rgb kAccent{0x00, 0xFF, 0x80};
   return key.action != termforge::KeyAction::Release;
 }
 
-// ── The size sentences (gitea #15 + #42) ─────────────────────────────────────
+// ── The size sentences (term-game#15 + term-game#42) ─────────────────────────
 
 [[nodiscard]] auto size_text(int cols, int rows) -> std::string {
   return std::to_string(cols) + "x" + std::to_string(rows);
@@ -184,7 +184,7 @@ Shell::Shell(std::unique_ptr<audio::AudioSink> sink,
   });
 }
 
-// ── Input ───────────────────────────────────────────────────────────────────
+// ── Input ────────────────────────────────────────────────────────────────────
 
 auto Shell::on_event(const termforge::Event& ev) -> void {
   // ⚠ This function NEVER calls App::on_event. See the escape rule at the top
@@ -240,7 +240,7 @@ auto Shell::on_event(const termforge::Event& ev) -> void {
       // We adopted upstream's convention rather than rebuilding the old one
       // here, which would have meant intercepting the wheel before route_mouse
       // and diverging from the framework on purpose — the workaround shape
-      // gitea #16 and #17 spent two issues deleting. test/11selector holds both
+      // term-game#16 and term-game#17 spent two issues deleting. test/11selector holds both
       // halves: the selection does not move, and no sound plays.
       //
       // A click still moves the selection and then fires on_select, and the
@@ -344,7 +344,7 @@ auto Shell::handle_in_game_key(const termforge::Event& ev,
   apply_transitions();
 }
 
-// ── Simulation ──────────────────────────────────────────────────────────────
+// ── Simulation ───────────────────────────────────────────────────────────────
 
 auto Shell::on_tick(std::chrono::duration<double> dt) -> void {
   // ⚠ ABOVE the pause gate, and not test scaffolding.
@@ -370,7 +370,7 @@ auto Shell::on_tick(std::chrono::duration<double> dt) -> void {
   // a confirm-quit — pauses the game too rather than silently letting it run
   // underneath.
   //
-  // ⚠ Do NOT add tick_widgets(dt, {&m_pause}) here (gitea #36). It is a
+  // ⚠ Do NOT add tick_widgets(dt, {&m_pause}) here (term-game#36). It is a
   // two-word line that looks like an omission, and it is not.
   //
   // Since termforge v0.4.0 a Button's press flash is a wall-clock countdown in
@@ -406,7 +406,7 @@ auto Shell::on_tick(std::chrono::duration<double> dt) -> void {
   apply_transitions();
 }
 
-// ── Frame ───────────────────────────────────────────────────────────────────
+// ── Frame ────────────────────────────────────────────────────────────────────
 
 auto Shell::on_render(termforge::Screen& screen) -> void {
   // THE point at which a pending game destruction actually happens. It runs
@@ -441,7 +441,7 @@ auto Shell::on_render(termforge::Screen& screen) -> void {
   // compile error rather than a silently blank screen.
 }
 
-// ── Transitions ─────────────────────────────────────────────────────────────
+// ── Transitions ──────────────────────────────────────────────────────────────
 
 auto Shell::enter_selected_game() -> void {
   const auto games = all_games();
@@ -460,7 +460,7 @@ auto Shell::enter_selected_game() -> void {
   m_game = games[static_cast<std::size_t>(index)].make();
   m_ctx.clear_quit_to_menu();
 
-  // The keyboard tier is the GAME's, for as long as the game is up (gitea #32).
+  // The keyboard tier is the GAME's, for as long as the game is up (term-game#32).
   // Restored to Legacy in apply_transitions(), so the selector and every game
   // that did not ask for a tier keep the input contract they were written
   // against.
@@ -522,7 +522,7 @@ auto Shell::open_pause() -> void {
   // showings, so without this the second pause opens with "Menu" focused and
   // Enter drops the player out of the game they just paused.
   m_pause.set_default(false);
-  // Same reason, second cause (gitea #44). Dialog owns its Frame privately and
+  // Same reason, second cause (term-game#44). Dialog owns its Frame privately and
   // that Frame defaults to BorderStyle::Single — a family sync_capabilities()
   // NEVER chooses, its two answers being Ascii and Rounded. So without this the
   // pause dialog is the one widget the tier never reaches: box drawing on a
@@ -656,7 +656,7 @@ auto Shell::sync_capabilities() -> void {
   rebuild_list();  // item text depends on the tier; see rebuild_list()
 }
 
-// ── Selector ────────────────────────────────────────────────────────────────
+// ── Selector ─────────────────────────────────────────────────────────────────
 
 auto Shell::rebuild_list() -> void {
   // ⚠ Built here, never per frame. ListWidget::set_items resets scroll_offset
@@ -710,7 +710,7 @@ auto Shell::refresh_detail() -> void {
 
   if (meta.options.empty()) return;
 
-  // ⚠ READ-ONLY, and that is the whole of the Shell's involvement with gitea
+  // ⚠ READ-ONLY, and that is the whole of the Shell's involvement with
   // #38. It never constructs an OptionsScreen and never learns which choice is
   // live — that belongs to the game, and the game does not exist yet while the
   // menu is up. All this does is stop the pane implying a game has no settings
@@ -769,14 +769,14 @@ auto Shell::draw_selector(termforge::Screen& screen) -> void {
   // every game already obeys. See kSelectorMaxCols in shell.hpp for why it is
   // columns only and why 120. Below the cap body_w == w and body_x == 0, so
   // every Rect below is what it has always been — this is a no-op at every
-  // size the suite drove before gitea #42.
+  // size the suite drove before term-game#42.
   //
   // ⚠ THE CHROME ROWS ARE OFFSET TOO, and an earlier draft left them at x=0 on
   // the argument that they are chrome rather than a measure. Three reviews
   // called it and they were right: at 240 columns that put the title, the
   // footer and the hint row hard against the left edge with the panes they
   // describe starting 60 columns away — the *same* screen disagreeing with
-  // itself, which is one better than the two-screens version gitea #42 is about
+  // itself, which is one better than the two-screens version term-game#42 is about
   // and no more defensible. Everything in the selector positions against the
   // body.
   const int body_w = std::min(w, kSelectorMaxCols);

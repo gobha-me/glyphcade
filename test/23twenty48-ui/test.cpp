@@ -113,7 +113,7 @@ auto enter_2048(Probe& app, int cols = 80, int rows = 24) -> void {
 
 }  // namespace
 
-// ── Geometry ───────────────────────────────────────────────────────────────
+// ── Geometry ─────────────────────────────────────────────────────────────────
 
 TEST_CASE("cell_at is the exact inverse of tile_x/tile_y", "[2048][layout]") {
   // ⚠ The reason layout.hpp exists as its own file: draw() and any hit-testing
@@ -195,12 +195,12 @@ TEST_CASE("the board does not claim to fit below its needed size",
   REQUIRE(small.hint_y == 9);
 }
 
-// ── Rendering at the bottom tier ───────────────────────────────────────────
+// ── Rendering at the bottom tier ─────────────────────────────────────────────
 
 TEST_CASE("the whole 2048 screen is 7-bit at the ASCII tier",
           "[2048][render][ascii]") {
   // The only case that catches a Unicode lattice glyph reaching a terminal that
-  // told us it cannot draw one — the same failure mode gitea #17 found on a real
+  // told us it cannot draw one — the same failure mode term-game#17 found on a real
   // pty for the selector's marker.
   Probe app;
   enter_2048(app);
@@ -359,7 +359,7 @@ TEST_CASE("a screen too small for the board says so", "[2048][render]") {
   REQUIRE(found);
 }
 
-// ── Input ──────────────────────────────────────────────────────────────────
+// ── Input ────────────────────────────────────────────────────────────────────
 
 TEST_CASE("arrows, hjkl and wasd all move the board", "[2048][input]") {
   for (const auto& ev : std::vector<termforge::Event>{
@@ -425,7 +425,7 @@ TEST_CASE("q returns to the menu", "[2048][input]") {
   REQUIRE(app.state() == Shell::State::Selector);
 }
 
-// ── Sound ──────────────────────────────────────────────────────────────────
+// ── Sound ────────────────────────────────────────────────────────────────────
 //
 // Asserted through Shell::audio().play_count(), which counts INTENT rather than
 // sound — so these pass identically on the GLYPHCADE_WITH_AUDIO=OFF arm CI runs,
@@ -526,7 +526,7 @@ TEST_CASE("winning plays Win once, and not the merge that caused it",
   REQUIRE(app.audio().play_count(SfxId::Win) == win_before + 1);
 }
 
-// ── Best score (gitea #14) ──────────────────────────────────────────────────
+// ── Best score (term-game#14) ────────────────────────────────────────────────
 //
 // The store's own format and merge live in test/24scores. What is asserted here
 // is the two properties that are 2048's rather than the store's: that the record
@@ -535,7 +535,7 @@ TEST_CASE("winning plays Win once, and not the merge that caused it",
 
 TEST_CASE("a best score outlives the game that set it", "[2048][scores]") {
   // ⚠ A fresh Twenty48 is built per menu entry, so a best score held in the Game
-  // would reset on every quit-to-menu — the reason gitea #14 exists at all.
+  // would reset on every quit-to-menu — the reason term-game#14 exists at all.
   // Move the store into the Game and this is the case that goes red.
   Probe app;
   enter_2048(app);

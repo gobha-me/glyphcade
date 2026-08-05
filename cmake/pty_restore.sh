@@ -2,7 +2,7 @@
 #
 # Does the terminal come back when a frame throws?
 #
-# This is the assertion gitea #16 exists for, and the only one in the suite that
+# This is the assertion term-game#16 exists for, and the only one in the suite that
 # looks at real escape bytes. test/21exception pins the contract headlessly —
 # teardown() ran, the exception was rethrown, our boundary turned it into exit 1
 # — but nothing there enters the alternate screen, so none of it can see the

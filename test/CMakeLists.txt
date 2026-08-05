@@ -65,7 +65,7 @@ else ()
   )
 endif ()
 
-# The gitea #13 guard: install to a scratch prefix and assert the exported
+# The term-game#13 guard: install to a scratch prefix and assert the exported
 # Targets file names no rtaudio. Standalone, like the checks above — it is a
 # cmake -P script, not a `<dir>-test` executable.
 #
@@ -75,7 +75,7 @@ endif ()
 # find_package(glyphcade) breaks, on someone else's machine. See
 # cmake/check_export.cmake for why a PRIVATE link is not a defence.
 #
-# Its sibling, the gitea #46 guard: install to a scratch prefix and CONFIGURE a
+# Its sibling, the term-game#46 guard: install to a scratch prefix and CONFIGURE a
 # generated throwaway consumer against it, so the floor in
 # cmake/project-config.cmake.in is executed rather than merely written. Neither
 # check subsumes the other — audio-export-clean judges the CONTENT of the
@@ -127,7 +127,7 @@ else ()
   message(STATUS
     "audio-export-clean and consumer-resolves not configured — "
     "${PROJECT_NAME}_INSTALL is off, so there is no exported package to inspect "
-    "and nothing installed for a consumer to resolve. gitea #13's and #46's "
+    "and nothing installed for a consumer to resolve. term-game#13's and term-game#46's "
     "guards are ABSENT in this configuration, not passing.")
 endif ()
 

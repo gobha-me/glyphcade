@@ -44,7 +44,7 @@ inline constexpr int kNeedRows = kWellRows + kChromeRows;
 // rows and the game stops fitting the terminal most people still have.
 //
 // The Shell's floor stays 20x8, so the selector will still launch this on a
-// terminal that cannot draw it — gitea #15 shipped a warning, not a refusal.
+// terminal that cannot draw it — term-game#15 shipped a warning, not a refusal.
 // kMeta declares this pair as its geometry and the menu says so one screen
 // earlier; the game-owned "does not fit" screen is still what catches the
 // player who goes ahead anyway, which is why `fits` is a field here rather than

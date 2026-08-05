@@ -2,7 +2,7 @@
 
 A TUI arcade suite in C++23. **TermForge** renders it, **RtAudio** sounds it.
 
-Sibling to [HTML-Games](https://git.gobha.me/xcaliber/HTML-Games) — same
+Sibling to HTML-Games — same
 arcade-of-small-games idea, same roster to raid, but TUI and C++ instead of
 HTML/CSS/JS. Where HTML-Games is a browser launcher over static directories,
 glyphcade is a single binary hosting compiled-in games.
@@ -235,7 +235,7 @@ UI thread                    lock-free SPSC ring                 audio thread
 **What Epic 2 decided, and why** — four things that are not obvious from the
 diagram, all with their full argument at the implementation site:
 
-- **The ring drops the NEWEST command, not the oldest**, and gitea #3 was
+- **The ring drops the NEWEST command, not the oldest**, and term-game#3 was
   amended to say so. Drop-oldest cannot be done inside the SPSC contract: it
   means the producer advancing the consumer's index, which turns a lock-free
   queue into a CAS problem and puts a retry loop on the audio thread. See
@@ -248,7 +248,7 @@ diagram, all with their full argument at the implementation site:
 - **Headroom is arithmetic, not a limiter.** Eight voices capped at 1/8 FS each
   cannot clip, and that is a `static_assert` rather than something you have to
   hear to trust. The honest cost is that one sound peaks at −18 dBFS.
-- **rtaudio is linked by exactly one never-exported target** (gitea #13). See
+- **rtaudio is linked by exactly one never-exported target** (term-game#13). See
   the note at the bottom of `cmake/audio.cmake`, and the `audio-export-clean`
   ctest that keeps it true.
 
@@ -290,7 +290,7 @@ second is the one that keeps being relearned:
   to `Ascii` or `Rounded`. So an unstyled sub-widget is not merely inconsistent,
   it is drawing from a family nothing here selected. This has now cost two
   releases twice: the detail pane's scrollbar (Epic 6) and the pause dialog's
-  frame and title delimiters (gitea #44).
+  frame and title delimiters (term-game#44).
 
 Venice-generated PNG art is decoded via a vendored `stb_image` in glyphcade.
 TermForge's stdlib-only policy is *its* constraint and correctly keeps decode out

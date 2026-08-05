@@ -3,7 +3,7 @@
 // glyphcade — whatever output this build can actually talk to.
 //
 // ⚠ THIS HEADER IS NOT UNDER include/ AND IS NEVER INSTALLED, and that is the
-// whole of gitea #13's decision expressed as a file path. It lives in a private
+// whole of term-game#13's decision expressed as a file path. It lives in a private
 // include root owned by src/audio_backend/, so there is no way to install it by
 // accident and no way for a downstream consumer to reach a symbol that is not
 // in the exported library.

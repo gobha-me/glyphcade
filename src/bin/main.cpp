@@ -12,7 +12,7 @@
 #include <glyphcade/arcade/shell.hpp>
 
 // ⚠ NOT under include/. This header belongs to src/audio_backend/, a target that
-// is never installed and never exported (gitea #13), and it is reachable here
+// is never installed and never exported (term-game#13), and it is reachable here
 // only because src/bin links that target. It declares one function, and CMake
 // decides which translation unit DEFINES it: the RtAudio backend when
 // GLYPHCADE_WITH_AUDIO is on, a NullSink when it is not.

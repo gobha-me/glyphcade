@@ -1,5 +1,5 @@
 // The geometry block: what a game says about the smallest terminal it wants,
-// and whether that number is true. gitea #15 + #42.
+// and whether that number is true. term-game#15 + term-game#42.
 //
 // ⚠ THE ONE ASSERTION THIS FILE EXISTS FOR is "the declared floor is the
 // ACTUAL boundary". Every game initialises GameMeta::geometry from the same
@@ -172,7 +172,7 @@ constexpr GameFits kFits[]{
 
 TEST_CASE("every registered game declares a size floor", "[geometry]") {
   // Not a style preference. A game with no floor is a game the selector cannot
-  // warn about, which is the defect gitea #15 is; the field is optional in the
+  // warn about, which is the defect term-game#15 is; the field is optional in the
   // SCHEMA so that a future game may abstain deliberately, and this case is
   // where abstaining has to be argued rather than forgotten.
   for (const auto& entry : all_games()) {

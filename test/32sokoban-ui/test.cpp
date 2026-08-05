@@ -80,7 +80,7 @@ auto enter_sokoban(Probe& app, int cols = 80, int rows = 24) -> void {
   app.dispatch_event(key(termforge::Key::Enter));
   REQUIRE(app.state() == Shell::State::InGame);
   // ⚠ A second Enter, AFTER the REQUIRE (which is what proves the Shell entered
-  // on the FIRST one). gitea #38: entering Sokoban now opens its twenty-level
+  // on the FIRST one). term-game#38: entering Sokoban now opens its twenty-level
   // picker, so a suite that wants a BOARD has to say so.
   app.dispatch_event(key(termforge::Key::Enter));
   app.step(1, cols, rows);
@@ -138,7 +138,7 @@ auto enter_sokoban(Probe& app, int cols = 80, int rows = 24) -> void {
 
 }  // namespace
 
-// ── Geometry ────────────────────────────────────────────────────────────────
+// ── Geometry ─────────────────────────────────────────────────────────────────
 
 TEST_CASE("the floor is 34x12 and it is about playability, not drawing",
           "[sokoban][layout]") {
@@ -196,7 +196,7 @@ TEST_CASE("a level larger than the window fills it and the rest scrolls",
   REQUIRE(odd.view_tiles_w() == 16);
 }
 
-// ── Rendering ───────────────────────────────────────────────────────────────
+// ── Rendering ────────────────────────────────────────────────────────────────
 
 TEST_CASE("the map renders as tiles at the ASCII tier", "[sokoban][render]") {
   Probe app;
@@ -383,14 +383,14 @@ TEST_CASE("every status budget fits its own width", "[sokoban][render]") {
   }
 }
 
-// ── The camera ──────────────────────────────────────────────────────────────
+// ── The camera ───────────────────────────────────────────────────────────────
 
 TEST_CASE("the camera follows the player and clamps at the map edge",
           "[sokoban][camera]") {
   // ⚠ The bundled pack does NOT exercise this: the largest level is 12x11 tiles
   // and fits any normal terminal with room to spare, so in ordinary play the
   // camera pins to 0,0 and never moves. A viewport smaller than the level is
-  // the only way to reach it from here, which is exactly what gitea #8 means by
+  // the only way to reach it from here, which is exactly what term-game#8 means by
   // "the case that makes MapWidget's coordinate model earn its keep".
   Probe app;
   enter_sokoban(app, 34, 12);
@@ -454,7 +454,7 @@ TEST_CASE("the camera follows the player and clamps at the map edge",
   REQUIRE(reached_top);
 }
 
-// ── Input ───────────────────────────────────────────────────────────────────
+// ── Input ────────────────────────────────────────────────────────────────────
 
 TEST_CASE("arrows, hjkl and wasd all push", "[sokoban][input]") {
   Probe app;
@@ -621,7 +621,7 @@ TEST_CASE("the game declines p and Escape so the Shell keeps them",
   REQUIRE(other.state() == Shell::State::Selector);
 }
 
-// ── Scores ──────────────────────────────────────────────────────────────────
+// ── Scores ───────────────────────────────────────────────────────────────────
 
 TEST_CASE("solving a level records its own key, and only its own",
           "[sokoban][scores]") {
@@ -737,7 +737,7 @@ TEST_CASE("entering the game resumes at the first unsolved level",
   REQUIRE(again->index() == 1);
 }
 
-// ── The roster ──────────────────────────────────────────────────────────────
+// ── The roster ───────────────────────────────────────────────────────────────
 
 TEST_CASE("sokoban asks for the Legacy keyboard tier", "[sokoban][meta]") {
   // ⚠ Not a default that nobody thought about. A Sokoban move is one discrete
@@ -749,7 +749,7 @@ TEST_CASE("sokoban asks for the Legacy keyboard tier", "[sokoban][meta]") {
   REQUIRE(Sokoban::kMeta.slug == "sokoban");
 }
 
-// ── The pre-start level picker (gitea #38) ─────────────────────────────────
+// ── The pre-start level picker (term-game#38) ────────────────────────────────
 //
 // ⚠ Sokoban is the ONLY consumer of OptionsScreen's list mode: twenty choices,
 // one past kInlineChoiceMax, so the screen renders a windowed vertical list

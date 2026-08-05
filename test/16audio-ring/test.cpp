@@ -108,7 +108,7 @@ TEST_CASE("the ring holds exactly kCapacity items", "[audio][ring]") {
 }
 
 TEST_CASE("overflow drops the NEWEST and counts it", "[audio][ring]") {
-  // ⚠ THIS CASE PINS A DELIBERATE DIVERGENCE FROM gitea #3, which specifies
+  // ⚠ THIS CASE PINS A DELIBERATE DIVERGENCE FROM term-game#3, which specifies
   // "drop the oldest command and count it". Drop-oldest cannot be done inside
   // the SPSC contract — it means the producer advancing the consumer's index —
   // so the ring drops the newest instead. ring.hpp carries the full argument.

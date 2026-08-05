@@ -99,7 +99,7 @@ auto Tetris::start(GameContext& ctx) -> void {
   // on a key that may already be up.
   //
   // Nothing is raised here: the Shell already raised the ErrorEvent when it
-  // could not get the tier it set on our behalf (gitea #32). What this file
+  // could not get the tier it set on our behalf (term-game#32). What this file
   // adds is that the player can SEE which arm they are on, in the hint row —
   // an event in a footer is not the same as knowing why the controls feel
   // different.
@@ -209,7 +209,7 @@ auto Tetris::best_lines() const -> long long {
       .value_or(0);
 }
 
-// ── Input ───────────────────────────────────────────────────────────────────
+// ── Input ────────────────────────────────────────────────────────────────────
 
 auto Tetris::on_event(const termforge::Event& ev) -> bool {
   if (m_options.is_open()) {
@@ -237,7 +237,7 @@ auto Tetris::handle_key(const termforge::KeyEvent& key) -> bool {
   // Escape is the Shell's quit-to-menu and 'p' is its pause. A game that
   // consumed either would strand the player inside it.
 
-  // ── Releases ──────────────────────────────────────────────────────────────
+  // ── Releases ───────────────────────────────────────────────────────────────
   //
   // ⚠ THE REASON THIS GAME ASKED FOR KeyboardMode::Enhanced. Under Legacy this
   // branch is unreachable, which is exactly the problem: without it the model
@@ -268,7 +268,7 @@ auto Tetris::handle_key(const termforge::KeyEvent& key) -> bool {
   // idempotent on direction; for rotate and hard drop, treating a held key as
   // repeated presses is what a player expects.
 
-  // ── Presses ───────────────────────────────────────────────────────────────
+  // ── Presses ────────────────────────────────────────────────────────────────
   //
   // ⚠ Every bound key returns true whether or not the move was accepted.
   // "Consumed" means "this game handled it", not "it changed something" — a
@@ -340,7 +340,7 @@ auto Tetris::handle_key(const termforge::KeyEvent& key) -> bool {
   }
 }
 
-// ── Rendering ───────────────────────────────────────────────────────────────
+// ── Rendering ────────────────────────────────────────────────────────────────
 
 auto Tetris::draw(termforge::Screen& screen) -> void {
   if (m_options.is_open()) {

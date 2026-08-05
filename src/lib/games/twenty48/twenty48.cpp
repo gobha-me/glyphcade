@@ -375,7 +375,7 @@ auto Twenty48::draw_grid(termforge::Screen& screen) -> void {
   const auto& lat = twenty48::lattice_for(ascii);
   const auto bg = termforge::theme::kBg;
 
-  // ── The lattice first, then the tiles over it ─────────────────────────────
+  // ── The lattice first, then the tiles over it ──────────────────────────────
   //
   // At the colour tier an empty cell is a filled block, so the grid is legible
   // from the fills alone. At the ASCII tier there are no fills, and four blank
@@ -464,7 +464,7 @@ auto Twenty48::draw_too_small(termforge::Screen& screen) -> void {
   const auto bg = termforge::theme::kBg;
   const auto fg = termforge::theme::kFg;
 
-  // Same answer minesweeper gives. gitea #15 landed and did NOT retire this:
+  // Same answer minesweeper gives. term-game#15 landed and did NOT retire this:
   // GameMeta now carries the size and the selector warns about it, but it never
   // refuses, so a player who presses Enter anyway still arrives here and the
   // game still has to say so itself.

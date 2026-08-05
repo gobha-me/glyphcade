@@ -14,13 +14,13 @@
 //    auxclick only, and most trackpads have no middle button.
 //  * There is a question-mark mark state. The reference has none.
 //
-// SFX bind in THIS file and nowhere lower (Epic 2, gitea #3). Board's verbs
+// SFX bind in THIS file and nowhere lower (Epic 2, term-game#3). Board's verbs
 // return "did anything change", and announce() turns that plus a state
 // comparison into a sound. Board itself learns nothing about audio — audio is
 // presentation, and AGENTS.md keeps game logic clear of presentation for the
 // same reason it keeps it clear of rendering.
 //
-// A best time PER LEVEL persists through GameContext::scores() (gitea #14). It
+// A best time PER LEVEL persists through GameContext::scores() (term-game#14). It
 // records on the win transition only, keyed off the Level enum rather than the
 // level's display name, and it is the Better::Lower half of that store's design —
 // 2048 wanting a best score and this wanting a best time is what proved a record
@@ -103,7 +103,7 @@ class Minesweeper final : public Game {
   auto draw(termforge::Screen& screen) -> void override;
   [[nodiscard]] auto done() const -> bool override { return m_done; }
 
-  // ── Observables for the tests ────────────────────────────────────────────
+  // ── Observables for the tests ──────────────────────────────────────────────
   //
   // ⚠ m_ticks / m_elapsed count EVERY tick, unconditionally, and are NOT the
   // game clock. Board::advance() runs only while the timer is running, i.e.
@@ -173,7 +173,7 @@ class Minesweeper final : public Game {
   auto draw_too_small(termforge::Screen& screen) -> void;
 
   GameContext* m_ctx{nullptr};
-  // The pre-start screen (gitea #38). A member the game consults, NOT a Shell
+  // The pre-start screen (term-game#38). A member the game consults, NOT a Shell
   // state: Shell::state() is InGame from the moment Enter is pressed in the
   // menu, which is why entering a game still means what it did.
   OptionsScreen m_options{};

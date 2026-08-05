@@ -1,4 +1,4 @@
-# ── Install, export, and package config ─────────────────────────────────────
+# ── Install, export, and package config ───────────────────────────────────────
 # This is the answer to the "TODO Install Template" the root CMakeLists carried
 # for years, and the reason it matters: a project consuming this one should be
 # able to write
@@ -16,7 +16,7 @@
 # closest thing was the audio-export-clean ctest, which only greps the Targets
 # file for rtaudio.
 #
-# gitea #46 closed that. The **consumer-resolves** ctest
+# term-game#46 closed that. The **consumer-resolves** ctest
 # (cmake/check_consumer.cmake) installs to a scratch prefix and CONFIGURES a
 # generated throwaway consumer against it, so `find_package(<project> REQUIRED)`
 # and the find_dependency line in cmake/project-config.cmake.in are executed on
@@ -43,9 +43,9 @@ include(CMakePackageConfigHelpers)
 
 set(_cfg_install_dir ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
 
-# ── The library ─────────────────────────────────────────────────────────────
+# ── The library ───────────────────────────────────────────────────────────────
 if (TARGET ${PROJECT_NAME}_lib)
-  # ── Every target in src/lib's chain joins the export set, because it must ──
+  # ── Every target in src/lib's chain joins the export set, because it must ───
   # src/lib is four static libraries since the per-game split, and
   # ${PROJECT_NAME}_lib links the other three PUBLIC. install(EXPORT) refuses to
   # write a Targets file that references a target it cannot name:
@@ -99,7 +99,7 @@ if (TARGET ${PROJECT_NAME}_lib)
     DESTINATION ${_cfg_install_dir}
   )
 
-  # ── Why there is no export(EXPORT ...) here ───────────────────────────────
+  # ── Why there is no export(EXPORT ...) here ─────────────────────────────────
   # There used to be one, describing this same target set against the build tree
   # so a consumer could point CMAKE_PREFIX_PATH at a build directory. It was
   # removed (#29), and it must not come back, because it cannot survive being
@@ -149,7 +149,7 @@ if (TARGET ${PROJECT_NAME}_lib)
   # target spelling, no packaging involved. (Nothing in this repo exercises that
   # path either; see the note at the top of this file.)
 
-  # ── Headers ───────────────────────────────────────────────────────────────
+  # ── Headers ─────────────────────────────────────────────────────────────────
   # *.hpp only, which picks up the public header and the generated version
   # header while leaving version.hpp.in.cmake behind (it does not end in .hpp).
   #
@@ -169,7 +169,7 @@ if (TARGET ${PROJECT_NAME}_lib)
   )
 endif ()
 
-# ── The application ─────────────────────────────────────────────────────────
+# ── The application ───────────────────────────────────────────────────────────
 # Installed when it is built, but deliberately not exported: an executable is
 # something you run, not something another project links.
 if (TARGET ${PROJECT_NAME} AND ${PROJECT_NAME}_BUILD_BIN)
@@ -178,7 +178,7 @@ if (TARGET ${PROJECT_NAME} AND ${PROJECT_NAME}_BUILD_BIN)
   )
 endif ()
 
-# ── Package config ──────────────────────────────────────────────────────────
+# ── Package config ────────────────────────────────────────────────────────────
 # <project>Config.cmake is what find_package(<project> CONFIG) loads; it exists
 # to pull in the Targets file (and, in a real project, to re-find the public
 # dependencies those targets need — see the commented block in the .in file).

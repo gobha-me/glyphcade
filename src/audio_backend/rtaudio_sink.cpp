@@ -2,7 +2,7 @@
 //
 // ⚠ This is the ONLY translation unit in the repo that includes <RtAudio.h> or
 // links rtaudio, and it belongs to a target that is never installed and never
-// exported (gitea #13). Nothing under include/glyphcade/ knows this file exists.
+// exported (term-game#13). Nothing under include/glyphcade/ knows this file exists.
 //
 // ⚠ AND IT HAS NEVER BEEN RUN AGAINST A DEVICE. This container has
 // librtaudio-dev 5.2.0 and no /dev/snd, so what IS exercised here — every time,

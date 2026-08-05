@@ -25,7 +25,7 @@ namespace glyphcade::twenty48 {
 // narrower tile could not draw the widest legal board. glyphs.hpp asserts that.
 //
 // ⚠ THAT IS A FLOOR, AND THIS IS WHERE A READER LOOKS FOR A CEILING — so here
-// is the other half, which gitea #42 asked for. Nothing caps kTileCols. A wider
+// is the other half, which term-game#42 asked for. Nothing caps kTileCols. A wider
 // tile is a legal change: under the suite's rule (AGENTS.md) the board extent
 // is the game and may not move, while the CELL is presentation and may. 2048 is
 // 4x4 and stays 4x4 (board.hpp says why); the six columns each of those tiles
@@ -53,7 +53,7 @@ inline constexpr int kChromeRows = 4;
 }
 
 // 29x19. Above the Shell's 20x8 floor, so the selector can still launch a board
-// this terminal cannot draw. Since gitea #15 it at least SAYS so first — kMeta
+// this terminal cannot draw. Since term-game#15 it at least SAYS so first — kMeta
 // declares this pair as its geometry and the menu warns — but the warning is
 // not a refusal, so the in-game too-small screen below is still the thing that
 // catches it, exactly as before.

@@ -59,9 +59,9 @@ inline constexpr std::size_t kMaxGameOptions = 4;
 // of a pane that only has 48 columns to begin with.
 inline constexpr std::size_t kInlineChoiceMax = 6;
 
-// What kind of fact a game's size floor is. gitea #15 + #42.
+// What kind of fact a game's size floor is. term-game#15 + term-game#42.
 //
-// ⚠ THIS ENUM IS THE WHOLE REASON #15 TOOK SIX DEFERRALS. The obvious shape —
+// ⚠ THIS ENUM IS THE WHOLE REASON term-game#15 TOOK SIX DEFERRALS. The obvious shape —
 // a bare `min_cols` / `min_rows` pair — was refused for a reason that is worth
 // keeping in front of whoever edits this next, and it is written out at
 // games/sokoban/layout.hpp:23: Minesweeper needs 21 columns because nine cells
@@ -81,7 +81,7 @@ inline constexpr std::size_t kInlineChoiceMax = 6;
 // "recommended" for Playable and "minimum" for Drawable, which read as "you may
 // go below this one"; a player then pressed Enter and got a hard refusal
 // screen. That is the same binary disagreeing with itself one keystroke apart —
-// the defect gitea #42 was filed about — reintroduced by the change meant to
+// the defect term-game#42 was filed about — reintroduced by the change meant to
 // fix it. Three independent reviews caught it and it reproduced on a 30x10 pty.
 //
 // What the kind actually records is whether the NUMBER is derivable or chosen,
@@ -168,7 +168,7 @@ struct GameMeta {
   termforge::KeyboardMode keyboard{termforge::KeyboardMode::Legacy};
 
   // The settings this game asks about before its first frame, or empty for
-  // none. gitea #38.
+  // none. term-game#38.
   //
   // ⚠ THE SHELL ONLY READS THIS. It advertises the labels and choices in the
   // selector's detail pane (Shell::refresh_detail) and does nothing else with
@@ -187,7 +187,7 @@ struct GameMeta {
   std::span<const OptionSpec> options{};
 
   // The smallest terminal this game asks for, and what kind of ask it is. See
-  // GameGeometry above for why the kind is part of it. gitea #15 + #42.
+  // GameGeometry above for why the kind is part of it. term-game#15 + term-game#42.
   //
   // ⚠ THE SHELL ONLY READS THIS TOO, and it never refuses. The detail pane
   // names the size, and the selector's footer says so when the current

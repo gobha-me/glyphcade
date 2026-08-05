@@ -111,7 +111,7 @@ auto Snake::start(GameContext& ctx) -> void {
   // entry, so freshness is structural rather than something start() has to
   // remember. See arcade/game.hpp.
 
-  // gitea #38: ask which level and which walls before the snake starts moving,
+  // term-game#38: ask which level and which walls before the snake starts moving,
   // rather than starting on Normal/Solid and making 1/2/3/m throw the run away.
   m_options.open(kMeta.title, kMeta.options, &ctx);
 }
@@ -192,7 +192,7 @@ auto Snake::announce(const snake::TickResult& r) -> void {
   // ⚠ Plain movement is SILENT, and this is the one place Snake's soundscape
   // differs in kind from the other two games: it steps several times a second
   // with no input at all, so a per-step sound is not feedback, it is a metronome
-  // nobody asked for. gitea #6 lists "eat, turn, die" and that list is exactly
+  // nobody asked for. term-game#6 lists "eat, turn, die" and that list is exactly
   // right — a turn is a player gesture, a step is not.
 }
 
@@ -484,7 +484,7 @@ auto Snake::draw_too_small(termforge::Screen& screen) -> void {
   const auto bg = termforge::theme::kBg;
   const auto fg = termforge::theme::kFg;
 
-  // Same answer both other games give. gitea #15 landed and did NOT retire
+  // Same answer both other games give. term-game#15 landed and did NOT retire
   // this: GameMeta now carries the size and the selector warns about it, but it
   // never refuses, so a player who presses Enter anyway still arrives here.
   const std::string need =

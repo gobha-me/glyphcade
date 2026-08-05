@@ -66,7 +66,7 @@ class TempWav {
 
 }  // namespace
 
-// ── The Discard short-circuit ───────────────────────────────────────────────
+// ── The Discard short-circuit ────────────────────────────────────────────────
 
 TEST_CASE("a closed engine records intent and posts nothing",
           "[audio][engine]") {
@@ -107,7 +107,7 @@ TEST_CASE("a NullSink engine never fills the ring", "[audio][engine]") {
   REQUIRE(e.play_count(SfxId::Click) == 500);
 }
 
-// ── Open / close ────────────────────────────────────────────────────────────
+// ── Open / close ─────────────────────────────────────────────────────────────
 
 TEST_CASE("open rejects a null sink and a double open", "[audio][engine]") {
   Engine e;
@@ -135,7 +135,7 @@ TEST_CASE("the engine adopts the format the sink granted", "[audio][engine]") {
   REQUIRE(e.sink()->format().sample_rate == 44100);
 }
 
-// ── Rendering ───────────────────────────────────────────────────────────────
+// ── Rendering ────────────────────────────────────────────────────────────────
 
 TEST_CASE("render overwrites the buffer it is handed", "[audio][engine]") {
   // ⚠ Engine::render is the TOP of the render stack, where Voice and Mixer both
@@ -187,10 +187,10 @@ TEST_CASE("the mono mix is fanned out to every channel", "[audio][engine]") {
   }
 }
 
-// ── The two AGENTS.md claims ────────────────────────────────────────────────
+// ── The two AGENTS.md claims ─────────────────────────────────────────────────
 
 TEST_CASE("N simultaneous voices do not clip", "[audio][engine]") {
-  // ⚠ "Summed with headroom so N simultaneous voices do not clip" (gitea #3).
+  // ⚠ "Summed with headroom so N simultaneous voices do not clip" (term-game#3).
   // Here the guarantee is arithmetic rather than a limiter: every spec's gain
   // is capped at kVoicePeakQ8 == 1/8 FS and there are 8 voices, so the sum
   // cannot exceed full scale. This is the case that would catch someone raising
@@ -266,7 +266,7 @@ TEST_CASE("the mix does not depend on how the frames are chunked",
   }
 }
 
-// ── Voice stealing ──────────────────────────────────────────────────────────
+// ── Voice stealing ───────────────────────────────────────────────────────────
 
 TEST_CASE("the ninth voice steals the oldest", "[audio][engine]") {
   const TempWav tmp("steal");
@@ -340,7 +340,7 @@ TEST_CASE("a free slot is preferred over stealing", "[audio][engine]") {
   REQUIRE(e.stats().active_voices == 0);
 }
 
-// ── pump ────────────────────────────────────────────────────────────────────
+// ── pump ─────────────────────────────────────────────────────────────────────
 
 TEST_CASE("pump renders wall-clock time into an offline sink",
           "[audio][engine]") {
@@ -400,7 +400,7 @@ TEST_CASE("pumping is deterministic", "[audio][engine]") {
   REQUIRE(first == second);
 }
 
-// ── Counters ────────────────────────────────────────────────────────────────
+// ── Counters ─────────────────────────────────────────────────────────────────
 
 TEST_CASE("play_count counts intent per effect", "[audio][engine]") {
   Engine e;

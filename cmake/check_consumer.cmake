@@ -1,11 +1,11 @@
 # Asserts that the installed package can actually be RESOLVED by a consumer
-# (gitea #46).
+# (term-game#46).
 #
 # Run as a ctest:
 #   cmake -DBUILD_DIR=<build> -DPROJECT=glyphcade -DEXPECT_VERSION=<ver> \
 #         [-DTERMFORGE_DIR=<dir>] -P cmake/check_consumer.cmake
 #
-# ── Why this exists, and why check_export.cmake is not it ───────────────────
+# ── Why this exists, and why check_export.cmake is not it ─────────────────────
 #
 # cmake/project-config.cmake.in carries the consumer-side termforge floor:
 #
@@ -40,7 +40,7 @@
 # every one of those times correctness rested on somebody remembering to edit a
 # second file. That is the thing being automated here.
 #
-# ── Why a generated consumer rather than a committed one ────────────────────
+# ── Why a generated consumer rather than a committed one ──────────────────────
 #
 # The obvious shape is a three-line CMakeLists.txt committed under test/. It
 # does not work: test/CMakeLists.txt globs test/* and add_subdirectory()s any
@@ -66,7 +66,7 @@ set(_bin    "${BUILD_DIR}/consumer-check-bin")
 # single most likely way a red arm of this check would come out green.
 file(REMOVE_RECURSE "${_prefix}" "${_src}" "${_bin}")
 
-# ── 1. Install the already-built tree to a scratch prefix ───────────────────
+# ── 1. Install the already-built tree to a scratch prefix ─────────────────────
 #
 # One install is enough for both packages: termforge_INSTALL follows
 # ${PROJECT_NAME}_INSTALL (see cmake/deps/termforge.cmake), so when termforge
@@ -84,7 +84,7 @@ if (NOT _rc EQUAL 0)
   message(FATAL_ERROR "install failed (${_rc}):\n${_out}\n${_err}")
 endif ()
 
-# ── 2. Generate the throwaway consumer ──────────────────────────────────────
+# ── 2. Generate the throwaway consumer ────────────────────────────────────────
 #
 # A bracket argument: CMake substitutes NOTHING inside [==[ ]==], so every line
 # below reaches the generated file byte for byte. The project name is not
@@ -117,7 +117,7 @@ message(STATUS "CONSUMED-TERMFORGE-VERSION=${termforge_VERSION}")
 message(STATUS "CONSUMED-TERMFORGE-DIR=${termforge_DIR}")
 ]==])
 
-# ── 3. Configure it against the scratch prefix ──────────────────────────────
+# ── 3. Configure it against the scratch prefix ────────────────────────────────
 #
 # Configure only. find_package IS the assertion; nothing needs compiling.
 #
@@ -169,7 +169,7 @@ set(_clog "${_cout}${_cerr}")
 
 if (NOT _crc EQUAL 0)
   message(FATAL_ERROR
-    "gitea #46: a consumer cannot resolve the installed package (exit ${_crc}).\n"
+    "term-game#46: a consumer cannot resolve the installed package (exit ${_crc}).\n"
     "This is the failure cmake/deps/termforge.cmake warns about — a package that "
     "resolves in our tree and nowhere else. The usual cause is that the floor in "
     "cmake/project-config.cmake.in disagrees with the pin in "
@@ -183,7 +183,7 @@ if (NOT _crc EQUAL 0)
     "──────── stderr ────────\n${_cerr}")
 endif ()
 
-# ── 4. Assert the configure that succeeded was the one we meant ─────────────
+# ── 4. Assert the configure that succeeded was the one we meant ───────────────
 #
 # Exit 0 alone is not enough, and the reasons are not hypothetical.
 
@@ -234,7 +234,7 @@ if (NOT _got_version VERSION_EQUAL EXPECT_VERSION)
     "`git describe` degrade — see cmake/install.cmake).")
 endif ()
 
-# ── 5. The floor line itself ────────────────────────────────────────────────
+# ── 5. The floor line itself ──────────────────────────────────────────────────
 #
 # Read the INSTALLED config, not cmake/project-config.cmake.in. The .in is a
 # template; the installed file is the artefact the consumer just executed. It

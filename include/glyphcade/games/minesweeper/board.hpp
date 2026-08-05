@@ -10,7 +10,7 @@
 // in here ever needs a Screen, the model and the view have grown together and
 // the fix is upstream of this file.
 //
-// The rules are ported from HTML-Games' minesweeper (gitea xcaliber/HTML-Games,
+// The rules are ported from HTML-Games' minesweeper (a private sibling repo,
 // minesweeper/js/game.js). Two deliberate divergences from that reference are
 // marked ⚠ DIVERGENCE below; both are bugs there, not rules.
 
@@ -65,7 +65,7 @@ struct Preset {
 
 inline constexpr Level kLevels[]{Level::Easy, Level::Medium, Level::Hard};
 
-// The pre-start screen's choice labels (gitea #38). Mixed case, unlike
+// The pre-start screen's choice labels (term-game#38). Mixed case, unlike
 // preset().name — that one is the status row's outcome-adjacent WORD and is
 // shouted on purpose; this is a thing you pick from a menu.
 //
@@ -180,15 +180,15 @@ class Board {
     return m_exploded;
   }
 
-  // ── The three player verbs ────────────────────────────────────────────────
+  // ── The three player verbs ─────────────────────────────────────────────────
   // Each returns true iff it changed something. That return value is not
   // decoration: it is what the "this does nothing" tests assert on, and it is
-  // the hook the SFX layer binds to when Epic 2 (gitea #3) lands.
+  // the hook the SFX layer binds to when Epic 2 (term-game#3) lands.
   auto reveal(Coord p) -> bool;
   auto cycle_mark(Coord p) -> bool;
   auto chord(Coord p) -> bool;
 
-  // ── The clock ─────────────────────────────────────────────────────────────
+  // ── The clock ──────────────────────────────────────────────────────────────
   // dt, and nothing else. There is no clock in this class and there must never
   // be one: that is what lets a test assert the timer by calling advance() N
   // times with no Screen and no terminal. Callers pass the Shell's fixed dt
@@ -215,7 +215,7 @@ class Board {
     return m_clock;
   }
 
-  // ── Fixture seam ──────────────────────────────────────────────────────────
+  // ── Fixture seam ───────────────────────────────────────────────────────────
   // Install an exact mine layout, recompute adjacency, and land in
   // State::Playing — placement has happened, so the next reveal() must not do
   // it again. total_mines() becomes the number actually placed. Every rule test

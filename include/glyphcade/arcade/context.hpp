@@ -8,11 +8,11 @@
 // makes a game testable by handing it a context and nothing else.
 //
 // Epic 1 shipped three things: the probed capability tier, the border family
-// the Shell picked from it, and quit_to_menu(). Epic 2 (gitea #3) added audio()
+// the Shell picked from it, and quit_to_menu(). Epic 2 (term-game#3) added audio()
 // - the seam this file reserved, filled in exactly as promised, additively and
 // without disturbing a single existing game.
 //
-// scores() (gitea #14) is the fourth and last service DESIGN.md named, and it
+// scores() (term-game#14) is the fourth and last service DESIGN.md named, and it
 // filled the same way: one accessor, one setter in the plumbing block below, one
 // new member, and not a line changed in either game's existing code.
 //
@@ -113,7 +113,7 @@ class GameContext {
   // Same hazard termforge's non-owning push_overlay() exists to avoid.
   auto quit_to_menu() noexcept -> void { m_quit_to_menu = true; }
 
-  // ── Shell-side plumbing below. Not for games. ────────────────────────────
+  // ── Shell-side plumbing below. Not for games. ──────────────────────────────
   [[nodiscard]] auto quit_to_menu_requested() const noexcept -> bool {
     return m_quit_to_menu;
   }

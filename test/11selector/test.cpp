@@ -24,7 +24,7 @@
 //      want of a seam: test_wire_headless is private, hardcodes the
 //      FallbackDriver, and that driver's capabilities() is an all-false
 //      literal, so TERM= in the ctest environment changes nothing. The pause
-//      dialog's border (gitea #44) joins the ▸ marker and the ↑↓ hint row on
+//      dialog's border (term-game#44) joins the ▸ marker and the ↑↓ hint row on
 //      the list of things whose colour-tier arm lives only in AGENTS.md's pty
 //      recipe. The consequence worth stating out loud: at this tier
 //      set_border_style(m_ctx.border_style()) and a hardcoded
@@ -38,7 +38,7 @@
 //      cases below assert it early for exactly that reason — do not tidy them
 //      down beside the other post-step assertions. (Shell::quit_requested()
 //      used to hide this by latching; it was a workaround for termforge #73
-//      and went with gitea #17.)
+//      and went with term-game#17.)
 //   5. Mouse events are HIT-TESTED before they are routed. App::route_mouse
 //      only offers an event to a widget whose rect() contains its x/y, so a
 //      wheel or click at coordinates outside the list is not "ignored by the
@@ -134,10 +134,10 @@ class Probe final : public Shell {
 // ⚠ These construct an event NO TERMINAL CAN SEND US TODAY, and that is the
 // point rather than a flaw. KeyAction::Release is only ever delivered under a
 // KeyboardMode above Legacy, no game on the roster asks for one yet, and the
-// first that does will be Tetris (gitea #7). The Shell's gate against them
+// first that does will be Tetris (term-game#7). The Shell's gate against them
 // therefore has to be pinned by synthesis or not at all — and "not at all"
 // means the gate lands together with the game that makes it reachable, which
-// is the bundling gitea #32 exists to avoid.
+// is the bundling term-game#32 exists to avoid.
 //
 // ⚠ .action is the LAST member of KeyEvent, appended deliberately because the
 // upstream parser aggregate-initializes positionally. Designated initializers
@@ -288,7 +288,7 @@ auto enter_game(Probe& app) -> void {
   // REQUIRE is what proves the Shell entered on the FIRST Enter; moving it below
   // this line would make the case pass even if entering had come to need two.
   //
-  // gitea #38: entering a game now opens its pre-start options screen, so a
+  // term-game#38: entering a game now opens its pre-start options screen, so a
   // suite that wants a BOARD has to say so. This is the change telling the truth
   // about itself, not a regression -- and the per-suite cases below assert the
   // screen is there before this dismisses it.
@@ -332,12 +332,12 @@ TEST_CASE("arrow keys move the selection", "[selector]") {
   }
 }
 
-// ── The selection marker ────────────────────────────────────────────────────
+// ── The selection marker ─────────────────────────────────────────────────────
 //
 // Until termforge v0.1.11 the Shell drew this itself, into a two-column gutter
 // it carved out of the list's rect, and NOTHING in this file asserted it. The
 // workaround shipped untested for two epics. Upstream owns the marker now
-// (#72, gitea #17), so these are the cases that should have existed all along —
+// (#72, term-game#17), so these are the cases that should have existed all along —
 // they pin the behaviour, not the implementation, and would have gone red for
 // either one.
 //
@@ -384,7 +384,7 @@ TEST_CASE("the selector screen is 7-bit at the ASCII tier", "[selector][mark]") 
   // The only thing that catches a dropped m_list.set_style(style). ListWidget
   // defaults to BorderStyle::Single, whose marker is '▸' (U+25B8) — three bytes
   // of UTF-8 on a terminal that has told us it cannot draw a box. Observed on a
-  // pty during gitea #17, not hypothesised.
+  // pty during term-game#17, not hypothesised.
   Probe app;
   app.step();
   REQUIRE(all_seven_bit(app));
@@ -542,7 +542,7 @@ TEST_CASE("Escape resumes from pause", "[selector][pause]") {
   REQUIRE(app.current_game() != nullptr);
 }
 
-// ── the pause dialog's border tier (gitea #44) ───────────────────────────────
+// ── the pause dialog's border tier (term-game#44) ────────────────────────────
 //
 // The dialog was the one widget in the app the tier never reached. termforge's
 // Dialog owns a Frame privately and that Frame defaults to BorderStyle::Single,
@@ -551,7 +551,7 @@ TEST_CASE("Escape resumes from pause", "[selector][pause]") {
 // U+2502 onto terminals that had just reported no colour, in every release since
 // the dialog existed.
 //
-// ⚠ This could not be asserted before gitea #36. See trap 6: frame_step restores
+// ⚠ This could not be asserted before term-game#36. See trap 6: frame_step restores
 // the backdrop before it returns, so a sweep after step() was sweeping the GAME.
 // paint_overlay_pass() is what makes the dialog's cells readable at all, and it
 // was deliberately left unspent there — an unrelated red inside a pin bump
@@ -626,7 +626,7 @@ TEST_CASE("the pause dialog stays 7-bit at every window size",
   }
 }
 
-// ── the pause dialog's press flash (gitea #36) ───────────────────────────────
+// ── the pause dialog's press flash (term-game#36) ────────────────────────────
 //
 // Two cases, and they are deliberately NOT one. The pin bump v0.2.2 -> v0.6.0
 // crosses two upstream tags that both touch this, and the only way to say which
@@ -649,7 +649,7 @@ TEST_CASE("the pause dialog stays 7-bit at every window size",
 // Widget::reset_transient(), which Dialog::draw() calls at its per-showing
 // boundary BEFORE anything paints, and Button implements by zeroing the flash.
 //
-// ⚠ What the two red arms actually proved, and it corrects the issue. gitea #36
+// ⚠ What the two red arms actually proved, and it corrects the issue. term-game#36
 // assumed v0.4.0 introduces this. It does not — v0.2.2, the pin we ship TODAY,
 // already paints one frame of a wrongly-lit Resume button every time the pause
 // dialog re-opens. v0.4.0 would have made that permanent; v0.5.0 cures both.
@@ -820,7 +820,7 @@ TEST_CASE("the selector survives entering and leaving repeatedly",
   }
 }
 
-// ── Menu SFX ────────────────────────────────────────────────────────────────
+// ── Menu SFX ─────────────────────────────────────────────────────────────────
 //
 // Asserted through Shell::audio().play_count(), which counts INTENT rather than
 // sound. Two consequences worth knowing before extending these:
@@ -1039,7 +1039,7 @@ TEST_CASE("a silent build still records what was asked for",
   REQUIRE(stats.silenced >= 1);
 }
 
-// ── The keyboard tier, and the Shell's gate on KeyAction (gitea #32) ─────────
+// ── The keyboard tier, and the Shell's gate on KeyAction (term-game#32) ──────
 //
 // Everything below is about a contract that has no consumer yet: no game on
 // this roster asks for a KeyboardMode above Legacy, so no terminal will ever
@@ -1173,7 +1173,7 @@ TEST_CASE("a released key still reaches the running game",
 TEST_CASE("the keyboard tier is the game's, and is given back on the way out",
           "[selector][keyboard]") {
   // ⚠ THIS CASE CHANGED SHAPE WHEN TETRIS LANDED, and the way it changed is the
-  // point. gitea #32 shipped the mode-switching branch with NO consumer: every
+  // point. term-game#32 shipped the mode-switching branch with NO consumer: every
   // roster entry declared Legacy, deleting either set_keyboard_mode left the
   // whole suite green, and the branch had to be red-verified in a pty by
   // flipping a game to Enhanced in a scratch tree. This is that flip, made
@@ -1219,7 +1219,7 @@ TEST_CASE("the keyboard tier is the game's, and is given back on the way out",
 
 TEST_CASE("a terminal without the protocol is told, once, on entry",
           "[selector][keyboard]") {
-  // The other half of gitea #32 that only a consumer can reach: upstream emits
+  // The other half of term-game#32 that only a consumer can reach: upstream emits
   // its fallback ErrorEvent from App::setup(), which has long returned by the
   // time a game entry sets a mode, so the Shell has to raise its own.
   //
@@ -1264,7 +1264,7 @@ TEST_CASE("a terminal without the protocol is told, once, on entry",
   REQUIRE(quiet.find("kitty keyboard protocol") == std::string::npos);
 }
 
-// ── What the fourth game turned on ──────────────────────────────────────────
+// ── What the fourth game turned on ───────────────────────────────────────────
 //
 // Both cases below were deferred with a condition, in this file and in
 // STATUS.md, from the v0.2.2 pin bump onward: "revisit when the roster reaches
@@ -1353,7 +1353,7 @@ TEST_CASE("the detail pane's scrollbar is 7-bit too", "[selector][render]") {
   }
 }
 
-// ── The detail pane advertises a game's settings (gitea #38) ────────────────
+// ── The detail pane advertises a game's settings (term-game#38) ──────────────
 //
 // ⚠ THIS IS THE HALF A GAME-SIDE-ONLY FIX WOULD HAVE LEFT STANDING. #38 names
 // two defects: the options are in the wrong place in time, AND the one screen
@@ -1453,7 +1453,8 @@ TEST_CASE("the options lines stay 7-bit at every pane width",
   }
 }
 
-// ── The geometry block: a floor with a kind, and a ceiling (gitea #15 + #42) ──
+// ── The geometry block: a floor with a kind, and a ceiling ──────────────────
+// (term-game#15 + term-game#42)
 //
 // ⚠ WHAT IS TESTED HERE AND NOT IN test/34geometry. That suite owns the
 // NUMBERS — that every declared floor is the size its own compute_layout
@@ -1514,7 +1515,7 @@ TEST_CASE("the detail pane names the size a game wants", "[selector][geometry]")
     // every other game (its compute_layout returns !fits below 34x12 and its
     // draw() falls through to draw_too_small). The menu was making a promise
     // the game does not keep, one keystroke apart, which is the exact defect
-    // gitea #42 was filed about.
+    // term-game#42 was filed about.
     //
     // No word in this pane may soften into advice. "recommended" and "prefers"
     // are the two that were actually written down at some point.
@@ -1810,7 +1811,7 @@ TEST_CASE("the selector body stops widening and centres", "[selector][geometry]"
     // them, the screen would look right and every click would land a row's
     // worth of columns away from where the player aimed — pixels and hit-test
     // drifting apart with no compile error, which is exactly the hazard
-    // gitea #42 warns about for Sokoban's camera.
+    // term-game#42 warns about for Sokoban's camera.
     //
     // Nothing here recomputes the offset by hand: it reads the marker's own
     // column off the screen, clicks a row BELOW it in that same column, and

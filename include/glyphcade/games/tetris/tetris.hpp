@@ -8,15 +8,15 @@
 // split load-bearing rather than decorative: test/27tetris exercises the rules,
 // the gravity clock and DAS with no terminal because it *cannot* reach one.
 //
-// ── What this file does NOT do ──────────────────────────────────────────────
+// ── What this file does NOT do ───────────────────────────────────────────────
 //
 // It does not implement pause, and it does not implement quit-to-menu. The
-// Shell binds 'p' and Escape on anything a game declines, so gitea #7's "pause"
+// Shell binds 'p' and Escape on anything a game declines, so term-game#7's "pause"
 // is satisfied by NOT writing it. Same as the other three games.
 //
 // ── This is the first game to ask for a keyboard tier ────────────────────────
 //
-// kMeta declares KeyboardMode::Enhanced (gitea #32). The Shell sets it on
+// kMeta declares KeyboardMode::Enhanced (term-game#32). The Shell sets it on
 // entry, restores Legacy on the way out, and raises an ErrorEvent{Info} when
 // the terminal cannot deliver it. What THIS file does with that is read
 // ctx.capabilities().kitty_keyboard once and hand the answer to the model as a
@@ -87,7 +87,7 @@ class Tetris final : public Game {
   auto on_event(const termforge::Event& ev) -> bool override;
   auto draw(termforge::Screen& screen) -> void override;
 
-  // ── Test seams ────────────────────────────────────────────────────────────
+  // ── Test seams ─────────────────────────────────────────────────────────────
   [[nodiscard]] auto board() const noexcept -> const tetris::Board& {
     return m_board;
   }
@@ -117,7 +117,7 @@ class Tetris final : public Game {
   auto draw_piece_box(termforge::Screen& screen, int x, int y,
                       const tetris::Piece* p) -> void;
 
-  // The pre-start screen (gitea #38). A member the game consults, not a Shell
+  // The pre-start screen (term-game#38). A member the game consults, not a Shell
   // state — see arcade/options_screen.hpp.
   OptionsScreen m_options{};
   GameContext* m_ctx{nullptr};

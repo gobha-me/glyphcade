@@ -8,10 +8,10 @@
 // test/31sokoban parse and validate all twenty bundled levels with no Screen
 // anywhere in the process.
 //
-// ── Why the standard charset ────────────────────────────────────────────────
+// ── Why the standard charset ─────────────────────────────────────────────────
 //
 // `#` `@` `$` `.` `*` `+` and space is the encoding every Sokoban level pack
-// published since the 1980s uses, and gitea #8 asks for it by name so the
+// published since the 1980s uses, and term-game#8 asks for it by name so the
 // existing corpus loads directly. Nothing here is invented: the reference's
 // js/levels.js uses the same seven characters, and so does every .sok file.
 //

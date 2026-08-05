@@ -21,8 +21,9 @@
 # dependency: termforge hardcodes project(termforge ...) rather than deriving it
 # from the directory name, precisely so _deps/termforge-src cannot rename it.
 #
-# HTTPS, not SSH: github.com has no key on the dev container or on CI runners.
-# git.gobha.me is the SSH-only forge; github.com is not.
+# HTTPS, not SSH: there is no GitHub SSH key on the dev container or on CI
+# runners, and an SSH URL here would fail in exactly the environments that most
+# need the fallback to work.
 
 # 0.6.0, not 0.6 — and the patch level here is load-bearing, not pedantry.
 #
@@ -44,7 +45,7 @@
 #     The only symptom is a wedged terminal, on one developer's machine, on the
 #     day something happens to throw. There is no build-time signal at all.
 #   - 0.1.10 compiles clean, links clean, runs clean — and draws the selector's
-#     selection marker TWICE. Since gitea #17 the Shell no longer draws its own
+#     selection marker TWICE. Since term-game#17 the Shell no longer draws its own
 #     (ListWidget marks its own selection from 0.1.11, in a gutter it reserves
 #     on every row), so a stale 0.1.10 reserves nothing and paints nothing, and
 #     what you get is a menu with no visible selection at all on the fallback
@@ -117,20 +118,20 @@ else ()
   #            test_winch_hooked probes — which is what lets test/21exception
   #            assert the guarantee rather than take the release note's word
   #            for it. This is the tag that retired run_or_report's
-  #            terminal-restore job; gitea #16.
+  #            terminal-restore job; term-game#16.
   #  v0.1.11 — ListWidget marks its own selection (#72): set_style, set_marker,
   #            set_marker_enabled, gutter_cols, and the colour setters that
   #            never existed. The marker is a glyph in a two-column gutter the
   #            widget reserves on every row, on by default, and — unlike the
   #            workaround it replaced — INSIDE rect(), so a click on it selects.
   #            This is the tag that retired the selector's hand-drawn "> ";
-  #            gitea #17. Also the tag that changed sizeof(ListWidget); see the
+  #            term-game#17. Also the tag that changed sizeof(ListWidget); see the
   #            ABI note above.
   #  v0.1.12 — the same fix for Select/MenuBar dropdowns, and
   #  v0.1.13 — for TableWidget (#76). We use neither; taken because they are on
   #            the way to v0.1.14 and splitting the pin buys nothing.
   #  v0.1.14 — App::running() (#73). This is what retired Shell::quit_requested,
-  #            which existed only because App::m_running was unreadable; gitea
+  #            which existed only because App::m_running was unreadable;
   #            #17. ⚠ It is not the same observable: test_run_frames re-arms
   #            m_running on entry, so running() answers "did a quit happen
   #            during the last run", not "ever". test/11selector's trap list
@@ -139,7 +140,7 @@ else ()
   #            the tip. Its default, MouseMode::Drag, is byte-for-byte the
   #            ?1006h?1002h we were already emitting, so taking the tag changes
   #            nothing until something calls it. MouseMode::Motion is what
-  #            Minesweeper wants for buttonless hover — gitea #18.
+  #            Minesweeper wants for buttonless hover — #4.
   #  v0.1.16 — Cell::attrs (#62): bold/dim/italic/underline/reverse/strike as a
   #            bitmask on every cell. The one tag here with a payoff we can
   #            spend: Minesweeper's cursor is a PAIR OF BRACKETS costing a
@@ -183,7 +184,7 @@ else ()
   #            STATUS.md lists as Epic 6's (Tetris) blocker: hold-to-move stops
   #            being OS auto-repeat guesswork.
   #
-  #  ── gitea #36 moves the pin v0.2.2 → v0.6.0. Six tags, not the four the
+  #  ── term-game#36 moves the pin v0.2.2 → v0.6.0. Six tags, not the four the
   #     issue describes; it was written when upstream was at v0.5.1. ──
   #
   #   v0.3.0 — draw_image(Rect cells, …), preferred_pixel_extent(), draw_pixels
@@ -192,7 +193,7 @@ else ()
   #            ONLY for a TerminalDriver implementor or a draw_pixels override.
   #            We are neither — nothing in src/, include/ or test/ derives from
   #            a termforge type except Shell : App — so it misses entirely.
-  #            ⚠ It is also the tag gitea #39 (art pipeline) is blocked on: at
+  #            ⚠ It is also the tag #8 (art pipeline) is blocked on: at
   #            v0.2.2 draw_image was handed an Image's PIXEL dims and used them
   #            as a CELL count, so an atlas rendered as one flat colour per
   #            cell. Generating art before this tag was generating art we could
@@ -227,7 +228,7 @@ else ()
   #            v0.5.0 (#122) added Widget::reset_transient(), which Dialog::draw
   #            calls at its per-showing boundary BEFORE anything paints, and
   #            Button implements by zeroing the flash. That cures both.
-  #            ⚠ So gitea #36's table is wrong on BOTH rows — it says v0.4.0
+  #            ⚠ So term-game#36's table is wrong on BOTH rows — it says v0.4.0
   #            bites only "if we ever hold" a ProgressBar or Button, and that
   #            v0.5.0 does not reach us. And the audit it prescribes — grep for
   #            those two type names — comes back CLEAN, because the Buttons are

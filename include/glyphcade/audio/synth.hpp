@@ -76,7 +76,7 @@ enum class SfxId : std::uint8_t {
   // Added for 2048. A move that merges nothing gets Slide; a move that merges
   // anything gets Merge instead, so one gesture is still one sound.
   //
-  // ⚠ There is deliberately no Spawn effect, which diverges from gitea #5's
+  // ⚠ There is deliberately no Spawn effect, which diverges from term-game#5's
   // "SFX: slide, merge, spawn, game-over". A spawn happens on EVERY legal move,
   // so a spawn sound is a second blip on every single gesture — that is not a
   // sound, it is a stutter. Nothing is lost: the move already sounded.
@@ -86,7 +86,7 @@ enum class SfxId : std::uint8_t {
   // portability trap this synth exists to avoid (see the header note above).
   Slide,
   Merge,
-  // Added for Snake (gitea #6), which asks for "eat, turn, die" — and gets ONE
+  // Added for Snake (term-game#6), which asks for "eat, turn, die" — and gets ONE
   // new id, not three. Turn is Click (a turn is a generic acknowledged gesture,
   // which is exactly what Click is for) and dying is Lose, so only eating had
   // nothing in the bank that already meant it.
@@ -96,7 +96,7 @@ enum class SfxId : std::uint8_t {
   // metronome — the same argument that kept Spawn out for 2048, but stronger,
   // because a step does not even follow a keystroke.
   Eat,
-  // Added for Tetris (gitea #7), which asks for "move, rotate, lock, line
+  // Added for Tetris (term-game#7), which asks for "move, rotate, lock, line
   // clear, tetris, level-up, top-out" — and gets THREE new ids, not seven.
   //
   // Reused instead: a move and a rotate are Click (a generic acknowledged
@@ -118,7 +118,7 @@ enum class SfxId : std::uint8_t {
   Lock,
   Tetris,
   LevelUp,
-  // Added for Sokoban (gitea #8), which asks for "step, push, crate-on-goal,
+  // Added for Sokoban (term-game#8), which asks for "step, push, crate-on-goal,
   // level complete" — and gets ONE new id, the fewest of any game so far.
   //
   // Reused instead: a step is Click (a generic acknowledged gesture, and a

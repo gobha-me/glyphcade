@@ -1,7 +1,7 @@
 // A binary that throws on purpose, so cmake/pty_restore.sh has something to
 // point a pty at.
 //
-// This exists because the one thing gitea #16 actually turns on — the terminal
+// This exists because the one thing term-game#16 actually turns on — the terminal
 // is restored when a frame throws — is the one thing test/21exception cannot
 // see. Nothing in that file enters the alternate screen (test_run_guarded
 // deliberately does not set m_in_screen, and with neither stream a tty the

@@ -9,7 +9,7 @@
 // seeing in a file list. The maps below are byte-for-byte the twenty in
 // HTML-Games' sokoban/js/levels.js, in its order, under its names.
 //
-// ── The pars are OURS, and that is not a preference ─────────────────────────
+// ── The pars are OURS, and that is not a preference ──────────────────────────
 //
 // The reference ships a `par` on every level and its README states they are
 // "derived from the optimal solution length". Neither half survives contact:
@@ -337,7 +337,7 @@ inline constexpr PackEntry kPack[] = {
   return static_cast<int>(pack().size());
 }
 
-// The pre-start picker's choice labels (gitea #38), one per level, in pack
+// The pre-start picker's choice labels (term-game#38), one per level, in pack
 // order.
 //
 // ⚠ Built rather than typed. OptionSpec::choices is a span<const string_view>

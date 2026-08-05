@@ -6,7 +6,7 @@
 // tetris/board.hpp: test/31sokoban drives every rule here and *cannot* reach a
 // Screen, because nothing in this translation unit knows one exists.
 //
-// ── The first game since Minesweeper with no clock at all ───────────────────
+// ── The first game since Minesweeper with no clock at all ────────────────────
 //
 // Snake has one accumulator, 2048 has one tween, Tetris has five. Sokoban has
 // none: nothing advances unless the player presses a key, so there is no
@@ -108,9 +108,9 @@ class Board {
   [[nodiscard]] auto boxes_on_goals() const noexcept -> int;
   [[nodiscard]] auto has_box(int x, int y) const noexcept -> bool;
 
-  // ── Deadlock ──────────────────────────────────────────────────────────────
+  // ── Deadlock ───────────────────────────────────────────────────────────────
   //
-  // gitea #8 asks for this and the reference has NOTHING: push a box into a
+  // term-game#8 asks for this and the reference has NOTHING: push a box into a
   // corner and it lets you keep playing a level that can no longer be solved.
   //
   // ⚠ Scope, stated so it is not mistaken for something larger. This is NOT a

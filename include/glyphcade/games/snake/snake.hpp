@@ -2,7 +2,7 @@
 
 // Snake as a glyphcade::Game.
 //
-// ── The only file here that knows a terminal exists ─────────────────────────
+// ── The only file here that knows a terminal exists ──────────────────────────
 //
 // board.hpp has the rules and the step clock, layout.hpp the geometry,
 // glyphs.hpp the tables — and none of them includes a termforge header. This
@@ -15,10 +15,10 @@
 // mechanic, whereas Snake occupies whole cells and a sub-cell tween in a
 // character grid is a feel question with no reference behind it to answer it.
 //
-// ── What this file does NOT do ──────────────────────────────────────────────
+// ── What this file does NOT do ───────────────────────────────────────────────
 //
 // It does not implement pause, and it does not implement quit-to-menu. The Shell
-// binds 'p' and Escape on anything a game declines, so gitea #6's "pause" scope
+// binds 'p' and Escape on anything a game declines, so term-game#6's "pause" scope
 // item is satisfied by NOT writing it — which is exactly the property Epic 1
 // built the Shell to have.
 
@@ -127,7 +127,7 @@ class Snake final : public Game {
   auto draw_field(termforge::Screen& screen) -> void;
   auto draw_too_small(termforge::Screen& screen) -> void;
 
-  // The pre-start screen (gitea #38). A member the game consults, not a Shell
+  // The pre-start screen (term-game#38). A member the game consults, not a Shell
   // state — see arcade/options_screen.hpp.
   OptionsScreen m_options{};
   GameContext* m_ctx{nullptr};

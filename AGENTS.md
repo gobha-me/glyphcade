@@ -8,23 +8,26 @@ This is **glyphcade**: a TUI arcade suite in C++23, built on
 [TermForge](https://github.com/gobha-me/termforge) for UI and
 [RtAudio](https://github.com/thestk/rtaudio) for sound.
 
-## ⚠ Two forges — check which one before filing anything
+## ⚠ Two repos — check which one before filing anything
 
-This is the single easiest mistake to make here.
+This is the single easiest mistake to make here. Both are on GitHub, both use
+`gh`, and the split is by *subject*, not by tool.
 
-| Repo | Forge | Tool | What goes there |
-|---|---|---|---|
-| **glyphcade** (this) | gitea `xcaliber/term-game` | `tea` | project work, game epics |
-| **termforge** | GitHub `gobha-me/termforge` | `gh` | framework gaps/bugs |
+| Repo | What goes there |
+|---|---|
+| **gobha-me/glyphcade** (this) | project work, game epics, anything about the arcade |
+| **gobha-me/termforge** | framework gaps and bugs in the rendering layer |
 
-Gitea repos live under the **user** `xcaliber`, not an org — `tea repos create
---owner xcaliber` fails with "org does not exist"; omit `--owner`. `tea issues
-create` has no `--body-file`, so use `-d "$(cat file)"` for long bodies. HTTPS
-clone from git.gobha.me needs auth; **SSH works**.
+If TermForge is missing something this project needs, that is an issue against
+**termforge** — not a workaround buried in game code. That feedback loop is half
+the point of this repo.
 
-If TermForge is missing something this project needs, that is a `gh` issue
-against termforge — not a workaround buried in game code. That feedback loop is
-half the point of this repo.
+⚠ **Issue numbers below 15 or so may predate the move.** This project was
+migrated from a self-hosted tracker before it went open source; references to
+issues that did not come across are written as plain text like
+`` `term-game#42` `` rather than as links, precisely so GitHub does not
+auto-link them to an unrelated issue of the same number. If you see that form,
+it points at history that is not public — treat it as a note, not a lead.
 
 ## Baseline
 
@@ -216,10 +219,10 @@ than the rest** — it OOM-killed `cc1plus` at 4 parallel jobs and needs 2, beca
 unit combination in the repo. Hence the explicit `CMAKE_BUILD_PARALLEL_LEVEL=2` on
 command 4 and nowhere else.
 
-⚠ `.gitea/workflows/ci.yaml` still passes a bare `--parallel`, against a
-container-limited runner. Left alone deliberately — CI is green and changing it
-belongs in its own change, not bundled into one whose signal depends on CI being
-trustworthy. Tracked as its own gitea issue.
+CI carries the same rule: `.github/workflows/ci.yml` passes `--parallel 4`, and
+`2` on the TSan arm. It used to pass a bare `--parallel` against a
+container-limited runner, which is the failure described above; that was fixed
+as part of the move to GitHub Actions.
 
 ⚠ **TSan is its own build, never a flag added to another one** — it does not
 compose with ASan or UBSan. It needs an explicit `-DCMAKE_BUILD_TYPE`, because
@@ -297,8 +300,8 @@ that is the evidence the simulation is advancing.
 this backwards and a check goes vacuous rather than red. `grep 'Resume'` on the
 raw file returns 0 at every pin — the renderer positions every cell, so screen
 adjacency is not byte adjacency. A colour check that also proves the widget
-never rendered proves nothing (gitea #36, and the same family as the `MINES`
-capture in gitea #38).
+never rendered proves nothing (term-game#36, and the same family as the `MINES`
+capture in term-game#38).
 
 ⚠ **A "this colour never appears" check needs a control that CAN appear.** Four
 were used for #36's press flash, and the fourth is the one that matters: the
@@ -310,7 +313,7 @@ pin's binary and diff the counts. For #36 that was 1 against 0, which is
 evidence a single arm cannot produce.
 
 ⚠ **The same rule holds for glyphs, and there the control is easy to get
-wrong.** gitea #44 checked that the pause dialog stopped painting box-drawing
+wrong.** term-game#44 checked that the pause dialog stopped painting box-drawing
 characters. Drive it — note the *two* `\r`, because Minesweeper is roster entry
 0 and has a pre-start options screen:
 
@@ -335,7 +338,7 @@ expect `┤` or `│` to move at the colour tier — `Rounded` shares both with
 as a failed fix.
 
 ⚠ **A glyph that IMPROVES at one tier must be shown not to change at the
-other**, and one `\r` is enough to reach it. gitea #45 swapped the options
+other**, and one `\r` is enough to reach it. term-game#45 swapped the options
 cycler's `<`/`>` for `‹`/`›` above the ASCII tier, where the old code was
 correct and had to stay so:
 
@@ -398,7 +401,7 @@ steps x cells-repainted and only its ORDER OF MAGNITUDE means anything — 28
 repaints over 8 s at a 1000 ms gravity is about seven steps of a four-cell piece,
 which is right, and a per-step number would need a glyph only one cell uses.
 
-**Checking that a game got the keyboard tier it asked for.** Since gitea #32 a
+**Checking that a game got the keyboard tier it asked for.** Since term-game#32 a
 game declares a `KeyboardMode` in its `kMeta` and the Shell sets it per entry, so
 the request is visible in the byte stream:
 
@@ -444,7 +447,7 @@ ear, and it is how the SFX bank is meant to be tuned.
 
 ## Porting from HTML-Games
 
-[HTML-Games](https://git.gobha.me/xcaliber/HTML-Games) (gitea, SSH clone) has
+HTML-Games (a private sibling repo) has
 working browser implementations of most of this roster — minesweeper, snake,
 sokoban, solitaire, tetris, 2048. **The game logic is solved there**; a port is a
 rendering and feel exercise, not a design one. Read the reference before

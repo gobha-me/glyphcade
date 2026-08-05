@@ -1,9 +1,9 @@
 // glyphcade — Sokoban: the Game, and the only file here that knows a terminal
 // exists.
 //
-// ── What MapWidget made awkward, written down where the workarounds are ─────
+// ── What MapWidget made awkward, written down where the workarounds are ──────
 //
-// gitea #8 makes feedback into termforge #64 a deliverable of this epic rather
+// term-game#8 makes feedback into termforge term-game#64 a deliverable of this epic rather
 // than a side effect, so each item below is a note at the site that pays for
 // it. All four are v0.2.2 (== v0.5.1: the widget has not changed in four tags).
 //
@@ -129,7 +129,7 @@ auto Sokoban::start(GameContext& ctx) -> void {
   // no-op rather than a reload.
   load(start_at);
 
-  // gitea #38: twenty levels is a list, not three keys. preselect() rather than
+  // term-game#38: twenty levels is a list, not three keys. preselect() rather than
   // default_index because this number comes from the score store and cannot be
   // constexpr; see the note on kSokobanOptions.
   m_options.open(kMeta.title, kMeta.options, &ctx);
@@ -236,7 +236,7 @@ auto Sokoban::sync_map() -> void {
                                               true)));
 }
 
-// ── Input ──────────────────────────────────────────────────────────────────
+// ── Input ────────────────────────────────────────────────────────────────────
 
 auto Sokoban::attempt(Dir d) -> bool {
   if (!m_board) return false;
@@ -378,7 +378,7 @@ auto Sokoban::on_event(const termforge::Event& ev) -> bool {
   return false;
 }
 
-// ── Scores ─────────────────────────────────────────────────────────────────
+// ── Scores ───────────────────────────────────────────────────────────────────
 
 auto Sokoban::record_best() -> void {
   if (m_ctx == nullptr || !m_board) return;
@@ -405,7 +405,7 @@ auto Sokoban::solved_count() const -> int {
   return n;
 }
 
-// ── Rendering ──────────────────────────────────────────────────────────────
+// ── Rendering ────────────────────────────────────────────────────────────────
 
 auto Sokoban::draw(termforge::Screen& screen) -> void {
   // Same arm as draw_broken()/draw_too_small(): the picker owns the whole
@@ -538,7 +538,7 @@ auto Sokoban::draw_too_small(termforge::Screen& screen) -> void {
   // Same answer the other four games give — but a different REASON, which
   // layout.hpp explains: this floor is about being able to plan a push, not
   // about being able to draw the level. That difference is no longer only a
-  // comment: gitea #15 shipped SizeFloor, this is the roster's one Playable,
+  // comment: term-game#15 shipped SizeFloor, this is the roster's one Playable,
   // and the selector says "recommended" here where it says "minimum" elsewhere.
   const std::string need = "Sokoban needs " + num(sokoban::kNeedCols) + "x" +
                            num(sokoban::kNeedRows);

@@ -25,7 +25,7 @@ target_include_directories(${PROJECT_NAME}
 # framework with it.
 #
 # ⚠ The audio backend is linked SEPARATELY and by name, not through
-# ${PROJECT_NAME}::lib, and that separation is gitea #13's decision made
+# ${PROJECT_NAME}::lib, and that separation is term-game#13's decision made
 # structural: the library must never reference rtaudio, or the imported target's
 # name lands in the exported glyphcadeTargets.cmake and an installed package
 # cannot resolve it. See src/audio_backend/CMakeLists.txt.
@@ -44,7 +44,7 @@ target_link_libraries(${PROJECT_NAME}
 
 # ⚠ Spelled without the :: alias on purpose — src/audio_backend deliberately has
 # none, because an alias is what an exported target looks like and that one must
-# never be exported (gitea #13). It carries ${PROJECT_NAME}::lib PUBLIC, so the
+# never be exported (term-game#13). It carries ${PROJECT_NAME}::lib PUBLIC, so the
 # line above is redundant with this one; both are kept so that removing the
 # backend does not silently take the library link with it.
 #

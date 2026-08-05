@@ -38,7 +38,7 @@ inline constexpr int kChromeRows = 4;
 // 28*2 + 2 = 58 columns, 16 + 4 = 20 rows. Inside minesweeper Hard's 63x20
 // envelope, and well above the Shell's 20x8 floor — so the "does not fit" path
 // is reachable in practice and has to be a real screen rather than an assert.
-// Same answer Epics 3 and 4 gave. gitea #15 has since put this pair into
+// Same answer Epics 3 and 4 gave. term-game#15 has since put this pair into
 // kMeta's geometry so the menu warns first, but it warns rather than refuses,
 // so the screen below is still what a player who presses Enter anyway sees.
 //

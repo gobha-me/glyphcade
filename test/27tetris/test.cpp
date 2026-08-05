@@ -58,7 +58,7 @@ constexpr std::chrono::duration<double> kTick{1.0 / 60.0};
 
 // ⚠ A COPY, not the span. preview() returns a view onto the board's own queue,
 // so a case that held the span across a lock would be comparing the queue with
-// itself and could never see a shift — the exact blindness gitea #55 lived in.
+// itself and could never see a shift — the exact blindness term-game#55 lived in.
 // ⚠ And it copies kPreview entries rather than three, so raising the preview
 // depth widens these cases instead of leaving them checking a prefix.
 [[nodiscard]] auto preview_of(const Board& b) -> std::array<Piece, kPreview> {
@@ -79,7 +79,7 @@ constexpr std::chrono::duration<double> kTick{1.0 / 60.0};
 
 }  // namespace
 
-// ── The piece tables ────────────────────────────────────────────────────────
+// ── The piece tables ─────────────────────────────────────────────────────────
 
 TEST_CASE("every tetromino has four cells in every rotation",
           "[tetris][pieces]") {
@@ -145,7 +145,7 @@ TEST_CASE("both kick tables match the standard SRS offsets",
   REQUIRE(kicks_for(Piece::I, 0, 1) != kicks_for(Piece::T, 0, 1));
 }
 
-// ── Rotation and kicks ──────────────────────────────────────────────────────
+// ── Rotation and kicks ───────────────────────────────────────────────────────
 
 TEST_CASE("a rotation in open space does not translate the piece",
           "[tetris][rotation]") {
@@ -227,7 +227,7 @@ TEST_CASE("a piece that fits no kick does not rotate at all",
   REQUIRE(b.active().x == x);
 }
 
-// ── The 7-bag ───────────────────────────────────────────────────────────────
+// ── The 7-bag ────────────────────────────────────────────────────────────────
 
 TEST_CASE("every seven spawned pieces contain each tetromino exactly once",
           "[tetris][bag]") {
@@ -236,7 +236,7 @@ TEST_CASE("every seven spawned pieces contain each tetromino exactly once",
   // this one on the first bag.
   //
   // ⚠ THE SPAWN STREAM, not the preview. This case used to read [active] +
-  // preview() as its first four entries, and gitea #55 is why that could not
+  // preview() as its first four entries, and term-game#55 is why that could not
   // fail: the preview was a dead-end copy, so those four were draws 4,1,2,3 —
   // a PERMUTATION of the first four — and the check below counts a multiset
   // rather than an order. It passed by arithmetic accident of the exact
@@ -293,9 +293,9 @@ TEST_CASE("the same seed produces the same sequence", "[tetris][bag]") {
   REQUIRE(differs_somewhere);
 }
 
-// ── The preview ─────────────────────────────────────────────────────────────
+// ── The preview ──────────────────────────────────────────────────────────────
 //
-// ⚠ gitea #55. m_next was filled once by reset() and read by nothing except
+// ⚠ term-game#55. m_next was filled once by reset() and read by nothing except
 // hold(), while every spawn drew a piece straight from the bag — so the NEXT
 // panel advertised three pieces the player would never receive, and it never
 // moved. Neither half of that is observable from preview() ALONE, which is why
@@ -407,7 +407,7 @@ TEST_CASE("a fresh board's active piece is the head of its own stream",
   REQUIRE(b.preview()[2] == Piece::S);
 }
 
-// ── Gravity, and the clock ──────────────────────────────────────────────────
+// ── Gravity, and the clock ───────────────────────────────────────────────────
 
 TEST_CASE("the gravity table is the reference's code, not its README",
           "[tetris][clock]") {
@@ -490,7 +490,7 @@ TEST_CASE("a finished board consumes no more time", "[tetris][clock]") {
   REQUIRE(r.lines == 0);
 }
 
-// ── Lock delay ──────────────────────────────────────────────────────────────
+// ── Lock delay ───────────────────────────────────────────────────────────────
 
 TEST_CASE("a hard drop locks immediately, without the lock delay",
           "[tetris][lock]") {
@@ -580,7 +580,7 @@ TEST_CASE("moving a grounded piece buys more lock delay, but only fifteen "
   REQUIRE(b.tick(ms(600)).locked);
 }
 
-// ── Line clears and scoring ─────────────────────────────────────────────────
+// ── Line clears and scoring ──────────────────────────────────────────────────
 
 TEST_CASE("a completed row clears after the freeze, and not during it",
           "[tetris][lines]") {
@@ -655,7 +655,7 @@ TEST_CASE("levelling up every ten lines changes the gravity interval",
   REQUIRE(hard.gravity_interval_ms() < b.gravity_interval_ms());
 }
 
-// ── T-spins ─────────────────────────────────────────────────────────────────
+// ── T-spins ──────────────────────────────────────────────────────────────────
 
 // ⚠ ONE BOARD, ONE FINAL POSITION, TWO HISTORIES. Both cases below put the
 // same T in the same cells of the same stack and clear the same two rows. The
@@ -705,7 +705,7 @@ TEST_CASE("the same T in the same cells, without rotating, is not a T-spin",
   REQUIRE(b.score() < kScoreTSpinDouble);
 }
 
-// ── Hold ────────────────────────────────────────────────────────────────────
+// ── Hold ─────────────────────────────────────────────────────────────────────
 
 TEST_CASE("hold works on every piece, not once per game", "[tetris][hold]") {
   // ⚠ REFERENCE DEFECT 1, and the one a player would notice within a minute.
@@ -759,7 +759,7 @@ TEST_CASE("a hold that would not fit is refused whole", "[tetris][hold]") {
   REQUIRE(preview_of(b) == queue);
 }
 
-// ── DAS, and the degraded arm ───────────────────────────────────────────────
+// ── DAS, and the degraded arm ────────────────────────────────────────────────
 
 TEST_CASE("a held shift waits for DAS and then repeats at ARR",
           "[tetris][das]") {
@@ -859,7 +859,7 @@ TEST_CASE("soft drop repeats on a clock rather than every frame",
   REQUIRE(b.active().y == 6);
 }
 
-// ── Top-out ─────────────────────────────────────────────────────────────────
+// ── Top-out ──────────────────────────────────────────────────────────────────
 
 TEST_CASE("a spawn that does not fit is a top-out, on a whole board",
           "[tetris][topout]") {

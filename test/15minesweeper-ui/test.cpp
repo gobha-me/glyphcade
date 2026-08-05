@@ -98,7 +98,7 @@ auto enter_game(Probe& app, int cols = 80, int rows = 24) -> Minesweeper* {
   // REQUIRE is what proves the Shell entered on the FIRST Enter; moving it below
   // this line would make the case pass even if entering had come to need two.
   //
-  // gitea #38: entering a game now opens its pre-start options screen, so a
+  // term-game#38: entering a game now opens its pre-start options screen, so a
   // suite that wants a BOARD has to say so. This is the change telling the truth
   // about itself, not a regression -- and the per-suite cases below assert the
   // screen is there before this dismisses it.
@@ -612,7 +612,7 @@ TEST_CASE("the game renders at every size without crashing", "[minesweeper]") {
   }
 }
 
-// ── SFX bindings ────────────────────────────────────────────────────────────
+// ── SFX bindings ─────────────────────────────────────────────────────────────
 //
 // Every case below drives the REAL input path — dispatch_event into the Shell,
 // into the game's handle_key/handle_mouse — over a board installed with
@@ -712,7 +712,7 @@ TEST_CASE("stepping on a mine plays explode and lose",
 
   // Now walk onto (4,4) and open it.
   //
-  // ⚠ BIDIRECTIONAL, like the by_keys walk earlier in this file. gitea #38
+  // ⚠ BIDIRECTIONAL, like the by_keys walk earlier in this file. term-game#38
   // made the entry cursor start CENTRED rather than at (0,0) -- dismissing the
   // options screen goes through new_game(), which recentres exactly as 1/2/3
   // always did -- so a one-directional walk can now start PAST its target and
@@ -828,7 +828,7 @@ TEST_CASE("the mark cycle sounds flag, then click, then click",
   const Coord mines[]{{0, 0}, {4, 4}, {8, 8}};
   g->board().load_mines(mines);
 
-  // ⚠ A BASELINE, not zero. gitea #38: dismissing the pre-start options screen
+  // ⚠ A BASELINE, not zero. term-game#38: dismissing the pre-start options screen
   // starts the game through new_game(), which clicks -- so entering a game is
   // no longer silent, and a case that hardcodes 0 is really asserting how many
   // sounds ENTRY makes. Deltas say what this case is actually about.
@@ -1016,7 +1016,7 @@ TEST_CASE("marking a revealed cell is silent", "[minesweeper][audio]") {
   REQUIRE(app.audio().play_count(SfxId::Flag) == flags);
 }
 
-// ── Best time (gitea #14) ───────────────────────────────────────────────────
+// ── Best time (term-game#14) ─────────────────────────────────────────────────
 //
 // ⚠ Every case below uses the SHELL's default store, which is memory-only. That
 // is the point: none of this needs a file, so none of it can leave one behind or
@@ -1255,7 +1255,7 @@ TEST_CASE("the outcome word survives a fourth status field on a narrow board",
   }
 }
 
-// ── The pre-start options screen (gitea #38) ────────────────────────────────
+// ── The pre-start options screen (term-game#38) ──────────────────────────────
 
 TEST_CASE("entering minesweeper shows the options screen, not the board",
           "[minesweeper][options]") {

@@ -3,7 +3,7 @@
 // glyphcade — the high-score store: the last of the four services DESIGN.md
 // named for GameContext, and the only one that touches a file.
 //
-// It waited deliberately. gitea #14 says "pick this up when the SECOND scoring
+// It waited deliberately. term-game#14 says "pick this up when the SECOND scoring
 // game lands, not the first", because a format chosen before there is anything
 // to persist is a format that gets migrated — and one game's scores can be
 // modelled wrong in a way only a second game reveals. That prediction paid off:

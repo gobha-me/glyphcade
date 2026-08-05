@@ -90,7 +90,7 @@ auto enter_tetris(Probe& app, int cols = 80, int rows = 24) -> void {
   // REQUIRE is what proves the Shell entered on the FIRST Enter; moving it below
   // this line would make the case pass even if entering had come to need two.
   //
-  // gitea #38: entering a game now opens its pre-start options screen, so a
+  // term-game#38: entering a game now opens its pre-start options screen, so a
   // suite that wants a BOARD has to say so. This is the change telling the truth
   // about itself, not a regression -- and the per-suite cases below assert the
   // screen is there before this dismisses it.
@@ -150,7 +150,7 @@ auto enter_tetris(Probe& app, int cols = 80, int rows = 24) -> void {
 
 }  // namespace
 
-// ── Geometry ────────────────────────────────────────────────────────────────
+// ── Geometry ─────────────────────────────────────────────────────────────────
 
 TEST_CASE("the well needs 35x24 and says so below it", "[tetris][layout]") {
   // ⚠ The first game in the suite that does not fit in twenty rows. Every other
@@ -200,7 +200,7 @@ TEST_CASE("the hidden rows are never drawn", "[tetris][layout]") {
   REQUIRE_FALSE(lay.row_visible(kRows));
 }
 
-// ── Rendering ───────────────────────────────────────────────────────────────
+// ── Rendering ────────────────────────────────────────────────────────────────
 
 TEST_CASE("the bottom tier draws the stack, the piece and its ghost with "
           "distinct glyphs",
@@ -272,7 +272,7 @@ TEST_CASE("the panel shows the hold and next boxes", "[tetris][render]") {
 }
 
 TEST_CASE("the NEXT panel advances when a piece locks", "[tetris][render]") {
-  // ⚠ gitea #55 was reported VISUALLY — "the preview does not update" — and the
+  // ⚠ term-game#55 was reported VISUALLY — "the preview does not update" — and the
   // model cases in test/27tetris pin preview() without ever reaching the loop
   // that DRAWS it. Three failure modes live only here: painting preview()[0]
   // into all three boxes, dropping the y advance so they overwrite each other,
@@ -371,7 +371,7 @@ TEST_CASE("the status row drops whole fields rather than truncating one",
   }
 }
 
-// ── Input ───────────────────────────────────────────────────────────────────
+// ── Input ────────────────────────────────────────────────────────────────────
 
 TEST_CASE("Escape and p are declined, so the Shell still owns them",
           "[tetris][input]") {
@@ -414,7 +414,7 @@ TEST_CASE("the movement keys reach the board", "[tetris][input]") {
 
 TEST_CASE("a release is consumed rather than handed back to the Shell",
           "[tetris][input]") {
-  // ⚠ The half that matters for gitea #32's gate. A release the game DECLINED
+  // ⚠ The half that matters for term-game#32's gate. A release the game DECLINED
   // would fall through to Shell::handle_in_game_key — which is exactly where a
   // released Escape used to quit to the menu twice. Tetris consumes the ones it
   // binds, so nothing downstream ever sees them.
@@ -453,7 +453,7 @@ TEST_CASE("q returns to the menu", "[tetris][input]") {
   REQUIRE(app.state() == Shell::State::Selector);
 }
 
-// ── The degraded keyboard arm ───────────────────────────────────────────────
+// ── The degraded keyboard arm ────────────────────────────────────────────────
 
 TEST_CASE("without the kitty protocol the game says so, in the hint row",
           "[tetris][keyboard][degraded]") {
@@ -492,7 +492,7 @@ TEST_CASE("a held shift does not auto-repeat on the degraded arm",
   REQUIRE(game_of(app)->board().active().x == x0 - 1);
 }
 
-// ── Sound intent ────────────────────────────────────────────────────────────
+// ── Sound intent ─────────────────────────────────────────────────────────────
 
 TEST_CASE("a hard drop sounds, and gravity does not", "[tetris][audio]") {
   // ⚠ Asserted through Shell::audio().play_count(), which counts INTENT rather
@@ -546,7 +546,7 @@ TEST_CASE("a rotation sounds only when it is accepted", "[tetris][audio]") {
   REQUIRE(app.audio().play_count(SfxId::Click) == before);
 }
 
-// ── Scores ──────────────────────────────────────────────────────────────────
+// ── Scores ───────────────────────────────────────────────────────────────────
 
 TEST_CASE("the record key carries the start level", "[tetris][scores]") {
   // ⚠ Recorded under at least TWO keys with DIFFERENT values. A case that only
@@ -626,7 +626,7 @@ TEST_CASE("lines are recorded separately from score", "[tetris][scores]") {
   REQUIRE(app.scores().get("tetris", "best_score_start1").value_or(0) > 1);
 }
 
-// ── The pre-start options screen (gitea #38) ────────────────────────────────
+// ── The pre-start options screen (term-game#38) ──────────────────────────────
 
 namespace {
 // Enter tetris and STOP on the options screen, which enter_tetris() dismisses.

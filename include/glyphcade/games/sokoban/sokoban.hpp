@@ -9,17 +9,17 @@
 // decorative: test/31sokoban drives every rule, every parse failure and every
 // deadlock with no terminal, because it *cannot* reach one.
 //
-// ── What this file does NOT do ──────────────────────────────────────────────
+// ── What this file does NOT do ───────────────────────────────────────────────
 //
 // No pause and no quit-to-menu. The Shell binds 'p' and Escape on anything a
-// game declines, so gitea #8's "pause" is satisfied by NOT writing it — the
+// game declines, so term-game#8's "pause" is satisfied by NOT writing it — the
 // same as the other four games. ⚠ Which is also why the level keys are '[' and
 // ']' and not 'p'/'n': a game that consumed 'p' would silently take pause away
 // from the player.
 //
-// ── This is MapWidget's first consumer ──────────────────────────────────────
+// ── This is MapWidget's first consumer ───────────────────────────────────────
 //
-// gitea #8 is explicit that this epic has two deliverables — a game, and
+// term-game#8 is explicit that this epic has two deliverables — a game, and
 // feedback into termforge #64 from OUTSIDE the library, before its API freezes.
 // That is why the map is drawn by termforge::MapWidget rather than straight to
 // the Screen the way Tetris draws its well: hand-drawn tiles would have been
@@ -97,7 +97,7 @@ class Sokoban final : public Game {
   auto on_event(const termforge::Event& ev) -> bool override;
   auto draw(termforge::Screen& screen) -> void override;
 
-  // ── Test seams ────────────────────────────────────────────────────────────
+  // ── Test seams ─────────────────────────────────────────────────────────────
   [[nodiscard]] auto board() const noexcept -> const sokoban::Board* {
     return m_board ? &*m_board : nullptr;
   }
@@ -144,7 +144,7 @@ class Sokoban final : public Game {
   auto draw_too_small(termforge::Screen& screen) -> void;
   auto draw_broken(termforge::Screen& screen) -> void;
 
-  // The pre-start level picker (gitea #38).
+  // The pre-start level picker (term-game#38).
   OptionsScreen m_options{};
   GameContext* m_ctx{nullptr};
   std::optional<sokoban::Board> m_board;

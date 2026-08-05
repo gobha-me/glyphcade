@@ -1,42 +1,50 @@
 # glyphcade
 
-A TUI arcade suite in **C++23**. [TermForge](https://github.com/gobha-me/termforge)
-renders it, [RtAudio](https://github.com/thestk/rtaudio) sounds it.
+[![CI](https://github.com/gobha-me/glyphcade/actions/workflows/ci.yml/badge.svg)](https://github.com/gobha-me/glyphcade/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
+[![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
 
-Sibling to [HTML-Games](https://git.gobha.me/xcaliber/HTML-Games) — same
-arcade-of-small-games idea and the same roster to raid, but terminal-native and
-compiled instead of HTML/CSS/JS. One binary, a selector, and a set of
-self-contained games.
+A terminal arcade in **C++23**. One binary, a selector, and five self-contained
+games. [TermForge](https://github.com/gobha-me/termforge) renders it, optional
+[RtAudio](https://github.com/thestk/rtaudio) sounds it.
 
-> **Status: the arcade runs, there are five games in it, and it makes noise.**
-> Pick Minesweeper, 2048, Snake, Tetris or Sokoban from the selector and play it
-> — mouse or keyboard, high scores that persist, pause and quit-to-menu. All of
-> it playable on a bare 7-bit terminal with no colour. Sound is synthesized, not
-> sampled, and degrades to silence rather than failing. See
-> [STATUS.md](STATUS.md) for live state, [DESIGN.md](DESIGN.md) for the
-> architecture, and the issue tracker for the epic breakdown.
+**Minesweeper · 2048 · Snake · Tetris · Sokoban** — mouse or keyboard, high
+scores that persist, pause and quit-to-menu. All of it playable on a bare 7-bit
+terminal with no colour, no mouse and no Unicode.
 
-**CI:** [five build arms](https://git.gobha.me/xcaliber/term-game/actions?workflow=ci.yaml)
-— gcc and clang, plus ASan, UBSan and TSan — on every push and pull request,
-each in a pinned `debian:trixie` container with `-Werror` and
-`GLYPHCADE_WITH_AUDIO=OFF`.
+## Build
 
-<!-- A status *badge* would be the convention here, and there is deliberately
-     none. git.gobha.me does not serve badge routes: the URL Gitea's own API
-     advertises as this workflow's badge_url returns 404, as do /badges/
-     release.svg, issues.svg and stars.svg, and as does the equivalent URL for
-     a sibling repo whose workflow has been succeeding for months. So this is
-     an instance setting, not something this repo can fix. Tracked in gitea
-     #21; swap this paragraph for the badge the day those routes answer. A
-     linked word beats an image that cannot load. -->
+```bash
+cmake -B build && cmake --build build && ctest --test-dir build --output-on-failure
+./build/src/bin/glyphcade
+```
 
+Requires **CMake 3.28+** and a **C++23** compiler (GCC 13+ / Clang 19+ — clang 18
+and earlier cannot compile `std::expected` against libstdc++). TermForge is
+fetched automatically if it is not already installed; there is nothing else to
+install.
 
+`librtaudio-dev` is optional. Without it you get a silent but fully playable
+arcade — detection is automatic, and `-DGLYPHCADE_WITH_AUDIO=OFF` forces the
+no-audio build, which is the configuration CI runs on every arm.
+
+## Use it as a library
+
+```cmake
+find_package(glyphcade CONFIG REQUIRED)
+target_link_libraries(app PRIVATE glyphcade::lib)
+```
+
+Individual games are exported too — `glyphcade::game_tetris`,
+`glyphcade::core`, and so on. A ctest (`consumer-resolves`) proves the installed
+package is genuinely resolvable by a real `find_package`, rather than only
+checking that the files were written.
 
 ## The idea
 
 Small games, escalating deliberately. Each one dogfoods a different part of
 TermForge — mouse routing, animation, real-time ticks, tile maps, inline pixel
-graphics — so framework gaps are found by a real consumer rather than guessed at.
+graphics — so framework gaps get found by a real consumer instead of guessed at.
 The suite doubles as the honest test of TermForge's pitch: notcurses-class inline
 graphics from a stdlib-only C++23 API.
 
@@ -50,31 +58,44 @@ graphics from a stdlib-only C++23 API.
 | 6 | Sokoban ✓ | tile maps, the camera, MapWidget's first consumer |
 | 7 | Solitaire | Kitty sprites, mouse drag-and-drop |
 
-Every game is playable at the bottom tier. Pixel sprites are an enhancement over
-a glyph fallback that always exists — never a requirement.
+Two rules hold across all of them:
+
+- **Every game is playable at the bottom tier.** Pixel sprites are an
+  enhancement over a glyph fallback that always exists — never a requirement.
+- **Rules extent never scales.** A bigger terminal buys a bigger *view*, never a
+  bigger board. Board size *is* the game.
 
 ## Audio
 
 Sound effects are **synthesized, not sampled** — square/triangle/noise
-oscillators with ADSR envelopes. No WAV decoder, no asset pipeline, no binary
-blobs in git, and it is the right sound for an arcade.
+oscillators with ADSR envelopes. No decoder, no asset pipeline, no binary blobs
+in git, and it is the right sound for an arcade.
 
-The device is abstracted behind an `AudioSink` with three implementations:
-`RtAudioSink` (real hardware), `NullSink` (no sound card present), and
-`WavFileSink` (renders to disk, which is what makes the audio path testable
-offline). `GLYPHCADE_WITH_AUDIO` auto-detects rtaudio and defaults OFF when it is
-absent, so the repo builds and tests anywhere.
+The device sits behind an `AudioSink` with three implementations: `RtAudioSink`
+(hardware), `NullSink` (no card present), and `WavFileSink` (renders to disk,
+which is what makes the audio path testable with no sound hardware at all).
 
-## Build
+## Testing
 
-```bash
-cmake -B build && cmake --build build && ctest --test-dir build --output-on-failure
-```
+Roughly 14k lines of tests against 15k lines of source, 32 ctest targets. CI runs
+five arms on every push and pull request — gcc, clang, ASan, UBSan and TSan —
+each in a pinned `debian:trixie` container with `-Werror`.
 
-Requires CMake 3.28+ and a C++23 compiler (GCC 13+ / Clang 19+). TermForge is
-fetched automatically if it is not already installed. `librtaudio-dev` is
-optional — without it you get a silent but fully playable arcade; force the
-no-audio build with `-DGLYPHCADE_WITH_AUDIO=OFF`.
+Games are driven headlessly: fixed timestep with a clamped delta means logic
+advances by *N* ticks with no `Screen` and no TTY, and rendering is asserted by
+reading cells back out of an off-screen buffer. Terminal restore is checked in a
+real pty via `script(1)`.
+
+What that does **not** cover is *feel*, and [STATUS.md](STATUS.md) is explicit
+about it. Nothing in CI can hear a sound or judge whether Tetris's DAS timing is
+right; those need hands on a keyboard.
+
+## Documentation
+
+- [STATUS.md](STATUS.md) — live state, what is verified and what is not
+- [DESIGN.md](DESIGN.md) — architecture
+- [AGENTS.md](AGENTS.md) — conventions, hard rules, and how to verify a change
+- [CONTRIBUTING.md](CONTRIBUTING.md) — start here to send a patch
 
 ## License
 

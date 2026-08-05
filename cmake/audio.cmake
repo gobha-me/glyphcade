@@ -60,7 +60,7 @@ else ()
   message(STATUS "GLYPHCADE_WITH_AUDIO=OFF — NullSink / WavFileSink only")
 endif ()
 
-# ── Where rtaudio is linked, and where it must never be (gitea #13) ─────────
+# ── Where rtaudio is linked, and where it must never be (term-game#13) ────────
 #
 # DECIDED, and the decision is load-bearing rather than stylistic. rtaudio is
 # linked by exactly one target — ${PROJECT_NAME}_audio_backend, in

@@ -1,7 +1,7 @@
 # cpp-template audit — the record of why our fork diverges
 
 Originally written 2026-07-28 against cpp-template `main` @ `3ed1d97`, *before*
-forking it, to find what would break [Epic 0](https://git.gobha.me/xcaliber/term-game/issues/1).
+forking it, to find what would break [Epic 0](`term-game#1`).
 Rewritten after Epic 0 landed, against `8f62930`.
 
 Its job now is to be the standing record of **where our copy of the template
@@ -80,7 +80,7 @@ an appending `set()`); we carry the same one.
 
 Because the fix is invisible when it regresses, CI asserts it separately:
 `grep -q -- '-Werror' build/compile_commands.json`, in
-[.gitea/workflows/ci.yaml](../.gitea/workflows/ci.yaml).
+[.github/workflows/ci.yml](../.github/workflows/ci.yml).
 
 ### 2. `check_artifacts.cmake` rule A1 scanned every tracked file
 
@@ -129,4 +129,4 @@ template hygiene and drift docs. No impact on us.
 
 `.github/workflows/ci.yml` is **not** carried over despite NEW_PROJECT.md's
 "copy verbatim, zero edits" — that instruction assumes a GitHub fork, and
-glyphcade is on gitea. See [.gitea/workflows/ci.yaml](../.gitea/workflows/ci.yaml).
+glyphcade is on GitHub. See [.github/workflows/ci.yml](../.github/workflows/ci.yml).

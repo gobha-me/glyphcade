@@ -6,7 +6,7 @@
 // it, it belongs in core". This names Screen and Rgb but no Shell type, so it
 // sits below the games in the link chain and changes nothing about it.
 //
-// ⚠ WHY IT EXISTS AT ALL. gitea #38 asked for a shared pre-start screen and
+// ⚠ WHY IT EXISTS AT ALL. term-game#38 asked for a shared pre-start screen and
 // noted that four games' worth of duplicated width-budgeted row drawing already
 // existed — so a helper that hand-rolled a fifth copy would have made the
 // problem worse while claiming to solve it. These are that pattern, extracted

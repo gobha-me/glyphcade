@@ -1,7 +1,7 @@
 #pragma once
 
 // glyphcade — OptionsScreen: the settings a game asks about before its first
-// frame of play. gitea #38.
+// frame of play. term-game#38.
 //
 // ── WHAT THIS IS NOT, because both alternatives were considered and rejected ─
 //

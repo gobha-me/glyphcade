@@ -1,9 +1,9 @@
-# Asserts that the installed package does not reference rtaudio (gitea #13).
+# Asserts that the installed package does not reference rtaudio (term-game#13).
 #
 # Run as a ctest:
 #   cmake -DBUILD_DIR=<build> -DPROJECT=glyphcade -P cmake/check_export.cmake
 #
-# ── Why this exists ─────────────────────────────────────────────────────────
+# ── Why this exists ───────────────────────────────────────────────────────────
 #
 # Epic 2's export decision is enforced by nothing except where files happen to
 # live. One plausible-looking line —
@@ -32,12 +32,12 @@
 # is the artefact a consumer actually resolves, which makes this the only check
 # that tests the thing that breaks rather than a proxy for it.
 #
-# ⚠ "The only check" is scoped to gitea #13's question. This script judges the
+# ⚠ "The only check" is scoped to term-game#13's question. This script judges the
 # CONTENT of the exported targets and nothing else — it reads them as TEXT and
 # never calls find_package, so it cannot tell whether the package resolves at
 # all. A stale floor in cmake/project-config.cmake.in makes the installed
 # package unresolvable by anyone while this script still prints CLEAN; that was
-# gitea #46, and its guard is the sibling cmake/check_consumer.cmake (ctest
+# term-game#46, and its guard is the sibling cmake/check_consumer.cmake (ctest
 # consumer-resolves). Neither check subsumes the other. If you are here because
 # a consumer cannot use the package, this is probably not the file you want.
 #
@@ -86,7 +86,7 @@ foreach (_file IN LISTS _targets)
     string(FIND "${_text}" "${_tok}" _at)
     if (NOT _at EQUAL -1)
       message(FATAL_ERROR
-        "gitea #13 VIOLATED: '${_tok}' appears in ${_file}.\n"
+        "term-game#13 VIOLATED: '${_tok}' appears in ${_file}.\n"
         "The RtAudio backend has leaked into the exported package. An installed "
         "glyphcade can no longer be resolved on a machine that has not run "
         "pkg_check_modules.\n"
@@ -101,7 +101,7 @@ endforeach ()
 file(GLOB_RECURSE _leaked "${_prefix}/**/device_sink.hpp")
 if (_leaked)
   message(FATAL_ERROR
-    "gitea #13 VIOLATED: ${_leaked} was installed. src/audio_backend/include/ "
+    "term-game#13 VIOLATED: ${_leaked} was installed. src/audio_backend/include/ "
     "is a private include root and must never appear in an install(DIRECTORY).")
 endif ()
 

@@ -26,7 +26,7 @@ auto draw_status_row(termforge::Screen& screen, int y,
   // implementation detail of the version we happen to be pinned to is exactly
   // what a bump removes silently.
   //
-  // ⚠ gitea #36 was named here as the event to re-check this against, and it
+  // ⚠ term-game#36 was named here as the event to re-check this against, and it
   // has now happened: the pin crossed six tags to v0.6.0 (not the v0.5.1 this
   // comment used to predict). Re-checked at that bump, and BOTH halves still
   // hold — `screen.cpp` still does `start_x = x < 0 ? 0 : x`, byte-identical to
