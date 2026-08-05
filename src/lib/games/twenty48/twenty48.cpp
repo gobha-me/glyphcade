@@ -464,9 +464,10 @@ auto Twenty48::draw_too_small(termforge::Screen& screen) -> void {
   const auto bg = termforge::theme::kBg;
   const auto fg = termforge::theme::kFg;
 
-  // Same answer minesweeper gives, and the same open issue behind it: GameMeta
-  // carries no minimum size, so the selector will happily launch a board this
-  // terminal cannot draw (gitea #15). Until it does, the game says so itself.
+  // Same answer minesweeper gives. gitea #15 landed and did NOT retire this:
+  // GameMeta now carries the size and the selector warns about it, but it never
+  // refuses, so a player who presses Enter anyway still arrives here and the
+  // game still has to say so itself.
   const std::string need = "2048 needs " + num(twenty48::needed_cols()) + "x" +
                            num(twenty48::needed_rows());
   const int mid = screen.rows() / 2;

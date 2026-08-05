@@ -108,6 +108,45 @@ static_assert(all_options_are_well_formed(),
               "kMaxGameOptions options, or a long-list option sharing a screen "
               "with another. See OptionSpec in arcade/game_meta.hpp.");
 
+// The per-meta predicate is geometry_is_well_formed() in arcade/game_meta.hpp,
+// for the same reason options_are_well_formed() is: a registry of correct
+// declarations cannot witness a check for an incorrect one.
+constexpr auto all_geometry_is_well_formed() -> bool {
+  for (const auto& entry : kGames) {
+    if (!geometry_is_well_formed(entry.meta)) return false;
+  }
+  return true;
+}
+
+static_assert(all_geometry_is_well_formed(),
+              "a registered game's size floor is malformed: a negative extent, "
+              "a floor declared in one axis but not the other, or a Playable "
+              "kind with no size to be a judgement about. See GameGeometry in "
+              "arcade/game_meta.hpp.");
+
+// ⚠ WELL-FORMED IS NOT THE SAME AS DECLARED, and this is the second assert
+// because {0,0} is deliberately LEGAL in the schema — a GameMeta with no floor
+// is well-formed, so the predicate above cannot catch a game that simply forgot
+// one. That is exactly the failure gitea #15 exists to prevent: a sixth game
+// omits `.geometry`, compiles clean under -Werror in all four configurations,
+// keeps every static_assert green, and ships with meets_floor() true at every
+// size — so the selector silently never warns about it. Registry POLICY is
+// stricter than the schema, and AGENTS.md's own claim about the neighbouring
+// GameMeta rules ("that is a static_assert, not a convention") is only true of
+// this one if it is written here.
+constexpr auto all_geometry_is_declared() -> bool {
+  for (const auto& entry : kGames) {
+    if (entry.meta.geometry.cols == 0) return false;
+  }
+  return true;
+}
+
+static_assert(all_geometry_is_declared(),
+              "a registered game declares no size floor. GameMeta::geometry is "
+              "optional in the schema so a future game may abstain "
+              "deliberately — but abstaining has to be argued here, not "
+              "forgotten in a kMeta. See GameGeometry in arcade/game_meta.hpp.");
+
 }  // namespace
 
 auto all_games() noexcept -> std::span<const GameEntry> { return kGames; }

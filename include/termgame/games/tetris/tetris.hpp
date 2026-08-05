@@ -69,6 +69,14 @@ class Tetris final : public Game {
       // declaration order and `options` is declared last in GameMeta. Tetris is
       // the game that made that ordering matter.
       .options = kTetrisOptions,
+      // 35x24, and the 24 is the tallest ask on the roster — four rows more
+      // than any other game, fitting a classic 80x24 terminal exactly with
+      // nothing to spare. Which makes Tetris the game most likely to trip this
+      // warning on a real terminal, and the reason the footer names what the
+      // player actually has beside what the game wants.
+      .geometry = {.cols = tetris::kNeedCols,
+                   .rows = tetris::kNeedRows,
+                   .floor = SizeFloor::Drawable},
   };
 
   Tetris();

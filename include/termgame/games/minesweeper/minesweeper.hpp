@@ -70,6 +70,27 @@ class Minesweeper final : public Game {
       // registry static_asserts on this via icon_is_safe().
       .icon = "\U0001F4A3",
       .options = kMinesweeperOptions,
+      // ⚠ EASY'S 21x13, NOT HARD'S 63x20, and this game is the reason
+      // GameGeometry's contract is "playable at all" rather than "playable at
+      // every setting". On a 40x15 terminal you can play Minesweeper; you just
+      // cannot play it on Hard. Declaring 63x20 here would have the selector
+      // warn about a game that is about to work fine.
+      //
+      // ⚠ DERIVED FROM THE OPTION'S OWN DEFAULT, not from a typed `Level::Easy`.
+      // Which level a player actually starts on is decided in exactly one place
+      // — kMinesweeperOptions[0].default_index, which the options screen hands
+      // back and the game casts straight to a Level (board.hpp says why that
+      // cast is safe). Writing Easy here as well would be a second copy of that
+      // decision: change the default to Medium and the menu would go on
+      // advertising 21x13 and go on staying silent at 30x18, while the game
+      // that starts needs 35x20 and lands on its own too-small screen. Every
+      // test would stay green, because they would all re-derive from the same
+      // hardcoded Easy.
+      .geometry = {.cols = minesweeper::needed_cols(
+                       minesweeper::default_preset(kMinesweeperOptions).cols),
+                   .rows = minesweeper::needed_rows(
+                       minesweeper::default_preset(kMinesweeperOptions).rows),
+                   .floor = SizeFloor::Drawable},
   };
 
   Minesweeper();

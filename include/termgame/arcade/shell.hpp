@@ -78,6 +78,50 @@ class Shell : public termforge::App {
   // usable width.
   static constexpr int kDetailPaneMinCols = 48;
 
+  // The list pane's own floor, in the one place it is not derived from a
+  // fraction of the screen. Only reachable while the detail pane is up, i.e.
+  // from 48 columns, and it BITES from 48 to 60 (48 * 2 / 5 == 19) — so in
+  // that band the detail pane gets w - 24 rather than the three fifths the
+  // fraction implies. It was a bare literal for six releases; naming it is not
+  // a behaviour change.
+  static constexpr int kListPaneMinCols = 24;
+
+  // ⚠ THE SUITE'S FIRST CEILING, and gitea #42 is the whole argument for it.
+  // Every game is a fixed rectangle centred in whatever it is given; the
+  // selector was the one screen that grew without bound, so a 300-column
+  // terminal got a full-width menu and then, one keystroke later, a 58x20 box
+  // floating in the middle of it. The same binary disagreeing with itself.
+  //
+  // Past this the list+detail body stops widening and is CENTRED, which is
+  // exactly what a game does. 120 splits as a 48-column list and a 72-column
+  // detail pane, and 72 is about where prose stops getting easier to read.
+  //
+  // ⚠ COLUMNS ONLY, and the asymmetry is deliberate rather than an omission.
+  // Rows past the floor are CAPACITY — more roster visible in a scrolling
+  // list, and for the game gitea #43 is about, more of a pile — while columns
+  // past a measure only stretch a line nobody wanted stretched. There is no
+  // kSelectorMaxRows and there should not be one.
+  //
+  // ⚠ Below it nothing changes at all, which is why the number is 120 and not
+  // 100: test/11selector's widest existing sweep is 120 columns, so those
+  // cases stay byte-identical and the new wide case is the only thing in the
+  // suite that can see this constant work.
+  static constexpr int kSelectorMaxCols = 120;
+
+  // ⚠ The ceiling is now what `with_detail` and `list_w` are keyed off, so it
+  // silently owns both floors. Drop it below kDetailPaneMinCols and the detail
+  // pane — and with it the `size:` line this whole change exists to surface —
+  // disappears at EVERY width, on a 300-column terminal, with no compile error
+  // and no red test. Drop it into the 48..59 band and `list_w` clamps to
+  // kListPaneMinCols everywhere, so the documented "120 splits as 48 + 72"
+  // quietly stops being true. Both are stated here instead of discovered.
+  static_assert(kSelectorMaxCols >= kDetailPaneMinCols,
+                "the selector ceiling must leave room for the detail pane, or "
+                "the pane is dropped at every width");
+  static_assert(kSelectorMaxCols * 2 / 5 >= kListPaneMinCols,
+                "at the ceiling the list's fraction must beat its floor, or "
+                "the two-fifths split is not what happens");
+
   [[nodiscard]] auto state() const noexcept -> State { return m_state; }
   [[nodiscard]] auto current_game() const noexcept -> const Game* {
     return m_game.get();
@@ -132,6 +176,11 @@ class Shell : public termforge::App {
 
   auto rebuild_list() -> void;
   auto refresh_detail() -> void;
+
+  // Rebuild m_footer_warning if and only if the selection or the terminal size
+  // has changed since it was last built. See the cache members below for why
+  // this is not optional.
+  auto refresh_footer_warning(int cols, int rows) -> void;
   auto draw_selector(termforge::Screen& screen) -> void;
   auto draw_too_small(termforge::Screen& screen) -> void;
 
@@ -150,6 +199,24 @@ class Shell : public termforge::App {
   bool m_release_game{false};    // deferred destruction; see apply_transitions
   bool m_caps_synced{false};
   int m_detail_index{-1};  // the index the detail pane was last built for
+
+  // The footer's size warning, cached on everything it depends on.
+  //
+  // ⚠ THIS CACHE IS NOT A MICRO-OPTIMISATION, and it was added because leaving
+  // it out broke a test in another suite. The warning was rebuilt every frame —
+  // three std::strings constructed and concatenated, on the render path, for an
+  // answer that changes only when the selection or the terminal does. That is
+  // small, but it is not free, and test/26snake-ui's "the board does not move
+  // while the options screen is up" counts TICKS: test_run_frames does not
+  // reset the tick clock, so wall time spent drawing selector frames becomes
+  // ticks the Shell's accumulator delivers. Slower frames, more ticks, red
+  // test — under load, on the TSan build, five runs in six, where main was
+  // stable in all six. A render path that allocates per frame is measurable
+  // from two suites away.
+  int m_footer_index{-1};
+  int m_footer_cols{-1};
+  int m_footer_rows{-1};
+  std::string m_footer_warning;
   std::string m_notice;    // most recent ErrorEvent, shown in the footer
 
   // Selector widgets, direct members — laid out and drawn together every frame
