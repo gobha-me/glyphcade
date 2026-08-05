@@ -355,6 +355,13 @@ class Board {
   // filled and anything else empty; the hidden rows are always empty, because a
   // fixture that started with something up there could not have been reached by
   // playing.
+  //
+  // ⚠ It rebuilds the stack and the active piece and deliberately does NOT
+  // touch the bag or the preview: a fixture continues its seed's stream from
+  // wherever reset() left it, so the piece that follows a fixture's first lock
+  // is preview()[0] and not a fresh draw. Two cases depend on that — it is what
+  // lets a loop clear the stack between locks without disturbing the sequence
+  // it is reading.
   auto load(std::span<const std::string_view> rows, Piece piece, int rot, int x,
             int y) -> bool;
 
@@ -369,6 +376,14 @@ class Board {
   auto spawn(Piece p) -> bool;
   auto refill_bag() -> void;
   auto take_next() -> Piece;
+  // Shift the preview up and refill its tail from the bag.
+  auto advance_preview() -> void;
+  // ⚠ The ONLY way a piece enters play. spawn(Piece) lets its caller choose,
+  // and gitea #55 was three callers each choosing take_next() — so the preview
+  // and the spawn order were two sequences that were meant to agree and never
+  // did. Keeping exactly one caller of spawn() is what makes them the same
+  // sequence by construction rather than by convention.
+  auto spawn_next() -> bool;
   auto try_shift(int dx) -> bool;
   auto step_down() -> bool;
   auto lock_active(TickResult& out) -> void;
@@ -394,6 +409,13 @@ class Board {
 
   // The bag holds at least kPreview + 1 so preview() never has to generate.
   std::vector<Piece> m_bag;
+  // ⚠ m_next[0] IS the next piece to spawn — not a forecast of it, not a copy
+  // kept alongside it. Every entry here has already left the bag.
+  //
+  // A span over the head of m_bag would express the same thing with one queue
+  // instead of two, and was rejected: m_bag is a vector that reallocates on
+  // every refill, so preview() would hand out a view that a later call can
+  // dangle. std::array has no such failure mode.
   std::array<Piece, kPreview> m_next{};
 
   // ⚠ The rotation flag is what makes a T-spin a T-spin rather than a shape

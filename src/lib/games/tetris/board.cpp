@@ -75,9 +75,13 @@ auto Board::reset(StartLevel start, HoldSupport hold) -> void {
   for (int i = 0; i < kPreview; ++i) {
     m_next[static_cast<std::size_t>(i)] = take_next();
   }
+  // ⚠ The active piece comes OUT of the preview, not from a further draw. This
+  // used to be spawn(take_next()) — a fourth draw — which is what made the
+  // opening panel advertise draws 1-3 while draw 4 was already falling.
+  //
   // A fresh board is empty, so this cannot fail. The return value is still
   // checked at the call site in lock_active(), where it can.
-  static_cast<void>(spawn(take_next()));
+  static_cast<void>(spawn_next());
 }
 
 auto Board::level() const noexcept -> int {
@@ -151,6 +155,21 @@ auto Board::take_next() -> Piece {
   m_bag.erase(m_bag.begin());
   if (static_cast<int>(m_bag.size()) < kPreview + 1) refill_bag();
   return p;
+}
+
+auto Board::advance_preview() -> void {
+  std::shift_left(m_next.begin(), m_next.end(), 1);
+  m_next.back() = take_next();
+}
+
+auto Board::spawn_next() -> bool {
+  // ⚠ Consume BEFORE the fit check inside spawn(), so a top-out leaves a queue
+  // that has already moved on and a preview()[0] that is not the piece which
+  // failed. Deliberate: the piece was taken, the board can never resume, and an
+  // advance that is unconditional is a rule rather than a special case.
+  const Piece p = m_next.front();
+  advance_preview();
+  return spawn(p);
 }
 
 auto Board::spawn(Piece p) -> bool {
@@ -304,6 +323,12 @@ auto Board::hold() -> bool {
   if (!m_can_hold) return false;
 
   const Piece current = m_active.piece;
+  // ⚠ A PEEK, with the advance further down and the fit check BETWEEN them —
+  // two touches of one queue straddling a guard, which is structurally the
+  // shape of the bug #55 fixed. It is safe only because fits() reads m_cells
+  // and spawn_x() is pure, so nothing between the peek and the advance can move
+  // the queue. That is what lets "refused whole" be true of the queue and not
+  // just the board.
   const Piece incoming = m_has_hold ? m_hold : m_next.front();
 
   // ⚠ Defect 8: the reference swaps without checking, so in a high stack the
@@ -319,14 +344,11 @@ auto Board::hold() -> bool {
   candidate.y = kHiddenRows;
   if (!fits(candidate)) return false;
 
-  if (!m_has_hold) {
-    // Consuming the preview's head, so the queue has to move up with it.
-    for (int i = 0; i + 1 < kPreview; ++i) {
-      m_next[static_cast<std::size_t>(i)] =
-          m_next[static_cast<std::size_t>(i + 1)];
-    }
-    m_next[kPreview - 1] = take_next();
-  }
+  // ⚠ The first hold takes a piece OUT of the stream; every later one is a swap
+  // with the slot and takes nothing. Advancing on both paths would eat one
+  // piece per hold — and a bag with a piece missing from its middle still looks
+  // like a bag seven entries later, so no bag check would see it.
+  if (!m_has_hold) advance_preview();
 
   m_hold = current;
   m_has_hold = true;
@@ -458,7 +480,7 @@ auto Board::lock_active(TickResult& out) -> void {
   }
 
   m_combo = -1;
-  if (!spawn(take_next())) out.topped_out = true;
+  if (!spawn_next()) out.topped_out = true;
 }
 
 auto Board::clear_full_rows(TickResult& out) -> void {
@@ -474,7 +496,10 @@ auto Board::clear_full_rows(TickResult& out) -> void {
   }
   m_clearing_count = 0;
   m_clear_elapsed = std::chrono::duration<double>{0.0};
-  if (!spawn(take_next())) out.topped_out = true;
+  // ⚠ The second spawn site, and it is a separate call because lock_active
+  // awards and returns while the rows are still on the board. Both have to take
+  // from the preview or the queue advances on some locks and not others.
+  if (!spawn_next()) out.topped_out = true;
 }
 
 auto Board::award(int line_count, bool tspin, bool mini, TickResult& out)
