@@ -1,9 +1,9 @@
-#include <termgame/games/tetris/board.hpp>
+#include <glyphcade/games/tetris/board.hpp>
 
 #include <algorithm>
 #include <cstddef>
 
-namespace termgame::tetris {
+namespace glyphcade::tetris {
 namespace {
 
 [[nodiscard]] auto ms(int n) noexcept -> std::chrono::duration<double> {
@@ -653,4 +653,4 @@ auto Board::load(std::span<const std::string_view> rows, Piece piece, int rot,
   return fits(m_active);
 }
 
-}  // namespace termgame::tetris
+}  // namespace glyphcade::tetris

@@ -1,9 +1,9 @@
-#include <termgame/games/twenty48/anim.hpp>
+#include <glyphcade/games/twenty48/anim.hpp>
 
 #include <algorithm>
 #include <cstddef>
 
-namespace termgame::twenty48 {
+namespace glyphcade::twenty48 {
 
 namespace {
 
@@ -161,4 +161,4 @@ auto Anim::rebuild() -> void {
   }
 }
 
-}  // namespace termgame::twenty48
+}  // namespace glyphcade::twenty48

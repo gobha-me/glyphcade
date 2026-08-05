@@ -23,11 +23,11 @@
 #include <system_error>
 #include <vector>
 
-#include <termgame/audio/engine.hpp>
+#include <glyphcade/audio/engine.hpp>
 
 namespace {
 
-using namespace termgame::audio;
+using namespace glyphcade::audio;
 
 constexpr int kRate = 48000;
 using Seconds = std::chrono::duration<double>;
@@ -36,7 +36,7 @@ class TempWav {
  public:
   explicit TempWav(const std::string& name)
       : m_path(std::filesystem::temp_directory_path() /
-               ("termgame-engine-" + name + ".wav")) {
+               ("glyphcade-engine-" + name + ".wav")) {
     std::filesystem::remove(m_path);
   }
   ~TempWav() {
@@ -91,7 +91,7 @@ TEST_CASE("a closed engine records intent and posts nothing",
 TEST_CASE("a NullSink engine never fills the ring", "[audio][engine]") {
   // ⚠ THE CASE THAT PINS THE SHORT-CIRCUIT. Without it, the 65th sound of the
   // session starts incrementing dropped() and every one after it does too — on
-  // the TERMGAME_WITH_AUDIO=OFF arm, i.e. everywhere CI runs. The counter that
+  // the GLYPHCADE_WITH_AUDIO=OFF arm, i.e. everywhere CI runs. The counter that
   // is supposed to mean "the audio thread is in trouble" would instead mean
   // "this build has no audio", which is already reported elsewhere.
   Engine e;

@@ -50,8 +50,8 @@ if (TARGET ${PROJECT_NAME}_lib)
   # ${PROJECT_NAME}_lib links the other three PUBLIC. install(EXPORT) refuses to
   # write a Targets file that references a target it cannot name:
   #
-  #   install(EXPORT "term-gameTargets" ...) includes target "term-game_lib"
-  #   which requires target "term-game_roster" that is not in any export set.
+  #   install(EXPORT "glyphcadeTargets" ...) includes target "glyphcade_lib"
+  #   which requires target "glyphcade_roster" that is not in any export set.
   #
   # So this is not a decision about how much of the internals to publish — it is
   # the only way the package generates at all. It is also the guard: add a game,
@@ -74,8 +74,8 @@ if (TARGET ${PROJECT_NAME}_lib)
   # can switch acquisition modes without touching its link lines.
   #
   # Derived by dropping the "${PROJECT_NAME}_" prefix rather than listed one by
-  # one, so a new game needs no line here either: term-game_game_2048 exports as
-  # term-game::game_2048. A target without the prefix would export under its own
+  # one, so a new game needs no line here either: glyphcade_game_2048 exports as
+  # glyphcade::game_2048. A target without the prefix would export under its own
   # name, which is a visible oddity rather than a silent one.
   foreach (_t IN LISTS _export_targets)
     string(REGEX REPLACE "^${PROJECT_NAME}_" "" _export_name "${_t}")

@@ -31,11 +31,11 @@
 #include <string_view>
 #include <vector>
 
-#include <termgame/games/tetris/board.hpp>
+#include <glyphcade/games/tetris/board.hpp>
 
 namespace {
 
-using namespace termgame::tetris;
+using namespace glyphcade::tetris;
 
 [[nodiscard]] auto ms(int n) -> std::chrono::duration<double> {
   return std::chrono::duration<double>{static_cast<double>(n) / 1000.0};

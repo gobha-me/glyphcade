@@ -30,16 +30,16 @@
 
 #include <termforge/core/types.hpp>
 
-#include <termgame/arcade/registry.hpp>
-#include <termgame/arcade/shell.hpp>
-#include <termgame/games/tetris/tetris.hpp>
+#include <glyphcade/arcade/registry.hpp>
+#include <glyphcade/arcade/shell.hpp>
+#include <glyphcade/games/tetris/tetris.hpp>
 
 namespace {
 
-using termgame::Shell;
-using termgame::Tetris;
-using termgame::audio::SfxId;
-using namespace termgame::tetris;
+using glyphcade::Shell;
+using glyphcade::Tetris;
+using glyphcade::audio::SfxId;
+using namespace glyphcade::tetris;
 
 class Probe final : public Shell {
  public:
@@ -70,7 +70,7 @@ class Probe final : public Shell {
 }
 
 [[nodiscard]] auto tetris_index() -> int {
-  const auto games = termgame::all_games();
+  const auto games = glyphcade::all_games();
   for (std::size_t i = 0; i < games.size(); ++i) {
     if (games[i].meta.slug == "tetris") return static_cast<int>(i);
   }
@@ -105,8 +105,8 @@ auto enter_tetris(Probe& app, int cols = 80, int rows = 24) -> void {
 }
 
 [[nodiscard]] auto game_of(Shell& shell) -> Tetris* {
-  return dynamic_cast<Tetris*>(const_cast<termgame::Game*>(
-      static_cast<const termgame::Game*>(shell.current_game())));
+  return dynamic_cast<Tetris*>(const_cast<glyphcade::Game*>(
+      static_cast<const glyphcade::Game*>(shell.current_game())));
 }
 
 [[nodiscard]] auto row_text(Probe& app, int y) -> std::string {
@@ -496,7 +496,7 @@ TEST_CASE("a held shift does not auto-repeat on the degraded arm",
 
 TEST_CASE("a hard drop sounds, and gravity does not", "[tetris][audio]") {
   // ⚠ Asserted through Shell::audio().play_count(), which counts INTENT rather
-  // than samples, so these pass identically on a TERMGAME_WITH_AUDIO=OFF build.
+  // than samples, so these pass identically on a GLYPHCADE_WITH_AUDIO=OFF build.
   // ⚠ Through the SHELL's engine, never the Game's: the Game may already be
   // gone by the time we look.
   Probe app;
@@ -745,7 +745,7 @@ TEST_CASE("HoldSupport survives the options screen, on BOTH arms",
   // always happened before any dismissal can. The reasoning was plausible and
   // wrong. The case is still worth having -- it covers the Held arm, which
   // nothing else does -- but not for the reason it was written.
-  using termgame::GameContext;
+  using glyphcade::GameContext;
 
   const auto run = [](bool kitty) {
     GameContext ctx;

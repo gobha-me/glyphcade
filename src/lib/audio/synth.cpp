@@ -1,9 +1,9 @@
-#include <termgame/audio/synth.hpp>
+#include <glyphcade/audio/synth.hpp>
 
 #include <algorithm>
 #include <cmath>
 
-namespace termgame::audio {
+namespace glyphcade::audio {
 
 namespace {
 
@@ -411,4 +411,4 @@ auto Voice::render_add(float* out, int frames) noexcept -> void {
   if (m_pos >= m_total) m_id = -1;
 }
 
-}  // namespace termgame::audio
+}  // namespace glyphcade::audio

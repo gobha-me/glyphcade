@@ -10,7 +10,7 @@
 // is a real pty, so setup() takes the tty path, run() emits the real sequences,
 // and the whole claim becomes checkable without a human.
 //
-// A bare termforge::App rather than a termgame::Shell, on purpose: what is
+// A bare termforge::App rather than a glyphcade::Shell, on purpose: what is
 // under test is the framework's run/teardown lifecycle plus our boundary around
 // it, and a Shell would drag the selector, the registry and a game into a test
 // about escape bytes.
@@ -40,7 +40,7 @@
 #include <termforge/core/screen.hpp>
 #include <termforge/widgets/theme.hpp>
 
-#include <termgame/arcade/exception_boundary.hpp>
+#include <glyphcade/arcade/exception_boundary.hpp>
 
 namespace {
 
@@ -67,5 +67,5 @@ class ThrowingProbe final : public termforge::App {
 auto main() -> int {
   ThrowingProbe app;  // outside the boundary — see the header comment
   app.set_frame_ms(0);
-  return termgame::run_or_report([&app] { return app.run(); });
+  return glyphcade::run_or_report([&app] { return app.run(); });
 }

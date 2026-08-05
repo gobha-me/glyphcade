@@ -1,4 +1,4 @@
-#include <termgame/games/snake/snake.hpp>
+#include <glyphcade/games/snake/snake.hpp>
 
 #include <algorithm>
 #include <array>
@@ -8,10 +8,10 @@
 
 #include <termforge/widgets/theme.hpp>
 
-#include <termgame/arcade/hud.hpp>
-#include <termgame/games/snake/glyphs.hpp>
+#include <glyphcade/arcade/hud.hpp>
+#include <glyphcade/games/snake/glyphs.hpp>
 
-namespace termgame {
+namespace glyphcade {
 
 namespace {
 
@@ -496,4 +496,4 @@ auto Snake::draw_too_small(termforge::Screen& screen) -> void {
   }
 }
 
-}  // namespace termgame
+}  // namespace glyphcade

@@ -1,9 +1,9 @@
-#include <termgame/games/snake/board.hpp>
+#include <glyphcade/games/snake/board.hpp>
 
 #include <algorithm>
 #include <cstddef>
 
-namespace termgame::snake {
+namespace glyphcade::snake {
 namespace {
 
 [[nodiscard]] auto index_of(Coord p) noexcept -> std::size_t {
@@ -250,4 +250,4 @@ auto Board::load(std::span<const Coord> body, Coord food, int eaten,
   rebuild_occupancy();
 }
 
-}  // namespace termgame::snake
+}  // namespace glyphcade::snake

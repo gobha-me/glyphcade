@@ -5,7 +5,7 @@
 # ⚠ The directory is twenty48 and the game's slug is "2048". Not a mistake: a slug
 # is a user-visible id and may begin with a digit, a C++ namespace may not, and
 # the directory follows the namespace so that
-# #include <termgame/games/twenty48/board.hpp> matches termgame::twenty48::Board.
+# #include <glyphcade/games/twenty48/board.hpp> matches glyphcade::twenty48::Board.
 # The CMake target follows the directory. See AGENTS.md.
 if (NOT TARGET ${PROJECT_NAME}_core)
   message(FATAL_ERROR
@@ -14,7 +14,7 @@ if (NOT TARGET ${PROJECT_NAME}_core)
 endif ()
 
 # Three TUs, not two: anim.cpp is the tween, which minesweeper had no need for.
-# Headers stay in include/termgame/games/twenty48/ — cmake/install.cmake ships
+# Headers stay in include/glyphcade/games/twenty48/ — cmake/install.cmake ships
 # public headers with one install(DIRECTORY include/ ...), so a header that leaves
 # include/ leaves the package.
 add_library(${PROJECT_NAME}_game_twenty48 STATIC
@@ -33,7 +33,7 @@ target_link_libraries(${PROJECT_NAME}_game_twenty48
   PUBLIC ${PROJECT_NAME}_core
 )
 
-# ⚠ No TERMGAME_WITH_AUDIO, no rtaudio, no link to ${PROJECT_NAME}_lib. A game
+# ⚠ No GLYPHCADE_WITH_AUDIO, no rtaudio, no link to ${PROJECT_NAME}_lib. A game
 # plays a sound by asking GameContext for the Player; it never learns whether the
-# sink is real. And core sits BELOW the games, so termgame::Shell is not on this
+# sink is real. And core sits BELOW the games, so glyphcade::Shell is not on this
 # target's link line — a game cannot reach the Shell even by accident.

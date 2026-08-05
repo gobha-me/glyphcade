@@ -1,4 +1,4 @@
-#include <termgame/games/tetris/tetris.hpp>
+#include <glyphcade/games/tetris/tetris.hpp>
 
 #include <algorithm>
 #include <array>
@@ -8,9 +8,9 @@
 
 #include <termforge/widgets/theme.hpp>
 
-#include <termgame/arcade/hud.hpp>
+#include <glyphcade/arcade/hud.hpp>
 
-namespace termgame {
+namespace glyphcade {
 
 namespace {
 
@@ -562,4 +562,4 @@ auto Tetris::draw_too_small(termforge::Screen& screen) -> void {
   screen.write_text(0, std::min(screen.rows() - 2, y + 1), want, fg, bg);
 }
 
-}  // namespace termgame
+}  // namespace glyphcade

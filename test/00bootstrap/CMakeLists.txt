@@ -23,7 +23,7 @@
 
   # The other half of owning your wiring: the automatic ${PROJECT_NAME}::lib
   # link does not reach here either. Same guard as the loop, same reason — the
-  # target does not exist under -Dterm-game_BUILD_LIB=OFF.
+  # target does not exist under -Dglyphcade_BUILD_LIB=OFF.
   if (TARGET ${PROJECT_NAME}::lib)
     target_link_libraries(${TEST_NAME}
       PRIVATE ${PROJECT_NAME}::lib
@@ -32,12 +32,12 @@
 
   # Hand the test what CMake decided, so it can assert the library's runtime
   # answer agrees. This is the only thing that catches "the option exists but
-  # never reached the compiler" — flip -DTERMGAME_WITH_AUDIO and both sides have
+  # never reached the compiler" — flip -DGLYPHCADE_WITH_AUDIO and both sides have
   # to move together or this test goes red.
   #
   # Note this definition is on the TEST target, not the library: it carries
   # CMake's belief. build_has_audio() carries the library's. Two independent
   # paths from the same option is what makes the comparison meaningful.
   target_compile_definitions(${TEST_NAME}
-    PRIVATE TERMGAME_EXPECT_AUDIO=$<BOOL:${TERMGAME_WITH_AUDIO}>
+    PRIVATE GLYPHCADE_EXPECT_AUDIO=$<BOOL:${GLYPHCADE_WITH_AUDIO}>
   )

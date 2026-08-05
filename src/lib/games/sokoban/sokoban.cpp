@@ -1,4 +1,4 @@
-// term-game — Sokoban: the Game, and the only file here that knows a terminal
+// glyphcade — Sokoban: the Game, and the only file here that knows a terminal
 // exists.
 //
 // ── What MapWidget made awkward, written down where the workarounds are ─────
@@ -30,7 +30,7 @@
 //     write_text lays out text rather than a single cell — but the contract
 //     does not say so, and the field name says otherwise.
 
-#include <termgame/games/sokoban/sokoban.hpp>
+#include <glyphcade/games/sokoban/sokoban.hpp>
 
 #include <algorithm>
 #include <string>
@@ -38,9 +38,9 @@
 
 #include <termforge/widgets/theme.hpp>
 
-#include <termgame/games/sokoban/level.hpp>
+#include <glyphcade/games/sokoban/level.hpp>
 
-namespace termgame {
+namespace glyphcade {
 
 namespace {
 
@@ -555,4 +555,4 @@ auto Sokoban::draw_broken(termforge::Screen& screen) -> void {
   screen.write_text(0, 0, msg, termforge::theme::kFg, termforge::theme::kBg);
 }
 
-}  // namespace termgame
+}  // namespace glyphcade

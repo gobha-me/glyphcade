@@ -1,4 +1,4 @@
-#include <termgame/arcade/scores.hpp>
+#include <glyphcade/arcade/scores.hpp>
 
 #include <charconv>
 #include <fstream>
@@ -8,7 +8,7 @@
 #include <system_error>
 #include <utility>
 
-namespace termgame::scores {
+namespace glyphcade::scores {
 
 namespace {
 
@@ -95,7 +95,7 @@ auto Store::load() -> void {
   std::string line;
   if (!std::getline(in, line) || line != kHeader) {
     // ⚠ Refuse the whole file rather than reading what we can. An unknown
-    // version is a file some FUTURE term-game wrote, and the one thing worse
+    // version is a file some FUTURE glyphcade wrote, and the one thing worse
     // than not reading a player's records is overwriting them with our
     // narrower understanding of them. Read-only, records still kept in memory,
     // and flush() will say so out loud rather than silently discarding.
@@ -236,10 +236,10 @@ auto resolve_path(std::string_view xdg_data_home, std::string_view home)
   // XDG_DATA_HOME wins outright when set, per the basedir spec — including when
   // HOME is also set, which is the case on every desktop.
   if (!xdg_data_home.empty()) {
-    return std::filesystem::path{xdg_data_home} / "term-game" / "scores";
+    return std::filesystem::path{xdg_data_home} / "glyphcade" / "scores";
   }
   if (!home.empty()) {
-    return std::filesystem::path{home} / ".local" / "share" / "term-game" /
+    return std::filesystem::path{home} / ".local" / "share" / "glyphcade" /
            "scores";
   }
   // Neither set: memory-only. Guessing a path from the cwd would scatter score
@@ -247,4 +247,4 @@ auto resolve_path(std::string_view xdg_data_home, std::string_view home)
   return {};
 }
 
-}  // namespace termgame::scores
+}  // namespace glyphcade::scores

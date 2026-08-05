@@ -32,18 +32,18 @@
 #include <string>
 #include <vector>
 
-#include <termgame/audio/sink.hpp>
+#include <glyphcade/audio/sink.hpp>
 
 namespace {
 
-using namespace termgame::audio;
+using namespace glyphcade::audio;
 
 // Removes its file on the way out, however the case ends.
 class TempWav {
  public:
   explicit TempWav(const std::string& name)
       : m_path(std::filesystem::temp_directory_path() /
-               ("termgame-test-" + name + ".wav")) {
+               ("glyphcade-test-" + name + ".wav")) {
     std::filesystem::remove(m_path);
   }
   ~TempWav() {

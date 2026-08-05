@@ -2,7 +2,7 @@
 # (gitea #46).
 #
 # Run as a ctest:
-#   cmake -DBUILD_DIR=<build> -DPROJECT=term-game -DEXPECT_VERSION=<ver> \
+#   cmake -DBUILD_DIR=<build> -DPROJECT=glyphcade -DEXPECT_VERSION=<ver> \
 #         [-DTERMFORGE_DIR=<dir>] -P cmake/check_consumer.cmake
 #
 # ── Why this exists, and why check_export.cmake is not it ───────────────────
@@ -13,8 +13,8 @@
 #
 # Until this file existed, nothing in ctest EXECUTED that line. Its sibling
 # cmake/check_export.cmake installs to a scratch prefix and greps the generated
-# term-gameTargets*.cmake for rtaudio tokens — as TEXT. It never calls
-# find_package(term-game), so the generated term-gameConfig.cmake was written
+# glyphcadeTargets*.cmake for rtaudio tokens — as TEXT. It never calls
+# find_package(glyphcade), so the generated glyphcadeConfig.cmake was written
 # and inspected and never run.
 #
 # That made a wrong floor invisible from two directions at once. The in-tree
@@ -45,7 +45,7 @@
 # The obvious shape is a three-line CMakeLists.txt committed under test/. It
 # does not work: test/CMakeLists.txt globs test/* and add_subdirectory()s any
 # directory holding a CMakeLists.txt, so a committed test/consumer/ would be
-# pulled into OUR build and run find_package(term-game) at our own configure
+# pulled into OUR build and run find_package(glyphcade) at our own configure
 # time. Generating it into the build tree keeps it unreachable by that glob, and
 # keeps the whole check readable as one file.
 
@@ -71,7 +71,7 @@ file(REMOVE_RECURSE "${_prefix}" "${_src}" "${_bin}")
 # One install is enough for both packages: termforge_INSTALL follows
 # ${PROJECT_NAME}_INSTALL (see cmake/deps/termforge.cmake), so when termforge
 # came from FetchContent the prefix gets lib/cmake/termforge/ alongside
-# lib/cmake/term-game/. No network, no second install step.
+# lib/cmake/glyphcade/. No network, no second install step.
 
 execute_process(
   COMMAND ${CMAKE_COMMAND} --install "${BUILD_DIR}" --prefix "${_prefix}"
@@ -96,11 +96,11 @@ endif ()
 # supposed to be incapable of.
 #
 # ${${CHECK_PROJECT}_VERSION} is a double dereference, and the hyphen in
-# `term-game` is fine in a variable name — test/CMakeLists.txt already relies on
+# `glyphcade` is fine in a variable name — test/CMakeLists.txt already relies on
 # the same thing in `if (${PROJECT_NAME}_INSTALL)`.
 #
 # project(consume CXX), not NONE. NONE would skip compiler detection and shave a
-# couple of seconds, and everything in term-gameTargets.cmake would still work —
+# couple of seconds, and everything in glyphcadeTargets.cmake would still work —
 # but a real consumer has a compiler, and fidelity to the thing being verified
 # is the point. Keep NONE in your pocket only if a runner ever turns up without
 # a default compiler.
@@ -125,8 +125,8 @@ message(STATUS "CONSUMED-TERMFORGE-DIR=${termforge_DIR}")
 # -Werror in CMAKE_CXX_FLAGS are cache entries, and `cmake -P` reads no cache.
 # Deliberately NOT passed:
 #
-#   CMAKE_BUILD_TYPE — the generated term-gameTargets.cmake globs and includes
-#   every term-gameTargets-<config>.cmake regardless of the consumer's build
+#   CMAKE_BUILD_TYPE — the generated glyphcadeTargets.cmake globs and includes
+#   every glyphcadeTargets-<config>.cmake regardless of the consumer's build
 #   type, so there is nothing to match.
 #
 #   CMAKE_CXX_COMPILER — forcing ours would couple this check to

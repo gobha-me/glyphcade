@@ -1,4 +1,4 @@
-# term-game
+# glyphcade
 
 A TUI arcade suite in **C++23**. [TermForge](https://github.com/gobha-me/termforge)
 renders it, [RtAudio](https://github.com/thestk/rtaudio) sounds it.
@@ -19,7 +19,7 @@ self-contained games.
 **CI:** [five build arms](https://git.gobha.me/xcaliber/term-game/actions?workflow=ci.yaml)
 — gcc and clang, plus ASan, UBSan and TSan — on every push and pull request,
 each in a pinned `debian:trixie` container with `-Werror` and
-`TERMGAME_WITH_AUDIO=OFF`.
+`GLYPHCADE_WITH_AUDIO=OFF`.
 
 <!-- A status *badge* would be the convention here, and there is deliberately
      none. git.gobha.me does not serve badge routes: the URL Gitea's own API
@@ -62,7 +62,7 @@ blobs in git, and it is the right sound for an arcade.
 The device is abstracted behind an `AudioSink` with three implementations:
 `RtAudioSink` (real hardware), `NullSink` (no sound card present), and
 `WavFileSink` (renders to disk, which is what makes the audio path testable
-offline). `TERMGAME_WITH_AUDIO` auto-detects rtaudio and defaults OFF when it is
+offline). `GLYPHCADE_WITH_AUDIO` auto-detects rtaudio and defaults OFF when it is
 absent, so the repo builds and tests anywhere.
 
 ## Build
@@ -74,7 +74,7 @@ cmake -B build && cmake --build build && ctest --test-dir build --output-on-fail
 Requires CMake 3.28+ and a C++23 compiler (GCC 13+ / Clang 19+). TermForge is
 fetched automatically if it is not already installed. `librtaudio-dev` is
 optional — without it you get a silent but fully playable arcade; force the
-no-audio build with `-DTERMGAME_WITH_AUDIO=OFF`.
+no-audio build with `-DGLYPHCADE_WITH_AUDIO=OFF`.
 
 ## License
 

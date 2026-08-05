@@ -193,7 +193,7 @@ message(STATUS "check_artifacts: mode=${MODE}, ${REPO_ROOT}")
 # The rule's own label says "README CI badge", and a stale badge can only live
 # in the README — but upstream scans every tracked file, which makes it
 # structurally impossible for a fork to document its own provenance. That is
-# something NEW_PROJECT.md Step 1 explicitly instructs you to do, and term-game
+# something NEW_PROJECT.md Step 1 explicitly instructs you to do, and glyphcade
 # names the template on purpose in AGENTS.md, DESIGN.md, STATUS.md and
 # docs/cpp-template-audit.md — eight honest references, all of which would fail
 # this rule unmodified.
@@ -512,6 +512,64 @@ if(GIT_FOUND)
   endif()
 endif()
 report_b("B5" "shell scripts keep their exec bit" _b5 _r)
+
+# The project name is a coupled pair across two files, and it became one the
+# moment CMakeLists.txt stopped deriving project() from the directory name (see
+# the divergences table in STATUS.md). Under the derivation these two agreed by
+# construction; now they can drift.
+#
+# Rename one side only and PROGRAM_NAME disagrees with every target name, the
+# install prefix and <name>Config.cmake. test/00bootstrap catches it — but only
+# if someone builds and runs the suite, and the message names two strings
+# without saying which file is wrong.
+#
+# Both sides are DERIVED, never hardcoded here: a rule that spelled the current
+# name would have to be edited by the next rename, which is precisely the thing
+# it exists to police, and it would be meaningless in a fork.
+#
+# If you touch these regexes, re-prove the rule by renaming ONE side only, in
+# both directions — the Class-B convention documented at the top of this file.
+set(_b6 0)
+set(_r "")
+set(_proj_name "")
+set(_boot_name "")
+
+if(EXISTS "${REPO_ROOT}/CMakeLists.txt")
+  _read_lines("${REPO_ROOT}/CMakeLists.txt" _c_lines)
+  foreach(_line IN LISTS _c_lines)
+    # Only a literal name counts. A ${var} argument means the derivation is
+    # back, which is itself the failure this rule reports.
+    if("${_line}" MATCHES "^[ \t]*project[ \t]*\\([ \t]*([A-Za-z0-9_.+-]+)([ \t)]|$)")
+      set(_proj_name "${CMAKE_MATCH_1}")
+      break()
+    endif()
+  endforeach()
+endif()
+
+if(EXISTS "${REPO_ROOT}/test/00bootstrap/test.cpp")
+  _read_lines("${REPO_ROOT}/test/00bootstrap/test.cpp" _t_lines)
+  foreach(_line IN LISTS _t_lines)
+    if("${_line}" MATCHES "PROGRAM_NAME\\}[ \t]*==[ \t]*\"([^\"]*)\"")
+      set(_boot_name "${CMAKE_MATCH_1}")
+      break()
+    endif()
+  endforeach()
+endif()
+
+if(_proj_name STREQUAL "")
+  math(EXPR _b6 "${_b6} + 1")
+  string(APPEND _r "\n           CMakeLists.txt has no literal project(<name>) — either the file moved or project() derives its name again")
+endif()
+if(_boot_name STREQUAL "")
+  math(EXPR _b6 "${_b6} + 1")
+  string(APPEND _r "\n           test/00bootstrap/test.cpp no longer asserts PROGRAM_NAME == \"...\" — the coupling is unguarded")
+endif()
+if(NOT _proj_name STREQUAL "" AND NOT _boot_name STREQUAL ""
+   AND NOT _proj_name STREQUAL _boot_name)
+  math(EXPR _b6 "${_b6} + 1")
+  string(APPEND _r "\n           project(${_proj_name}) but test/00bootstrap asserts PROGRAM_NAME == \"${_boot_name}\" — rename both sides")
+endif()
+report_b("B6" "the project name matches on both sides" _b6 _r)
 
 # ── Verdict ─────────────────────────────────────────────────────────────────
 if(_fail_count GREATER 0)

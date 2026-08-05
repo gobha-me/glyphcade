@@ -24,7 +24,7 @@
 
   # The other half of owning your wiring: the automatic ${PROJECT_NAME}::lib link
   # does not reach here either. Same guard as the loop, same reason — the target
-  # does not exist under -Dterm-game_BUILD_LIB=OFF.
+  # does not exist under -Dglyphcade_BUILD_LIB=OFF.
   if (TARGET ${PROJECT_NAME}::lib)
     target_link_libraries(${TEST_NAME}
       PRIVATE ${PROJECT_NAME}::lib
@@ -45,11 +45,11 @@
   # handed up from src/lib/CMakeLists.txt by PARENT_SCOPE. So the number here and
   # the table over there come from independent places, which is the only reason
   # comparing them means anything — the same argument test/00bootstrap makes for
-  # TERMGAME_EXPECT_AUDIO.
+  # GLYPHCADE_EXPECT_AUDIO.
   #
   # ⚠ If this goes red after you add a game, the likely cause is a missing entry
   # in kGames rather than a wrong count here.
   list(LENGTH ${PROJECT_NAME}_GAME_TARGETS _game_count)
   target_compile_definitions(${TEST_NAME}
-    PRIVATE TERMGAME_EXPECT_GAMES=${_game_count}
+    PRIVATE GLYPHCADE_EXPECT_GAMES=${_game_count}
   )

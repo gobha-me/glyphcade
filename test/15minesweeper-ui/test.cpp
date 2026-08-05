@@ -34,16 +34,16 @@
 
 #include <termforge/core/types.hpp>
 
-#include <termgame/arcade/registry.hpp>
-#include <termgame/arcade/shell.hpp>
-#include <termgame/games/minesweeper/glyphs.hpp>
-#include <termgame/games/minesweeper/minesweeper.hpp>
+#include <glyphcade/arcade/registry.hpp>
+#include <glyphcade/arcade/shell.hpp>
+#include <glyphcade/games/minesweeper/glyphs.hpp>
+#include <glyphcade/games/minesweeper/minesweeper.hpp>
 
 namespace {
 
-using termgame::Minesweeper;
-using termgame::Shell;
-using namespace termgame::minesweeper;
+using glyphcade::Minesweeper;
+using glyphcade::Shell;
+using namespace glyphcade::minesweeper;
 
 class Probe final : public Shell {
  public:
@@ -73,7 +73,7 @@ class Probe final : public Shell {
 }
 
 [[nodiscard]] auto minesweeper_index() -> int {
-  const auto games = termgame::all_games();
+  const auto games = glyphcade::all_games();
   for (std::size_t i = 0; i < games.size(); ++i) {
     if (games[i].meta.slug == "minesweeper") return static_cast<int>(i);
   }
@@ -81,8 +81,8 @@ class Probe final : public Shell {
 }
 
 [[nodiscard]] auto game_of(Shell& shell) -> Minesweeper* {
-  return dynamic_cast<Minesweeper*>(const_cast<termgame::Game*>(
-      static_cast<const termgame::Game*>(shell.current_game())));
+  return dynamic_cast<Minesweeper*>(const_cast<glyphcade::Game*>(
+      static_cast<const glyphcade::Game*>(shell.current_game())));
 }
 
 auto enter_game(Probe& app, int cols = 80, int rows = 24) -> Minesweeper* {
@@ -628,11 +628,11 @@ TEST_CASE("the game renders at every size without crashing", "[minesweeper]") {
 // asserting there sidesteps the trap structurally rather than by remembering.
 //
 // play_count() records INTENT, so all of this passes identically on the
-// TERMGAME_WITH_AUDIO=OFF arm — no sink is injected and no file is written.
+// GLYPHCADE_WITH_AUDIO=OFF arm — no sink is injected and no file is written.
 
 TEST_CASE("revealing a safe cell plays the reveal sound",
           "[minesweeper][audio]") {
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   Minesweeper* g = enter_game(app);
@@ -656,7 +656,7 @@ TEST_CASE("revealing an already-open cell is silent", "[minesweeper][audio]") {
   // whenever the verb returned true" is the obvious simplification, and it is
   // wrong in exactly this way: a second press on an open cell changes nothing
   // and must make no sound.
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   Minesweeper* g = enter_game(app);
@@ -676,7 +676,7 @@ TEST_CASE("revealing an already-open cell is silent", "[minesweeper][audio]") {
 TEST_CASE("space on a flagged cell is silent", "[minesweeper][audio]") {
   // The other half of the same guard: reveal() refuses a flagged cell, so the
   // press is a deliberate no-op and must stay quiet.
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   Minesweeper* g = enter_game(app);
@@ -698,7 +698,7 @@ TEST_CASE("stepping on a mine plays explode and lose",
   // ⚠ The case that proves announce() reads the STATE TRANSITION rather than
   // the return value. reveal() returns the same `true` here as it does for an
   // ordinary open, so a binding that trusted the bool alone would play Reveal.
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   Minesweeper* g = enter_game(app);
@@ -735,7 +735,7 @@ TEST_CASE("stepping on a mine plays explode and lose",
 }
 
 TEST_CASE("clearing the board plays the win sound", "[minesweeper][audio]") {
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   Minesweeper* g = enter_game(app);
@@ -765,7 +765,7 @@ TEST_CASE("winning through the input path plays the win sound",
   // ⚠ The previous case proves Board stays silent; this one proves the INPUT
   // path is what sounds. Together they pin "audio is presentation": driving the
   // model makes no sound, driving the game does.
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   Minesweeper* g = enter_game(app);
@@ -821,7 +821,7 @@ TEST_CASE("the mark cycle sounds flag, then click, then click",
   // Placing a flag is a decision; stepping to Question and clearing back to
   // None are undoing one. announce_mark() reads what the cell BECAME, so all
   // three presses of the same key produce two different sounds.
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   Minesweeper* g = enter_game(app);
@@ -851,7 +851,7 @@ TEST_CASE("a chord with the wrong flag count is silent",
           "[minesweeper][audio]") {
   // chord() is a deliberate visible no-op when the flags do not add up, and a
   // no-op must be inaudible as well as harmless.
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   Minesweeper* g = enter_game(app);
@@ -890,7 +890,7 @@ TEST_CASE("cursor movement makes no sound", "[minesweeper][audio]") {
   // clock — and dt inside Game::tick is the only clock a game may read. That is
   // a feel decision requiring a human ear, so it is deferred rather than
   // guessed at. Recorded in STATUS.md's Epic 2 deferral table.
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   Minesweeper* g = enter_game(app);
@@ -902,7 +902,7 @@ TEST_CASE("cursor movement makes no sound", "[minesweeper][audio]") {
   // here fails for a reason that has nothing to do with the cursor. What is
   // being claimed is that MOVING adds nothing, not that nothing ever happened.
   std::vector<std::uint32_t> before;
-  for (const auto id : termgame::audio::kSfxIds) {
+  for (const auto id : glyphcade::audio::kSfxIds) {
     before.push_back(app.audio().play_count(id));
   }
 
@@ -913,8 +913,8 @@ TEST_CASE("cursor movement makes no sound", "[minesweeper][audio]") {
   app.dispatch_event(key(termforge::Key::Home));
   app.dispatch_event(key(termforge::Key::End));
 
-  for (std::size_t i = 0; i < termgame::audio::kSfxIds.size(); ++i) {
-    REQUIRE(app.audio().play_count(termgame::audio::kSfxIds[i]) == before[i]);
+  for (std::size_t i = 0; i < glyphcade::audio::kSfxIds.size(); ++i) {
+    REQUIRE(app.audio().play_count(glyphcade::audio::kSfxIds[i]) == before[i]);
   }
 }
 
@@ -922,7 +922,7 @@ TEST_CASE("starting a new game clicks", "[minesweeper][audio]") {
   // ⚠ NOT routed through announce(): new_game() resets the board, so the state
   // goes Playing -> Ready, which announce() would read as neither progress nor
   // an outcome and would have to special-case.
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   Minesweeper* g = enter_game(app);
@@ -945,7 +945,7 @@ TEST_CASE("starting a new game clicks", "[minesweeper][audio]") {
 TEST_CASE("a right click flags, like the keyboard", "[minesweeper][audio]") {
   // The mouse path and the key path must not drift apart — they are the same
   // two verbs and should make the same two sounds.
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   Minesweeper* g = enter_game(app);
@@ -980,7 +980,7 @@ TEST_CASE("marking a revealed cell is silent", "[minesweeper][audio]") {
   // the guard, announce_mark() reads that None as "became not-a-flag" and
   // clicks — so every press of f on an open square would blip. There is nothing
   // else to compare against, because nothing about the board moved.
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   Minesweeper* g = enter_game(app);

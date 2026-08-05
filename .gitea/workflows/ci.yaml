@@ -1,6 +1,6 @@
 # Gitea Actions, not GitHub Actions.
 #
-# term-game lives on git.gobha.me. cpp-template ships .github/workflows/ci.yml
+# glyphcade lives on git.gobha.me. cpp-template ships .github/workflows/ci.yml
 # and NEW_PROJECT.md says to copy it verbatim — that instruction assumes a
 # GitHub fork, so it is deliberately NOT carried over here. It would never
 # execute, its badge could never go green, and it references example/consumer
@@ -55,7 +55,7 @@ on:
 #   host apt works ................ pass
 #   host reaches github ........... pass
 #   container support ............. pass   <- act_runner honours `container:`
-#   workspace dir is term-game .... pass
+#   workspace dir as expected ..... pass   <- probe since retired, see below
 #
 # Two consequences worth keeping:
 #
@@ -63,10 +63,12 @@ on:
 #     has gcc and not clang, and no apt-reachable clang >= 19 on an Ubuntu
 #     runner. The container was the cheaper correct answer, not merely the
 #     tidier one.
-#   - `workspace dir is term-game` is not paranoia. cpp-template derives
-#     project() from the directory name, PROGRAM_NAME follows it, and
+#   - The workspace-name probe was not paranoia at the time: cpp-template
+#     derived project() from the directory name, PROGRAM_NAME followed it, and
 #     test/00bootstrap asserts on it — the local rehearsal of this change
-#     checked out into /src and failed with `"src" == "term-game"`.
+#     checked out into /src and failed with `"src" == "<project>"`. That
+#     coupling is now gone (project() takes a literal name), so the probe is
+#     retired and no CI arm depends on the checkout directory's name.
 
 jobs:
   # Fail fast, loudly, and on the right line. This used to be a report on an
@@ -102,7 +104,7 @@ jobs:
 
           if [ "$fail" -ne 0 ]; then
             echo
-            echo "debian:trixie no longer clears term-game's toolchain floor."
+            echo "debian:trixie no longer clears glyphcade's toolchain floor."
             echo "Pin a newer image in this file rather than lowering the floor."
             echo "C++23 is not optional here: termforge requires it, and clang"
             echo "18 and earlier cannot compile std::expected against libstdc++."
@@ -175,7 +177,7 @@ jobs:
       - name: Trust the workspace
         run: git config --global --add safe.directory "$PWD"
 
-      # TERMGAME_WITH_AUDIO=OFF on every job. Runners have no sound hardware,
+      # GLYPHCADE_WITH_AUDIO=OFF on every job. Runners have no sound hardware,
       # and OFF is the configuration this repo promises always works — it is not
       # the auto-detected default on a box that happens to have librtaudio-dev,
       # so it has to be asked for explicitly or the arm rots.
@@ -187,7 +189,7 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain/${{ matrix.toolchain }} \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type || 'Debug' }} \
             -DCMAKE_CXX_FLAGS=-Werror \
-            -DTERMGAME_WITH_AUDIO=OFF
+            -DGLYPHCADE_WITH_AUDIO=OFF
 
       # cpp-template's toolchain/default.cmake replaces CMAKE_CXX_FLAGS rather
       # than appending to it, which silently discards the -Werror above and

@@ -1,11 +1,11 @@
-// term-game — Sokoban: the rules.
+// glyphcade — Sokoban: the rules.
 
-#include <termgame/games/sokoban/board.hpp>
+#include <glyphcade/games/sokoban/board.hpp>
 
 #include <algorithm>
 #include <utility>
 
-namespace termgame::sokoban {
+namespace glyphcade::sokoban {
 
 Board::Board(Level level)
     : m_level(std::move(level)),
@@ -155,4 +155,4 @@ auto Board::deadlocked() const noexcept -> bool {
   return false;
 }
 
-}  // namespace termgame::sokoban
+}  // namespace glyphcade::sokoban

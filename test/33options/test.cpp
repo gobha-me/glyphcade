@@ -44,23 +44,23 @@
 #include <termforge/widgets/glyphs.hpp>
 #include <termforge/widgets/theme.hpp>
 
-#include <termgame/arcade/context.hpp>
-#include <termgame/arcade/game_meta.hpp>
-#include <termgame/arcade/hud.hpp>
-#include <termgame/arcade/options_screen.hpp>
-#include <termgame/arcade/registry.hpp>
+#include <glyphcade/arcade/context.hpp>
+#include <glyphcade/arcade/game_meta.hpp>
+#include <glyphcade/arcade/hud.hpp>
+#include <glyphcade/arcade/options_screen.hpp>
+#include <glyphcade/arcade/registry.hpp>
 
 namespace {
 
-namespace hud = termgame::hud;
+namespace hud = glyphcade::hud;
 
-using termgame::GameContext;
-using termgame::GameMeta;
-using termgame::kInlineChoiceMax;
-using termgame::kMaxGameOptions;
-using termgame::meta_text_is_ascii;
-using termgame::OptionSpec;
-using termgame::options_are_well_formed;
+using glyphcade::GameContext;
+using glyphcade::GameMeta;
+using glyphcade::kInlineChoiceMax;
+using glyphcade::kMaxGameOptions;
+using glyphcade::meta_text_is_ascii;
+using glyphcade::OptionSpec;
+using glyphcade::options_are_well_formed;
 
 // ⚠ Namespace scope, `inline constexpr`, not written inline in the metas below.
 // That is the storage-duration rule from OptionSpec's own comment, and this
@@ -237,7 +237,7 @@ TEST_CASE("every registered game's options schema is well formed") {
   // Deliberately duplicated from all_games.cpp's static_assert rather than
   // shared: this file is about the predicate, and a shared helper would let
   // both sites be wrong together.
-  for (const auto& entry : termgame::all_games()) {
+  for (const auto& entry : glyphcade::all_games()) {
     INFO("game: " << entry.meta.slug);
     REQUIRE(options_are_well_formed(entry.meta));
     REQUIRE(meta_text_is_ascii(entry.meta));
@@ -248,7 +248,7 @@ TEST_CASE("a game with no options is the cheap case") {
   // 2048 declares nothing and must stay that way — the empty span is what the
   // detail pane short-circuits on and what lets the game hold no member at all.
   bool found_empty = false;
-  for (const auto& entry : termgame::all_games()) {
+  for (const auto& entry : glyphcade::all_games()) {
     if (entry.meta.slug == "2048") {
       REQUIRE(entry.meta.options.empty());
       found_empty = true;
@@ -467,7 +467,7 @@ TEST_CASE("draw_status_row: a screen narrower than the word keeps the word") {
 
 namespace {
 
-using termgame::OptionsScreen;
+using glyphcade::OptionsScreen;
 using Reply = OptionsScreen::Reply;
 
 inline constexpr std::string_view kLevels[]{"Easy", "Normal", "Hard"};

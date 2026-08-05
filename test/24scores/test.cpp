@@ -31,15 +31,15 @@
 #include <system_error>
 #include <vector>
 
-#include <termgame/arcade/registry.hpp>
-#include <termgame/arcade/scores.hpp>
-#include <termgame/arcade/shell.hpp>
+#include <glyphcade/arcade/registry.hpp>
+#include <glyphcade/arcade/scores.hpp>
+#include <glyphcade/arcade/shell.hpp>
 
 namespace {
 
-using termgame::Shell;
-using termgame::scores::Better;
-using termgame::scores::Store;
+using glyphcade::Shell;
+using glyphcade::scores::Better;
+using glyphcade::scores::Store;
 
 // Removes its file — and anything the store wrote beside it — on the way out,
 // however the case ends. The same shape as test/17audio-sink's TempWav.
@@ -47,7 +47,7 @@ class TempScores {
  public:
   explicit TempScores(const std::string& name)
       : m_path(std::filesystem::temp_directory_path() /
-               ("termgame-test-" + name + ".scores")) {
+               ("glyphcade-test-" + name + ".scores")) {
     wipe();
   }
   ~TempScores() { wipe(); }
@@ -100,7 +100,7 @@ class Probe final : public Shell {
   using Shell::screen;
 
   explicit Probe(std::filesystem::path scores)
-      : Shell(std::make_unique<termgame::audio::NullSink>(), std::move(scores)) {
+      : Shell(std::make_unique<glyphcade::audio::NullSink>(), std::move(scores)) {
     set_frame_ms(0);  // see the comment in test/10render
   }
 
@@ -162,7 +162,7 @@ TEST_CASE("a record survives a write and a fresh read", "[scores]") {
   // scores.hpp as hand-editable, so a player may reasonably open it.
   const auto lines = lines_of(file.text());
   REQUIRE(lines.size() == 2);
-  REQUIRE(lines[0] == "# term-game scores v1");
+  REQUIRE(lines[0] == "# glyphcade scores v1");
   REQUIRE(lines[1] == "2048 best_score 20488");
 
   const Store reopened{file.path()};
@@ -209,7 +209,7 @@ TEST_CASE("an unrecognised version is refused rather than clobbered",
           "[scores]") {
   const TempScores file{"badversion"};
   const std::string original =
-      "# term-game scores v9\n2048 best_score 999999\nsomething else\n";
+      "# glyphcade scores v9\n2048 best_score 999999\nsomething else\n";
   file.write(original);
 
   Store store{file.path()};
@@ -237,7 +237,7 @@ TEST_CASE("an unwritable target is an error, not an abort", "[scores]") {
   // container that runs as uid 0.
   blocker.write("not a directory\n");
 
-  Store store{blocker.path() / "term-game" / "scores"};
+  Store store{blocker.path() / "glyphcade" / "scores"};
   REQUIRE(store.record("2048", "best_score", 1, Better::Higher));
 
   const auto written = store.flush();
@@ -343,7 +343,7 @@ TEST_CASE("a malformed line is skipped and the rest of the file survives",
           "[scores]") {
   const TempScores file{"malformed"};
   file.write(
-      "# term-game scores v1\n"
+      "# glyphcade scores v1\n"
       "2048 best_score 100\n"
       "minesweeper\n"                      // too few fields
       "minesweeper best_time_easy\n"       // no value
@@ -363,14 +363,14 @@ TEST_CASE("a malformed line is skipped and the rest of the file survives",
 
 TEST_CASE("resolve_path prefers XDG_DATA_HOME and falls back to HOME",
           "[scores]") {
-  using termgame::scores::resolve_path;
+  using glyphcade::scores::resolve_path;
   namespace fs = std::filesystem;
 
-  REQUIRE(resolve_path("/xdg", "/home/p") == fs::path{"/xdg/term-game/scores"});
+  REQUIRE(resolve_path("/xdg", "/home/p") == fs::path{"/xdg/glyphcade/scores"});
   // XDG wins even when HOME is set, which is the case on every desktop.
-  REQUIRE(resolve_path("/xdg", "") == fs::path{"/xdg/term-game/scores"});
+  REQUIRE(resolve_path("/xdg", "") == fs::path{"/xdg/glyphcade/scores"});
   REQUIRE(resolve_path("", "/home/p") ==
-          fs::path{"/home/p/.local/share/term-game/scores"});
+          fs::path{"/home/p/.local/share/glyphcade/scores"});
   // Neither set: empty, which the Store reads as memory-only. Guessing from the
   // cwd would scatter score files wherever the binary was run.
   REQUIRE(resolve_path("", "").empty());
@@ -384,7 +384,7 @@ TEST_CASE("the scores notice does not displace the colour notice",
   // The order matters because m_notice keeps only the most recent message, and a
   // bad-version scores file is the first deterministic way to make two fire.
   const TempScores file{"notice-order"};
-  file.write("# term-game scores v9\n");
+  file.write("# glyphcade scores v9\n");
 
   Probe app{file.path()};
   app.step();
@@ -418,12 +418,12 @@ TEST_CASE("a store that cannot save says so on the way back to the menu",
   // probe write the constructor deliberately does not make. Delete the flush
   // report in apply_transitions() and this goes red.
   const TempScores file{"flush-notice"};
-  file.write("# term-game scores v9\n");
+  file.write("# glyphcade scores v9\n");
 
   Probe app{file.path()};
   app.step();
 
-  const auto games = termgame::all_games();
+  const auto games = glyphcade::all_games();
   int index = -1;
   for (std::size_t i = 0; i < games.size(); ++i) {
     if (games[i].meta.slug == "2048") index = static_cast<int>(i);
@@ -453,5 +453,5 @@ TEST_CASE("a store that cannot save says so on the way back to the menu",
   REQUIRE(footer.find("scores") != std::string::npos);
   REQUIRE(all_seven_bit(app));
   // And it really was refused rather than written.
-  REQUIRE(file.text() == "# term-game scores v9\n");
+  REQUIRE(file.text() == "# glyphcade scores v9\n");
 }

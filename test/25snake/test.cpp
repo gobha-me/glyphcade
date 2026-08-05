@@ -26,11 +26,11 @@
 #include <chrono>
 #include <vector>
 
-#include <termgame/games/snake/board.hpp>
+#include <glyphcade/games/snake/board.hpp>
 
 namespace {
 
-using namespace termgame::snake;
+using namespace glyphcade::snake;
 
 constexpr std::chrono::duration<double> kTick{1.0 / 60.0};
 

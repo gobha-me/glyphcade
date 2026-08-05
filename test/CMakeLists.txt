@@ -72,7 +72,7 @@ endif ()
 # ⚠ This is the ONLY thing standing between Epic 2's export decision and one
 # plausible-looking target_link_libraries line. The damage that line would do is
 # invisible from inside this repo — everything stays green and only a downstream
-# find_package(term-game) breaks, on someone else's machine. See
+# find_package(glyphcade) breaks, on someone else's machine. See
 # cmake/check_export.cmake for why a PRIVATE link is not a defence.
 #
 # Its sibling, the gitea #46 guard: install to a scratch prefix and CONFIGURE a

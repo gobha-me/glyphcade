@@ -15,7 +15,7 @@ endif ()
 # cell effect the model already owns as a state, so there is nothing to tween.
 # ⚠ FOUR headers here, not three: pieces.hpp carries the SRS tables, which are
 # the one part of the reference taken verbatim, and having that boundary visible
-# in a file list is worth a header. Headers stay in include/termgame/games/tetris/ — cmake/install.cmake
+# in a file list is worth a header. Headers stay in include/glyphcade/games/tetris/ — cmake/install.cmake
 # ships public headers with one install(DIRECTORY include/ ...), so a header that
 # leaves include/ leaves the package.
 add_library(${PROJECT_NAME}_game_tetris STATIC
@@ -33,7 +33,7 @@ target_link_libraries(${PROJECT_NAME}_game_tetris
   PUBLIC ${PROJECT_NAME}_core
 )
 
-# ⚠ No TERMGAME_WITH_AUDIO, no rtaudio, no link to ${PROJECT_NAME}_lib. A game
+# ⚠ No GLYPHCADE_WITH_AUDIO, no rtaudio, no link to ${PROJECT_NAME}_lib. A game
 # plays a sound by asking GameContext for the Player; it never learns whether the
-# sink is real. And core sits BELOW the games, so termgame::Shell is not on this
+# sink is real. And core sits BELOW the games, so glyphcade::Shell is not on this
 # target's link line — a game cannot reach the Shell even by accident.

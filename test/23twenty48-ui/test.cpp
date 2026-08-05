@@ -22,16 +22,16 @@
 
 #include <termforge/core/types.hpp>
 
-#include <termgame/arcade/registry.hpp>
-#include <termgame/arcade/shell.hpp>
-#include <termgame/games/twenty48/glyphs.hpp>
-#include <termgame/games/twenty48/twenty48.hpp>
+#include <glyphcade/arcade/registry.hpp>
+#include <glyphcade/arcade/shell.hpp>
+#include <glyphcade/games/twenty48/glyphs.hpp>
+#include <glyphcade/games/twenty48/twenty48.hpp>
 
 namespace {
 
-using termgame::Shell;
-using termgame::Twenty48;
-using namespace termgame::twenty48;
+using glyphcade::Shell;
+using glyphcade::Twenty48;
+using namespace glyphcade::twenty48;
 
 class Probe final : public Shell {
  public:
@@ -56,7 +56,7 @@ class Probe final : public Shell {
 }
 
 [[nodiscard]] auto twenty48_index() -> int {
-  const auto games = termgame::all_games();
+  const auto games = glyphcade::all_games();
   for (std::size_t i = 0; i < games.size(); ++i) {
     if (games[i].meta.slug == "2048") {
       return static_cast<int>(i);
@@ -83,7 +83,7 @@ auto enter_2048(Probe& app, int cols = 80, int rows = 24) -> void {
 // the test, not a hole in the Shell's interface.
 [[nodiscard]] auto game_of(Shell& shell) -> Twenty48* {
   return dynamic_cast<Twenty48*>(
-      const_cast<termgame::Game*>(static_cast<const termgame::Game*>(
+      const_cast<glyphcade::Game*>(static_cast<const glyphcade::Game*>(
           shell.current_game())));
 }
 
@@ -428,11 +428,11 @@ TEST_CASE("q returns to the menu", "[2048][input]") {
 // ── Sound ──────────────────────────────────────────────────────────────────
 //
 // Asserted through Shell::audio().play_count(), which counts INTENT rather than
-// sound — so these pass identically on the TERMGAME_WITH_AUDIO=OFF arm CI runs,
+// sound — so these pass identically on the GLYPHCADE_WITH_AUDIO=OFF arm CI runs,
 // and nothing here touches a device or the disk.
 
 TEST_CASE("a move that only slides plays Slide, not Merge", "[2048][audio]") {
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   enter_2048(app);
@@ -454,7 +454,7 @@ TEST_CASE("a move that only slides plays Slide, not Merge", "[2048][audio]") {
 TEST_CASE("a move that merges plays Merge instead of Slide", "[2048][audio]") {
   // One gesture, one sound — the same principle the selector's click case pins.
   // Merge REPLACES Slide rather than stacking on it.
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   enter_2048(app);
@@ -479,7 +479,7 @@ TEST_CASE("a direction that changes nothing is silent", "[2048][audio]") {
   // is no deny blip in the bank and inventing one is a feel decision nobody who
   // cannot hear it should make — so a rejected key must produce NO sound at all,
   // not a quieter one.
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   enter_2048(app);
@@ -501,7 +501,7 @@ TEST_CASE("a direction that changes nothing is silent", "[2048][audio]") {
 
 TEST_CASE("winning plays Win once, and not the merge that caused it",
           "[2048][audio]") {
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   enter_2048(app);

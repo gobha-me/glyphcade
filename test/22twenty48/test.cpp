@@ -22,12 +22,12 @@
 #include <cmath>
 #include <vector>
 
-#include <termgame/games/twenty48/anim.hpp>
-#include <termgame/games/twenty48/board.hpp>
+#include <glyphcade/games/twenty48/anim.hpp>
+#include <glyphcade/games/twenty48/board.hpp>
 
 namespace {
 
-using namespace termgame::twenty48;
+using namespace glyphcade::twenty48;
 
 constexpr std::chrono::duration<double> kTick{1.0 / 60.0};
 

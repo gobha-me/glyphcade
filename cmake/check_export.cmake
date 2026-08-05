@@ -1,18 +1,18 @@
 # Asserts that the installed package does not reference rtaudio (gitea #13).
 #
 # Run as a ctest:
-#   cmake -DBUILD_DIR=<build> -DPROJECT=term-game -P cmake/check_export.cmake
+#   cmake -DBUILD_DIR=<build> -DPROJECT=glyphcade -P cmake/check_export.cmake
 #
 # ── Why this exists ─────────────────────────────────────────────────────────
 #
 # Epic 2's export decision is enforced by nothing except where files happen to
 # live. One plausible-looking line —
 #
-#   target_link_libraries(term-game_core PRIVATE PkgConfig::RTAUDIO)
+#   target_link_libraries(glyphcade_core PRIVATE PkgConfig::RTAUDIO)
 #
 # — undoes it, and the damage is INVISIBLE from inside this repo: the build
 # stays green, the tests stay green, and the only symptom is that somebody
-# else's `find_package(term-game)` fails on a machine that never ran
+# else's `find_package(glyphcade)` fails on a machine that never ran
 # pkg_check_modules. Nobody here would see it.
 #
 # ⚠ And PRIVATE is not a defence. CMake records a private link into a static
@@ -22,7 +22,7 @@
 # happened.
 #
 # ⚠ Since the per-game library split there are FOUR exported targets, and the
-# example above deliberately names term-game_core rather than term-game_lib: core
+# example above deliberately names glyphcade_core rather than glyphcade_lib: core
 # is the one whose name says "audio" and holds audio/*.cpp, so it is where that
 # line would most plausibly be written. This check reads the whole Targets file,
 # so it covers all four — but a reader looking for "where would this go wrong"
@@ -88,7 +88,7 @@ foreach (_file IN LISTS _targets)
       message(FATAL_ERROR
         "gitea #13 VIOLATED: '${_tok}' appears in ${_file}.\n"
         "The RtAudio backend has leaked into the exported package. An installed "
-        "term-game can no longer be resolved on a machine that has not run "
+        "glyphcade can no longer be resolved on a machine that has not run "
         "pkg_check_modules.\n"
         "Remember a PRIVATE link still counts — CMake records it as "
         "$<LINK_ONLY:...>. rtaudio belongs to src/audio_backend/ only, which is "

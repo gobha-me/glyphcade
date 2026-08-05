@@ -19,13 +19,13 @@
 #include <string_view>
 #include <vector>
 
-#include <termgame/games/sokoban/board.hpp>
-#include <termgame/games/sokoban/level.hpp>
-#include <termgame/games/sokoban/levels.hpp>
+#include <glyphcade/games/sokoban/board.hpp>
+#include <glyphcade/games/sokoban/level.hpp>
+#include <glyphcade/games/sokoban/levels.hpp>
 
 namespace {
 
-using namespace termgame::sokoban;
+using namespace glyphcade::sokoban;
 
 [[nodiscard]] auto make(std::initializer_list<std::string_view> rows)
     -> Board {

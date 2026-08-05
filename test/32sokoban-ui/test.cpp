@@ -25,16 +25,16 @@
 
 #include <termforge/core/types.hpp>
 
-#include <termgame/arcade/registry.hpp>
-#include <termgame/arcade/shell.hpp>
-#include <termgame/games/sokoban/glyphs.hpp>
-#include <termgame/games/sokoban/sokoban.hpp>
+#include <glyphcade/arcade/registry.hpp>
+#include <glyphcade/arcade/shell.hpp>
+#include <glyphcade/games/sokoban/glyphs.hpp>
+#include <glyphcade/games/sokoban/sokoban.hpp>
 
 namespace {
 
-using termgame::Shell;
-using termgame::Sokoban;
-using namespace termgame::sokoban;
+using glyphcade::Shell;
+using glyphcade::Sokoban;
+using namespace glyphcade::sokoban;
 
 class Probe final : public Shell {
  public:
@@ -63,7 +63,7 @@ class Probe final : public Shell {
 }
 
 [[nodiscard]] auto sokoban_index() -> int {
-  const auto games = termgame::all_games();
+  const auto games = glyphcade::all_games();
   for (std::size_t i = 0; i < games.size(); ++i) {
     if (games[i].meta.slug == "sokoban") return static_cast<int>(i);
   }
@@ -87,8 +87,8 @@ auto enter_sokoban(Probe& app, int cols = 80, int rows = 24) -> void {
 }
 
 [[nodiscard]] auto game_of(Shell& shell) -> Sokoban* {
-  return dynamic_cast<Sokoban*>(const_cast<termgame::Game*>(
-      static_cast<const termgame::Game*>(shell.current_game())));
+  return dynamic_cast<Sokoban*>(const_cast<glyphcade::Game*>(
+      static_cast<const glyphcade::Game*>(shell.current_game())));
 }
 
 [[nodiscard]] auto row_text(Probe& app, int y) -> std::string {

@@ -58,10 +58,10 @@ endif ()
 # Use find_dependency, not find_package: it forwards REQUIRED/QUIET and reports
 # a miss as "package X not found because dependency Y was missing".
 #
-# termforge is linked PUBLIC into term-game_core — the bottom of src/lib's link
+# termforge is linked PUBLIC into glyphcade_core — the bottom of src/lib's link
 # chain, so every target above it inherits termforge through the PUBLIC closure,
-# term-game_lib included (the Shell derives from termforge::App and names its
-# types in our headers). An installed term-gameTargets.cmake therefore references
+# glyphcade_lib included (the Shell derives from termforge::App and names its
+# types in our headers). An installed glyphcadeTargets.cmake therefore references
 # termforge::lib, and this line is what lets a consumer resolve it.
 #
 # ⚠ termforge::lib is the ONLY external name any of our four exported targets
@@ -78,7 +78,7 @@ endif ()
 # Shell holds a termforge::ListWidget BY VALUE, in a header we install; v0.1.11
 # added members to that class, and v0.2.1 did it AGAIN (the scrollbar's track
 # and thumb colours, #21). So a consumer resolving an older 0.6.x compiles our
-# public header against one object layout while term-game_lib was built against
+# public header against one object layout while glyphcade_lib was built against
 # another. Nothing fails to find, nothing fails to link — the sizes just
 # disagree. Anything we hold by value in an installed header makes the build
 # floor an ABI floor too, and this is the line that enforces it consumer-side.

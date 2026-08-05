@@ -19,7 +19,7 @@
 #include <stdexcept>
 
 #include <termforge/core/app.hpp>
-#include <termgame/arcade/exception_boundary.hpp>
+#include <glyphcade/arcade/exception_boundary.hpp>
 
 namespace {
 
@@ -57,7 +57,7 @@ class TeardownWitness final : public termforge::App {
 TEST_CASE("upstream tears the terminal down before the throw reaches us",
           "[exception]") {
   // This asserts termforge's guarantee, not ours, which is why it goes through
-  // no termgame code at all. It is the reason the pin is at v0.1.10: before
+  // no glyphcade code at all. It is the reason the pin is at v0.1.10: before
   // that, App::run() had no try/catch and what restored the terminal was
   // ~App() — reached only by unwinding, which a throw escaping main() does not
   // do. Now run_loop() tears down and then rethrows.
@@ -88,7 +88,7 @@ TEST_CASE("an escaping exception becomes exit 1", "[exception]") {
   // the mechanism was retired with termforge#71, since teardown no longer
   // depends on the App being destroyed at all. The guarantee it was standing in
   // for is asserted directly by the case above, at the level it actually lives.
-  const int rc = termgame::run_or_report([] {
+  const int rc = glyphcade::run_or_report([] {
     TeardownWitness app;
     app.set_frame_ms(0);
     return app.test_run_guarded(20, 3, nullptr);  // rethrows
@@ -98,11 +98,11 @@ TEST_CASE("an escaping exception becomes exit 1", "[exception]") {
 }
 
 TEST_CASE("a clean return passes through untouched", "[exception]") {
-  REQUIRE(termgame::run_or_report([] { return 7; }) == 7);
+  REQUIRE(glyphcade::run_or_report([] { return 7; }) == 7);
 }
 
 TEST_CASE("a non-std exception is still caught", "[exception]") {
   // The catch(...) arm. Without it this would escape the boundary and
   // terminate the test binary rather than failing an assertion.
-  REQUIRE(termgame::run_or_report([]() -> int { throw 42; }) == 1);
+  REQUIRE(glyphcade::run_or_report([]() -> int { throw 42; }) == 1);
 }

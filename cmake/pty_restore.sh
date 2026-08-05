@@ -61,10 +61,10 @@ fi
 # real failure would report itself as silence. Found by mutation-testing this
 # script, not by reading it.
 leave_at=$(grep -abo $'\033\[?1049l' "$capture" | head -1 | cut -d: -f1 || true)
-fatal_at=$(grep -abo 'term-game: fatal:' "$capture" | head -1 | cut -d: -f1 || true)
+fatal_at=$(grep -abo 'glyphcade: fatal:' "$capture" | head -1 | cut -d: -f1 || true)
 
 if [ -z "$fatal_at" ]; then
-  echo "FAIL: no 'term-game: fatal:' in the capture" >&2
+  echo "FAIL: no 'glyphcade: fatal:' in the capture" >&2
   echo "      the boundary in src/lib/arcade/exception_boundary.cpp did not run," >&2
   echo "      or the probe stopped throwing." >&2
   exit 1

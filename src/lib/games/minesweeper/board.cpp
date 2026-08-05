@@ -1,10 +1,10 @@
-#include <termgame/games/minesweeper/board.hpp>
+#include <glyphcade/games/minesweeper/board.hpp>
 
 #include <algorithm>
 #include <cstdlib>
 #include <utility>
 
-namespace termgame::minesweeper {
+namespace glyphcade::minesweeper {
 namespace {
 
 // Returned by Board::at() for out-of-range coordinates. A caller that indexes
@@ -313,4 +313,4 @@ auto Board::seconds() const noexcept -> int {
   return static_cast<int>(s);
 }
 
-}  // namespace termgame::minesweeper
+}  // namespace glyphcade::minesweeper

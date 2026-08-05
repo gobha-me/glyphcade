@@ -1,8 +1,8 @@
-#include <termgame/arcade/hud.hpp>
+#include <glyphcade/arcade/hud.hpp>
 
 #include <algorithm>
 
-namespace termgame::hud {
+namespace glyphcade::hud {
 
 auto draw_status_row(termforge::Screen& screen, int y,
                      std::span<const std::string> fields, std::string_view word,
@@ -57,4 +57,4 @@ auto draw_status_row(termforge::Screen& screen, int y,
   screen.write_text(0, y, left, field_fg, bg);
 }
 
-}  // namespace termgame::hud
+}  // namespace glyphcade::hud

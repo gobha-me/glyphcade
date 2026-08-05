@@ -13,12 +13,12 @@
 
 #include <string>
 
-#include <termgame/arcade/registry.hpp>
-#include <termgame/arcade/shell.hpp>
+#include <glyphcade/arcade/registry.hpp>
+#include <glyphcade/arcade/shell.hpp>
 
 namespace {
 
-class Probe final : public termgame::Shell {
+class Probe final : public glyphcade::Shell {
  public:
   // App::screen() is protected. Re-exposing it is the whole reason Shell is not
   // `final`.
@@ -90,8 +90,8 @@ TEST_CASE("the Shell paints the selector with no tty", "[render]") {
   // Every registered game's title is on screen. This is the selector's whole
   // job, and it fails loudly if the registry came back empty — the exact
   // symptom self-registering statics produce.
-  REQUIRE_FALSE(termgame::all_games().empty());
-  for (const auto& entry : termgame::all_games()) {
+  REQUIRE_FALSE(glyphcade::all_games().empty());
+  for (const auto& entry : glyphcade::all_games()) {
     INFO("missing game title: " << entry.meta.title);
     REQUIRE(screen_contains(screen, entry.meta.title));
   }
@@ -113,7 +113,7 @@ TEST_CASE("the selector re-renders at a different size", "[render]") {
   REQUIRE(screen.rows() == 12);
   REQUIRE(row_has_content(screen, 0));
   REQUIRE(row_has_content(screen, 12 - 1));
-  REQUIRE(screen_contains(screen, termgame::all_games().front().meta.title));
+  REQUIRE(screen_contains(screen, glyphcade::all_games().front().meta.title));
 }
 
 TEST_CASE("a too-small window degrades instead of crashing", "[render]") {

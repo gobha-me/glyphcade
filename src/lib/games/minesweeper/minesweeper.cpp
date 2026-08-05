@@ -1,4 +1,4 @@
-#include <termgame/games/minesweeper/minesweeper.hpp>
+#include <glyphcade/games/minesweeper/minesweeper.hpp>
 
 #include <algorithm>
 #include <array>
@@ -8,10 +8,10 @@
 
 #include <termforge/widgets/theme.hpp>
 
-#include <termgame/arcade/hud.hpp>
-#include <termgame/games/minesweeper/glyphs.hpp>
+#include <glyphcade/arcade/hud.hpp>
+#include <glyphcade/games/minesweeper/glyphs.hpp>
 
-namespace termgame {
+namespace glyphcade {
 namespace {
 
 using minesweeper::Coord;
@@ -555,4 +555,4 @@ auto Minesweeper::draw_grid(termforge::Screen& screen) -> void {
   screen.write_text(m_layout.gutter_x(m_cursor.col + 1), cy, "]", kCursorFg, bg);
 }
 
-}  // namespace termgame
+}  // namespace glyphcade

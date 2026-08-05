@@ -19,7 +19,7 @@
 // through. The narrower-does-not-fit half is what pins it from the other side.
 //
 // ⚠ WHY THE SHELL COMPARISON LIVES HERE AND NOT IN game_meta.hpp. GameMeta is
-// in term-game_core, which sits below the Shell in the link chain precisely so
+// in glyphcade_core, which sits below the Shell in the link chain precisely so
 // a game cannot reach the Shell (AGENTS.md). A test is above both and may
 // include both, so "no game asks for less than the Shell itself needs" is
 // checkable here and nowhere lower.
@@ -33,23 +33,23 @@
 #include <string>
 #include <string_view>
 
-#include <termgame/arcade/game_meta.hpp>
-#include <termgame/arcade/registry.hpp>
-#include <termgame/arcade/shell.hpp>
-#include <termgame/games/minesweeper/board.hpp>
-#include <termgame/games/minesweeper/layout.hpp>
-#include <termgame/games/snake/layout.hpp>
-#include <termgame/games/sokoban/layout.hpp>
-#include <termgame/games/tetris/layout.hpp>
-#include <termgame/games/twenty48/layout.hpp>
+#include <glyphcade/arcade/game_meta.hpp>
+#include <glyphcade/arcade/registry.hpp>
+#include <glyphcade/arcade/shell.hpp>
+#include <glyphcade/games/minesweeper/board.hpp>
+#include <glyphcade/games/minesweeper/layout.hpp>
+#include <glyphcade/games/snake/layout.hpp>
+#include <glyphcade/games/sokoban/layout.hpp>
+#include <glyphcade/games/tetris/layout.hpp>
+#include <glyphcade/games/twenty48/layout.hpp>
 
-using termgame::all_games;
-using termgame::GameGeometry;
-using termgame::GameMeta;
-using termgame::geometry_is_well_formed;
-using termgame::meets_floor;
-using termgame::Shell;
-using termgame::SizeFloor;
+using glyphcade::all_games;
+using glyphcade::GameGeometry;
+using glyphcade::GameMeta;
+using glyphcade::geometry_is_well_formed;
+using glyphcade::meets_floor;
+using glyphcade::Shell;
+using glyphcade::SizeFloor;
 
 namespace {
 
@@ -146,19 +146,19 @@ constexpr GameFits kFits[]{
     {"minesweeper",
      [](int c, int r) {
        const auto easy =
-           termgame::minesweeper::preset(termgame::minesweeper::Level::Easy);
-       return termgame::minesweeper::compute_layout(c, r, easy.rows, easy.cols)
+           glyphcade::minesweeper::preset(glyphcade::minesweeper::Level::Easy);
+       return glyphcade::minesweeper::compute_layout(c, r, easy.rows, easy.cols)
            .fits;
      }},
-    {"2048", [](int c, int r) { return termgame::twenty48::compute_layout(c, r).fits; }},
-    {"snake", [](int c, int r) { return termgame::snake::compute_layout(c, r).fits; }},
-    {"tetris", [](int c, int r) { return termgame::tetris::compute_layout(c, r).fits; }},
+    {"2048", [](int c, int r) { return glyphcade::twenty48::compute_layout(c, r).fits; }},
+    {"snake", [](int c, int r) { return glyphcade::snake::compute_layout(c, r).fits; }},
+    {"tetris", [](int c, int r) { return glyphcade::tetris::compute_layout(c, r).fits; }},
     // ⚠ The level size is deliberately arbitrary (level 1 is 8x5 tiles).
     // Sokoban's `fits` is a screen-only comparison — a level larger than the
     // window scrolls rather than being refused — so no choice here can change
     // the answer, and that independence IS the reason its floor is Playable.
     {"sokoban",
-     [](int c, int r) { return termgame::sokoban::compute_layout(c, r, 8, 5).fits; }},
+     [](int c, int r) { return glyphcade::sokoban::compute_layout(c, r, 8, 5).fits; }},
 };
 
 [[nodiscard]] auto fits_for(std::string_view slug) -> bool (*)(int, int) {

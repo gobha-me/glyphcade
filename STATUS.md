@@ -1,4 +1,4 @@
-# STATUS — term-game
+# STATUS — glyphcade
 
 Live state. Update this when something lands; do not let it drift.
 
@@ -414,8 +414,8 @@ and does not belong inside a preview fix.
 `cmake/project-config.cmake.in` carries the consumer-side termforge floor,
 `find_dependency(termforge 0.6.0)`. Until now **nothing in `ctest` executed that
 line.** `cmake/check_export.cmake` installs to a scratch prefix and greps the
-generated `term-gameTargets*.cmake` for rtaudio tokens — as *text*. It never
-calls `find_package(term-game)`, so the generated `term-gameConfig.cmake` was
+generated `glyphcadeTargets*.cmake` for rtaudio tokens — as *text*. It never
+calls `find_package(glyphcade)`, so the generated `glyphcadeConfig.cmake` was
 written, inspected, and never run.
 
 That made a wrong floor invisible from both sides at once: the in-tree build
@@ -454,7 +454,7 @@ the consumer's own diagnosis into the failure message.
 The obvious shape — a three-line `CMakeLists.txt` under `test/` — does not work.
 `test/CMakeLists.txt` globs `test/*` and `add_subdirectory()`s any directory
 holding a `CMakeLists.txt`, so a committed `test/consumer/` would be pulled into
-**our** build and run `find_package(term-game)` at our own configure time. It is
+**our** build and run `find_package(glyphcade)` at our own configure time. It is
 written with a bracket argument (`[==[ … ]==]`, no substitution at all) and the
 project name arrives as `-DCHECK_PROJECT=` on the consumer's command line, so
 the text needs no `\$` escaping — where one dropped backslash writes an *empty*
@@ -475,7 +475,7 @@ Three of the four extra checks were red-verified individually:
 **R4 is the one that matters most in the long run.** Nothing stops somebody
 running `cmake --install build` into `/usr/local` once; from then on the
 consumer would resolve *that* forever, and the test would pass no matter what
-the source tree said. Asserting `term-game_DIR` starts with the scratch prefix —
+the source tree said. Asserting `glyphcade_DIR` starts with the scratch prefix —
 and that the reported version equals this build's — is what distinguishes
 "resolved the package we just built" from "resolved a package". `EXPECT_VERSION`
 also catches the shallow-clone case where `git describe` degrades to `0.0.0` and
@@ -496,13 +496,13 @@ not written.
 **Editing the `.in` is not enough.** `configure_package_config_file()` runs at
 *configure* time and `check_consumer.cmake` only *installs*, so editing
 `project-config.cmake.in` and going straight to `ctest` leaves
-`build/term-gameConfig.cmake` at the old value and the arm is a **false green**.
+`build/glyphcadeConfig.cmake` at the old value and the arm is a **false green**.
 Reconfigure with `cmake -B build`, then `grep find_dependency
-build/term-gameConfig.cmake` to confirm the edit actually arrived, before
+build/glyphcadeConfig.cmake` to confirm the edit actually arrived, before
 believing any result.
 
 **A leftover consumer cache is the other false green.** `consumer-check-bin`
-holds `term-game_DIR` and `termforge_DIR` as resolved cache entries; the script
+holds `glyphcade_DIR` and `termforge_DIR` as resolved cache entries; the script
 wipes all three scratch directories on entry for that reason. On *failure* it
 leaves them behind on purpose — same stance as `check_export.cmake`.
 
@@ -520,7 +520,7 @@ the two. The label names nothing real; it is plain mutual exclusion.
 
 Six configurations green — GCC, GCC without audio, Clang, ASan, UBSan, TSan —
 **31 suites** each, up from 30, `-Werror` throughout. The green arm resolves
-`term-game 0.16.0` with `termforge 0.6.0` against the scratch prefix. No C++
+`glyphcade 0.16.0` with `termforge 0.6.0` against the scratch prefix. No C++
 changed; the whole issue is CMake.
 
 ⚠ **Nothing compiles or links against the installed package** — the consumer
@@ -794,7 +794,7 @@ side. That is the mutation "Snake's floor overstated by one column" catches.
 
 ⚠ The Shell comparison (`no game asks for less than the Shell itself needs`)
 lives in the test and **not** in `game_meta.hpp`, because `GameMeta` is in
-`term-game_core`, which sits below the Shell in the link chain precisely so a
+`glyphcade_core`, which sits below the Shell in the link chain precisely so a
 game cannot reach it. A test is above both.
 
 **32 suites, up from 31.** Four configurations green — GCC with audio
@@ -840,7 +840,7 @@ The argument is a comment on the issue.
 - **The Shell only READS it**, to advertise settings in the detail pane.
   `Shell::State` is still `{Selector, InGame, Paused}`, `game.hpp` is untouched,
   `enter_selected_game` is untouched.
-- **The game draws its own screen**, via `OptionsScreen` in `term-game_core`, in
+- **The game draws its own screen**, via `OptionsScreen` in `glyphcade_core`, in
   the same arm where it already draws `draw_too_small()`. "A running game owns
   the whole Screen" stays true.
 - One schema, two consumers — which is what stops the menu advertising an option
@@ -1277,25 +1277,25 @@ was nothing for us to delete. See
 Sokoban, in six headers and three TUs — Tetris' five-header shape plus a
 level-pack header, and one more TU than any other game:
 
-- **[`level.hpp`](include/termgame/games/sokoban/level.hpp)** + **`level.cpp`** —
+- **[`level.hpp`](include/glyphcade/games/sokoban/level.hpp)** + **`level.cpp`** —
   the standard Sokoban charset (`#` `@` `$` `.` `*` `+` and space) and a `parse()`
   that is total: it returns a `ParseError`, never throws, and refuses seven kinds
   of malformed level. **Its own header and its own TU** because the format is
   separable from the rules — a level is validated once, at load, and nothing
   looks at a character again — and because it is the only part of this game a
   future level-FILE loader would reuse unchanged.
-- **[`levels.hpp`](include/termgame/games/sokoban/levels.hpp)** — the twenty maps,
+- **[`levels.hpp`](include/glyphcade/games/sokoban/levels.hpp)** — the twenty maps,
   verbatim from the reference. Its own header for the same reason
   `tetris/pieces.hpp` is: it is the part taken verbatim, and that boundary is
   worth seeing in a file list. **The pars are not verbatim** — see below.
-- **[`board.hpp`](include/termgame/games/sokoban/board.hpp)** + **`board.cpp`** —
+- **[`board.hpp`](include/glyphcade/games/sokoban/board.hpp)** + **`board.cpp`** —
   push rules, undo, counters, win detection, deadlock detection. No termforge
   header, so `test/31sokoban` *cannot* reach a `Screen`.
-- **[`layout.hpp`](include/termgame/games/sokoban/layout.hpp)** — a viewport rect
+- **[`layout.hpp`](include/glyphcade/games/sokoban/layout.hpp)** — a viewport rect
   for a camera, not a coordinate per cell. **34x12 needed.**
-- **[`glyphs.hpp`](include/termgame/games/sokoban/glyphs.hpp)** — two tiers, three
+- **[`glyphs.hpp`](include/glyphcade/games/sokoban/glyphs.hpp)** — two tiers, three
   `static_assert`s.
-- **[`sokoban.hpp`](include/termgame/games/sokoban/sokoban.hpp)** — the `Game`,
+- **[`sokoban.hpp`](include/glyphcade/games/sokoban/sokoban.hpp)** — the `Game`,
   and the only file that knows `Screen`, `Event`, `MapWidget` or `GameContext`
   exist.
 
@@ -1551,19 +1551,19 @@ pass is how you find out.
 
 Tetris, in five headers and two TUs — Snake's shape, plus one:
 
-- **[`pieces.hpp`](include/termgame/games/tetris/pieces.hpp)** — the seven
+- **[`pieces.hpp`](include/glyphcade/games/tetris/pieces.hpp)** — the seven
   tetrominoes' four rotations and both SRS kick tables. **Its own header because
   it is the one part of the reference taken verbatim**, and that boundary is
   worth seeing in a file list. Two `static_assert`s: every state has exactly
   four cells, and nothing is set outside a piece's own bounding box (kick
   offsets are relative to that box, so a stray cell moves every kick).
-- **[`board.hpp`](include/termgame/games/tetris/board.hpp)** — the rules and all
+- **[`board.hpp`](include/glyphcade/games/tetris/board.hpp)** — the rules and all
   five clocks. No termforge header, so `test/27tetris` *cannot* reach a Screen.
-- **[`layout.hpp`](include/termgame/games/tetris/layout.hpp)** — 10x20 cells at
+- **[`layout.hpp`](include/glyphcade/games/tetris/layout.hpp)** — 10x20 cells at
   two columns each, plus a 12-column panel. **35x24 needed.**
-- **[`glyphs.hpp`](include/termgame/games/tetris/glyphs.hpp)** — two tiers, three
+- **[`glyphs.hpp`](include/glyphcade/games/tetris/glyphs.hpp)** — two tiers, three
   `static_assert`s.
-- **[`tetris.hpp`](include/termgame/games/tetris/tetris.hpp)** — the `Game`, and
+- **[`tetris.hpp`](include/glyphcade/games/tetris/tetris.hpp)** — the `Game`, and
   the only file that knows `Screen`, `Event` or `GameContext` exist.
 
 ### 24 rows: the first game that does not fit in twenty
@@ -1852,7 +1852,7 @@ and `MenuMove` fires twice. That isolation is the evidence, not the failure.
 roster longer than the list pane, and no legal size produces one: the Shell's
 floor is 20x8, which leaves three interior rows for two entries. `all_games()` is
 a file-local `constexpr` table with no injection seam. **Revisit at four roster
-entries (Epic 6)**, or when a test-only substitute for the `term-game_roster`
+entries (Epic 6)**, or when a test-only substitute for the `glyphcade_roster`
 target earns its keep — `src/lib/CMakeLists.txt` already makes the roster its own
 archive, so the seam exists at the link level.
 
@@ -1900,12 +1900,12 @@ argument.
 
 ## What Epic 0 built
 
-- **CMake scaffold** from cpp-template, project name `term-game` (follows the
+- **CMake scaffold** from cpp-template, project name `glyphcade` (follows the
   directory name, as does the gitea repo).
 - **termforge consumed** via [cmake/deps/termforge.cmake](cmake/deps/termforge.cmake)
   — `find_package(termforge ... CONFIG)` first, FetchContent as the fallback.
   Epic 0 pinned v0.1.7; the pin is now **v0.6.0** — see below.
-- **`TERMGAME_WITH_AUDIO`** auto-detection in [cmake/audio.cmake](cmake/audio.cmake).
+- **`GLYPHCADE_WITH_AUDIO`** auto-detection in [cmake/audio.cmake](cmake/audio.cmake).
   Epic 2 answered the export question (gitea #13): rtaudio is linked by
   `src/audio_backend/` alone, which is never installed and never exported.
 - **`run_or_report`** — the process's exception boundary. Until v0.1.10 it was
@@ -1928,7 +1928,7 @@ Epic 0's `BootApp` no longer exists — Epic 1 replaced it with the Shell.
 
 ## What Epic 1 built
 
-- **`Game`** ([include/termgame/arcade/game.hpp](include/termgame/arcade/game.hpp))
+- **`Game`** ([include/glyphcade/arcade/game.hpp](include/glyphcade/arcade/game.hpp))
   — `meta/start/tick/on_event/draw/done`, with the Shell's guarantees written
   into the docstrings because a game author reads that file and nothing else.
 - **`GameMeta`** — `slug/title/description/tag/icon`, all `string_view` so the
@@ -1962,7 +1962,7 @@ Every one of these is a decision with a condition attached, not an oversight.
 |---|---|
 | Audio in `GameContext` | **shipped in Epic 2** as `audio() -> const audio::Player&`, additively, exactly as the seam promised |
 | High-score persistence | **shipped after Epic 4** as `scores() -> const scores::Recorder&`, additively, exactly as the seam promised — and the "second scoring game, not the first" condition is what kept it from shipping as one integer. gitea [#14](https://git.gobha.me/xcaliber/term-game/issues/14) |
-| One static library target per game | **done** — landed ahead of Epic 4 as its own change, since a build restructure bundled with a new game makes a red CI run ambiguous. `src/lib` is now `term-game_lib` → `_roster` → `_game_<name>` → `_core`; see the section below |
+| One static library target per game | **done** — landed ahead of Epic 4 as its own change, since a build restructure bundled with a new game makes a red CI run ambiguous. `src/lib` is now `glyphcade_lib` → `_roster` → `_game_<name>` → `_core`; see the section below |
 | `StubGame` | **done** — deleted by Epic 3 |
 | `Shell::quit_requested()` | **done** — retired by gitea [#17](https://git.gobha.me/xcaliber/term-game/issues/17); termforge [#73](https://github.com/gobha-me/termforge/issues/73) shipped `App::running()` in v0.1.14. ⚠ Not a drop-in: see the section below |
 | The selector's gutter marker | **done** — retired by gitea [#17](https://git.gobha.me/xcaliber/term-game/issues/17); termforge [#72](https://github.com/gobha-me/termforge/issues/72) shipped in v0.1.11 and the two columns went back to the list |
@@ -1976,27 +1976,27 @@ C++ moved, no symbol left the program, only which archive holds it — and a bui
 restructure bundled with a new game makes a red CI run ambiguous between the two.
 
 ```
-term-game_lib      arcade/shell.cpp, arcade/exception_boundary.cpp
+glyphcade_lib      arcade/shell.cpp, arcade/exception_boundary.cpp
   ↓                the ALIAS, the export, the only spelling outside src/lib
-term-game_roster   arcade/all_games.cpp
+glyphcade_roster   arcade/all_games.cpp
   ↓
-term-game_game_minesweeper
+glyphcade_game_minesweeper
   ↓
-term-game_core     build_info.cpp, audio/*.cpp
+glyphcade_core     build_info.cpp, audio/*.cpp
 ```
 
-`term-game_lib` stayed the umbrella, which is why **`src/bin` and all 14
+`glyphcade_lib` stayed the umbrella, which is why **`src/bin` and all 14
 auto-discovered test dirs needed no change at all** — they link
 `${PROJECT_NAME}::lib`, still an ALIAS to a STATIC target, now carrying the whole
 chain PUBLIC.
 
 ### ⚠ What would silently undo this
 
-- **`arcade/shell.cpp` must stay in `term-game_lib`, above the roster.** It is the
+- **`arcade/shell.cpp` must stay in `glyphcade_lib`, above the roster.** It is the
   only TU that references `all_games()` (three sites), so its archive must be
   scanned first. Tidying it down into `core` closes a cycle
   `core → roster → game → core`. That fails *loudly* — `undefined reference to
-  termgame::all_games()` — and, verified both ways, in **every** link declaration
+  glyphcade::all_games()` — and, verified both ways, in **every** link declaration
   order: CMake emits the topological order, and `game → core` pins core last, so
   no `target_link_libraries` argument order can rescue it and `core` never gets
   duplicated. The fix is always to move the file.
@@ -2005,28 +2005,28 @@ chain PUBLIC.
   "build_info + audio" rather than "everything that is not a game".
 - **`target_link_libraries(_roster PUBLIC ${_game_targets})` is load-bearing
   twice.** Removing it fails at *compile* time, not link time —
-  `all_games.cpp:20` cannot find `<termgame/arcade/registry.hpp>`, because that
+  `all_games.cpp:20` cannot find `<glyphcade/arcade/registry.hpp>`, because that
   edge carries core's include directory as well as the game archives.
-- **`TERMGAME_WITH_AUDIO` belongs on `core`, PRIVATE.** `build_info.cpp` is the
-  one TU in the repo that reads it. Promoting it to `term-game_lib` to look
+- **`GLYPHCADE_WITH_AUDIO` belongs on `core`, PRIVATE.** `build_info.cpp` is the
+  one TU in the repo that reads it. Promoting it to `glyphcade_lib` to look
   tidier stops it reaching that TU, `build_has_audio()` answers false in an
   audio-ON build, and `test/00bootstrap` goes red — the tripwire it exists to arm.
 - **Every target must be in the export set.** This one enforces itself:
   `install(EXPORT)` refuses to name a target it cannot resolve, so adding a game
   and forgetting `src/lib`'s game list stops *generation*. The list is handed to
   `cmake/install.cmake` via `PARENT_SCOPE`, and `EXPORT_NAME`s are derived by
-  stripping the `term-game_` prefix, so a new game needs no line there.
+  stripping the `glyphcade_` prefix, so a new game needs no line there.
 
 **Packaging changed, intentionally**: the install prefix gains three `.a` files
-and `term-gameTargets.cmake` now defines four imported targets —
-`term-game::lib`, `::roster`, `::game_minesweeper`, `::core`.
-`find_package(term-game)` + `target_link_libraries(app term-game::lib)` is
+and `glyphcadeTargets.cmake` now defines four imported targets —
+`glyphcade::lib`, `::roster`, `::game_minesweeper`, `::core`.
+`find_package(glyphcade)` + `target_link_libraries(app glyphcade::lib)` is
 unchanged. `include/` and `bin/` are unchanged. A consumer linking
-`term-game::core` alone would get an undefined `all_games()`, which is the
+`glyphcade::core` alone would get an undefined `all_games()`, which is the
 roster becoming a substitutable piece rather than a defect.
 
 **A guarantee the layering now provides for free:** a game cannot reach the Shell,
-because core sits *below* the games, so `termgame::Shell` is not on a game's link
+because core sits *below* the games, so `glyphcade::Shell` is not on a game's link
 line. AGENTS.md's "games never touch `App`, `Terminal`, or each other" is a link
 error rather than a convention.
 
@@ -2034,7 +2034,7 @@ error rather than a convention.
 
 Measured against a build of the parent commit on the same box, not asserted:
 
-- **175/175 compile commands identical** modulo `-DTERMGAME_WITH_AUDIO`, which
+- **175/175 compile commands identical** modulo `-DGLYPHCADE_WITH_AUDIO`, which
   five TUs lost and **none of them reads** (only `build_info.cpp` does).
 - **Archive symbols conserved exactly** — 1500 defined, 101 undefined, zero diff
   between the old single archive and the union of the four.
@@ -2045,7 +2045,7 @@ Measured against a build of the parent commit on the same box, not asserted:
 - **`ctest -N` byte-identical** — no test appeared or vanished.
 - **Two-tier pty capture renders identically**, including 353 truecolor SGRs at
   the colour tier and zero at the bare one, one `?1049h`/`?1049l` pair each.
-- Six arms green at 20/20: GCC, GCC `TERMGAME_WITH_AUDIO=OFF`, Clang, TSan
+- Six arms green at 20/20: GCC, GCC `GLYPHCADE_WITH_AUDIO=OFF`, Clang, TSan
   (`RelWithDebInfo`), ASan, UBSan — all `-Werror`, no `ctest -E`.
 
 Mutation-tested five ways, and **two of the five findings corrected a claim** in
@@ -2059,17 +2059,17 @@ the commit message for all five verbatim.
 
 Snake, in four pieces — minesweeper's shape exactly, and 2048's minus the tween:
 
-- **[`board.hpp`](include/termgame/games/snake/board.hpp)** — the rules AND the
+- **[`board.hpp`](include/glyphcade/games/snake/board.hpp)** — the rules AND the
   step clock. Snake body as a deque with an incrementally-maintained occupancy
   grid, a two-deep turn queue, food, both wall modes, the speed curve. It
   includes **no termforge header**, which is what makes `test/25snake` *unable*
   to construct a `Screen`.
-- **[`layout.hpp`](include/termgame/games/snake/layout.hpp)** — 28x16 cells at
+- **[`layout.hpp`](include/glyphcade/games/snake/layout.hpp)** — 28x16 cells at
   **two columns each**, **58x20 needed**. No `cell_at`: Snake takes no mouse
   input, so nothing hit-tests.
-- **[`glyphs.hpp`](include/termgame/games/snake/glyphs.hpp)** — two tiers and
+- **[`glyphs.hpp`](include/glyphcade/games/snake/glyphs.hpp)** — two tiers and
   three `static_assert`s (7-bit, exactly `kCellCols` wide, pairwise distinct).
-- **[`snake.hpp`](include/termgame/games/snake/snake.hpp)** — the `Game`, and the
+- **[`snake.hpp`](include/glyphcade/games/snake/snake.hpp)** — the `Game`, and the
   only file that knows `Screen`, `Event` or `GameContext` exist.
 
 **There is deliberately no `anim.hpp`.** 2048 needed one because sliding *is* the
@@ -2202,17 +2202,17 @@ shipped with Minesweeper alone it would have been one integer per game and wrong
 Wiring the *second* game is what proved the shape; wiring the first only closed
 the issue.
 
-**Where it lives.** `include/termgame/arcade/scores.hpp` +
-`src/lib/arcade/scores.cpp`, in **`term-game_core`** — both games call it, which
+**Where it lives.** `include/glyphcade/arcade/scores.hpp` +
+`src/lib/arcade/scores.cpp`, in **`glyphcade_core`** — both games call it, which
 is the rule at `src/lib/CMakeLists.txt`. The `arcade/` prefix does *not* imply
 `_lib`; its three siblings sit in three different targets. No new dependency:
 `<filesystem>` and `<fstream>` were already in core via `audio/sink.cpp`.
 
-**The file**, at `$XDG_DATA_HOME/term-game/scores` (else `$HOME/.local/share/…`,
+**The file**, at `$XDG_DATA_HOME/glyphcade/scores` (else `$HOME/.local/share/…`,
 else memory-only):
 
 ```
-# term-game scores v1
+# glyphcade scores v1
 2048 best_score 20488
 2048 best_tile 2048
 minesweeper best_time_easy 42
@@ -2292,19 +2292,19 @@ degraded modes, and the end-to-end path in a real pty.
 
 2048, in five pieces — minesweeper's four-file split plus the one it never needed:
 
-- **[`board.hpp`](include/termgame/games/twenty48/board.hpp)** — the rules.
+- **[`board.hpp`](include/glyphcade/games/twenty48/board.hpp)** — the rules.
   Slide/merge per direction, 90/10 spawning, win as a latch, loss via
   `can_move()`, one level of undo. It includes **no termforge header**, which is
   what makes `test/22twenty48` *unable* to construct a `Screen`.
-- **[`anim.hpp`](include/termgame/games/twenty48/anim.hpp)** — the tween. Also no
+- **[`anim.hpp`](include/glyphcade/games/twenty48/anim.hpp)** — the tween. Also no
   termforge, and it does not know `Board` either: it takes a span of cell values,
   so it is drivable by N fixed ticks with no terminal.
-- **[`layout.hpp`](include/termgame/games/twenty48/layout.hpp)** — 6×3 tiles, gap
+- **[`layout.hpp`](include/glyphcade/games/twenty48/layout.hpp)** — 6×3 tiles, gap
   1, **29×19 needed**. `tile_x`/`tile_y` have `double` overloads, which is the
   tween's only entry into geometry.
-- **[`glyphs.hpp`](include/termgame/games/twenty48/glyphs.hpp)** — the colour ramp
+- **[`glyphs.hpp`](include/glyphcade/games/twenty48/glyphs.hpp)** — the colour ramp
   ported from the reference's CSS, the ASCII lattice, and four `static_assert`s.
-- **[`twenty48.hpp`](include/termgame/games/twenty48/twenty48.hpp)** — the `Game`,
+- **[`twenty48.hpp`](include/glyphcade/games/twenty48/twenty48.hpp)** — the `Game`,
   and the only file that knows `Screen`, `Event` or `GameContext` exist.
 
 ### The tween was designed, not ported
@@ -2349,7 +2349,7 @@ Two properties are structural rather than maintained by care:
 | `Math.random()` | `arcade/rng.hpp` | `std::uniform_int_distribution` is not specified bit-for-bit — the argument `board.hpp` already made |
 
 `splitmix64` **moved** out of `minesweeper/board.hpp` into
-[`arcade/rng.hpp`](include/termgame/arcade/rng.hpp) rather than being copied,
+[`arcade/rng.hpp`](include/glyphcade/arcade/rng.hpp) rather than being copied,
 since being byte-identical across toolchains is the whole reason it is
 hand-rolled. `minesweeper::Rng` still resolves via a using-declaration, so no call
 site moved — and minesweeper's seed-pinned mine layouts are unchanged, which is
@@ -2434,19 +2434,19 @@ unfixed description first.
 
 Minesweeper, in four pieces, three of which name no termforge type at all:
 
-- **[`board.hpp`](include/termgame/games/minesweeper/board.hpp)** — the rules.
+- **[`board.hpp`](include/glyphcade/games/minesweeper/board.hpp)** — the rules.
   Deferred mine placement, flood fill, marks, chording, win/loss, and a clock
   driven only by `dt`. It includes **no termforge header**, which is what makes
   `test/14minesweeper` unable to construct a `Screen` rather than merely not
   doing so.
-- **[`layout.hpp`](include/termgame/games/minesweeper/layout.hpp)** — integer
+- **[`layout.hpp`](include/glyphcade/games/minesweeper/layout.hpp)** — integer
   geometry. One `Layout` per frame feeds both `draw()` and `on_event()`, so
   drawing and hit-testing cannot drift apart; `cell_at()` is round-tripped over
   every cell at every size.
-- **[`glyphs.hpp`](include/termgame/games/minesweeper/glyphs.hpp)** — the two
+- **[`glyphs.hpp`](include/glyphcade/games/minesweeper/glyphs.hpp)** — the two
   tile tiers, with three `static_assert`s (7-bit ASCII, one column each,
   pairwise distinct).
-- **[`minesweeper.hpp`](include/termgame/games/minesweeper/minesweeper.hpp)** —
+- **[`minesweeper.hpp`](include/glyphcade/games/minesweeper/minesweeper.hpp)** —
   the `Game`. The only file that knows `Screen`, `Event` or `GameContext` exist.
 
 **Three divergences from the HTML-Games reference**, each pinned by a test:
@@ -2523,7 +2523,7 @@ quarantined outside the exported package.
 | No `sin`/`exp` anywhere — integer phase, linear envelopes | glibc's transcendentals are not correctly-rounded and move between versions; `-ffp-contract` defaults differ. Same argument `board.hpp` makes for splitmix64. Result: byte-identical output across GCC -O0/-O2/-O3 and Clang -O2. |
 | Numeric fingerprints, **not** golden files | AGENTS.md asked for golden files and forbade binary blobs two sections earlier. A cross-toolchain byte digest is also a portability trap; "we measured it identical" is not "it is specified". |
 | Headroom by `static_assert`, not a limiter | 8 voices × 1/8 FS cannot clip, provably. A limiter is something you must HEAR to trust. Cost: one sound peaks at −18 dBFS. |
-| `play()` short-circuits on a Discard sink | Otherwise the ring fills once and `dropped()` climbs forever on the `TERMGAME_WITH_AUDIO=OFF` arm CI runs — destroying the one counter that means "the audio thread is in trouble". |
+| `play()` short-circuits on a Discard sink | Otherwise the ring fills once and `dropped()` climbs forever on the `GLYPHCADE_WITH_AUDIO=OFF` arm CI runs — destroying the one counter that means "the audio thread is in trouble". |
 | rtaudio in a never-exported target (gitea #13) | A PRIVATE link still reaches the exported Targets file as `$<LINK_ONLY:...>`. Guarded by the `audio-export-clean` ctest. |
 
 ### Mutation-tested, and three of them changed the code
@@ -2541,7 +2541,7 @@ Not a formality — these all looked correct and were not:
    24 ms effect, and a square wave's peak and RMS do not move with frequency.
    **Tightened to `max(1, 0.2%)`.**
 4. `audio-export-clean` was mutation-tested with the exact violation it exists
-   for — a PRIVATE `PkgConfig::RTAUDIO` link into `term-game_lib` — and catches
+   for — a PRIVATE `PkgConfig::RTAUDIO` link into `glyphcade_lib` — and catches
    it, confirming PRIVATE is no defence.
 
 ### ⚠ Traps in this area
@@ -2556,7 +2556,7 @@ Not a formality — these all looked correct and were not:
 - **The audio notice is emitted BEFORE the ASCII-tier one** in
   `sync_capabilities()`, because `m_notice` keeps only the most recent message
   and the colour notice is the one `test/11selector` and the pty recipe assert on.
-- **`TERMGAME_WITH_AUDIO` now looks unused inside `src/lib`** — no audio source
+- **`GLYPHCADE_WITH_AUDIO` now looks unused inside `src/lib`** — no audio source
   is `#ifdef`'d on it. It is not unused: it is what `build_has_audio()` reports
   and what `test/00bootstrap` asserts against CMake's own belief.
 
@@ -2564,7 +2564,7 @@ Not a formality — these all looked correct and were not:
 
 | Deferred | Condition to revisit |
 |---|---|
-| **A tuned bank** | Nothing here has been heard. Render a session with `TERMGAME_AUDIO_WAV=/tmp/session.wav ./build/src/bin/term-game` and listen; the fingerprints in `test/18audio-synth` record what the bank IS, not what it should sound like, and are expected to move when it is retuned. |
+| **A tuned bank** | Nothing here has been heard. Render a session with `GLYPHCADE_AUDIO_WAV=/tmp/session.wav ./build/src/bin/glyphcade` and listen; the fingerprints in `test/18audio-synth` record what the bank IS, not what it should sound like, and are expected to move when it is retuned. |
 | **In-game cursor-move SFX** | A blip per keystroke under a held arrow key needs a rate limit; a rate limit needs a clock; `dt` inside `Game::tick` is the only clock a game may read. A feel decision requiring an ear. |
 | **A positive `MenuMove` assertion** | **done** — Epic 4 registered a second game, so the `size() > 1` guard now passes and the assertion runs. |
 | **Coverage of the `State::Selector` guard** in both selector handlers | Established by mutation: deleting it from the mouse path leaves the suite green, because with one game a click does not move the selection. Kept because the argument is sound; untested until a second game exists. |
@@ -2635,7 +2635,7 @@ depended on API introduced in a *patch* release, and twice missing it is
 ⚠ From 0.1.11 this is also an **ABI** floor. That release added members to
 `ListWidget`, and `Shell` holds one *by value* in `arcade/shell.hpp`, which we
 install. A consumer resolving an older 0.2.x compiles our public header against
-a different object layout than `term-game_lib` was built with — no link error,
+a different object layout than `glyphcade_lib` was built with — no link error,
 just disagreement about a size. Anything held by value in an installed header
 turns the build floor into an ABI floor.
 
@@ -2675,9 +2675,9 @@ delete the file. Upstream *rethrows* rather than converting to an exit code — 
 the stated grounds that "an int has no room for it, and the library will not
 decide that your exception was meaningless" — and points the consumer at exactly
 this: "Catch it around `run()` if you want a diagnostic of your own." Deleting
-outright would move a thrown frame from `1` + `term-game: fatal: <what>` to `134`
+outright would move a thrown frame from `1` + `glyphcade: fatal: <what>` to `134`
 + SIGABRT + silence. So the file survives as
-[`run_or_report`](include/termgame/arcade/exception_boundary.hpp), stripped of
+[`run_or_report`](include/glyphcade/arcade/exception_boundary.hpp), stripped of
 every terminal claim, and it no longer has a deletion condition — it has an
 upstream dependency.
 
@@ -2802,7 +2802,7 @@ statuses. They were deleted once they had reported.
 in one `apt-get` — cmake 3.31, gcc 14, clang 19.1 — and ships util-linux, so
 `script(1)` exists for `pty-restore`. The matrix is gcc/default, clang/default,
 ASan, UBSan and TSan, all with `-DCMAKE_CXX_FLAGS=-Werror` and
-`-DTERMGAME_WITH_AUDIO=OFF`.
+`-DGLYPHCADE_WITH_AUDIO=OFF`.
 
 Pinning the image *here* rather than asking for the runner image to be bumped is
 deliberate: a bumped image fixes one repo on one host and silently un-fixes
@@ -2819,15 +2819,18 @@ itself the next time it is rebuilt. This is version-controlled and reviewable.
 All three fail *silently or confusingly*, which is why they are commented at
 their sites as well as here.
 
-### ⚠ The project name follows the checkout directory name
+### The project name no longer follows the checkout directory name
 
-cpp-template derives `project()` from the directory name, so `PROGRAM_NAME`
-follows wherever the checkout lands, and `test/00bootstrap` asserts on it. A
-workspace named anything but `term-game` reddens that test with a message
-(`"src" == "term-game"`) that points nowhere near the cause. Found by tripping
-over it: the local container rehearsal of #10 checked out into `/src`. Gitea's
-workspace is `.../xcaliber/term-game`, so it holds — but it is an assumption,
-not a guarantee, and it was verified with a probe rather than assumed.
+It used to, because cpp-template derives `project()` from the directory, and that
+made `PROGRAM_NAME` — which `test/00bootstrap` asserts on — a function of wherever
+the checkout landed. A workspace named anything else reddened that test with a
+message (`"src" == "glyphcade"`) pointing nowhere near the cause. Found by
+tripping over it: the local container rehearsal of #10 checked out into `/src`.
+
+`project()` now takes a literal name, so the directory is irrelevant and the CI
+probe that used to assert on the workspace name is retired. See the divergences
+table. Rule B6 asserts that `project()` and `test/00bootstrap` still agree, which
+is the coupling the derivation used to guarantee for free.
 
 ### There is no CI badge, deliberately
 
@@ -2848,11 +2851,12 @@ owns reverting the narrowing when upstream narrows it.
 
 ## Divergences from cpp-template
 
-Two, both deliberate, both filed upstream, both with a deletion condition. Do not
-"re-sync" these files from the template without reading this.
+Three, all deliberate, all with a deletion condition. Do not "re-sync" these files
+from the template without reading this.
 
 | File | Divergence | Delete when |
 |---|---|---|
+| [CMakeLists.txt](CMakeLists.txt) | `project()` takes a **literal** name instead of `get_filename_component(... NAME)`. Upstream's derivation makes every target, every `-D<name>_*` option, the install prefix and `PROGRAM_NAME` a function of the checkout directory. FetchContent unpacks us into `_deps/<name>-src`, so a consumer's targets would be `<name>-src_lib` and `find_package` would resolve nothing; a renamed clone or fork reddens `test/00bootstrap` with a message naming the directory. Our own dependency hardcodes `project(termforge ...)` for this exact reason. Rule B6 keeps the two sides in agreement. | never — upstream is a template, this is a shipped library |
 | [cmake/toolchain/default.cmake](cmake/toolchain/default.cmake) | Appends to `CMAKE_CXX_FLAGS` instead of replacing it, plus `include_guard(GLOBAL)`. Upstream's plain `set()` silently discards `-DCMAKE_CXX_FLAGS=-Werror` from the command line, because a toolchain normal variable shadows the cache — CI stays green while enforcing nothing. termforge already carries this exact fix. | upstream appends |
 | [cmake/check_artifacts.cmake](cmake/check_artifacts.cmake) | Rule A1's path filter narrowed from `.*` to `^README\.md$`. The rule's own label says "README CI badge", but upstream scans every tracked file, which makes it impossible for a fork to document its own provenance — something NEW_PROJECT.md Step 1 tells you to do. | upstream narrows it |
 
@@ -2871,9 +2875,6 @@ Settled and recorded in [DESIGN.md](DESIGN.md) with reasoning:
   git. Venice is for sprite/title art instead.
 - **Audio behind an `AudioSink`** with `WavFileSink` for offline testing.
 - **Port logic from HTML-Games** rather than reinventing game rules.
-- **Spelling split:** the project, repo and CMake target are **`term-game`**; the
-  include dir and C++ namespace are **`termgame`**. A hyphen is illegal in a
-  namespace. Not a typo — do not "fix" it.
 
 Added by Epic 1:
 
@@ -2893,16 +2894,16 @@ Added by Epic 1:
 - **rtaudio is installed in the dev container, but there is no sound hardware.**
   `librtaudio-dev 5.2.0` and `libasound2-dev` are present; `/dev/snd` is not.
   Two consequences, and the first is easy to miss:
-  1. `TERMGAME_WITH_AUDIO` **auto-detects to ON here.** The OFF arm — the
+  1. `GLYPHCADE_WITH_AUDIO` **auto-detects to ON here.** The OFF arm — the
      configuration CI runs and the one this repo promises always works — has to
-     be built explicitly (`-DTERMGAME_WITH_AUDIO=OFF`) or it rots unnoticed.
+     be built explicitly (`-DGLYPHCADE_WITH_AUDIO=OFF`) or it rots unnoticed.
   2. Nothing audio can ever be *device*-verified from this container. Report
      audio work as "builds clean, offline sink tests pass, needs device
      verification" — never as verified.
 - **Debian ships no `RtAudioConfig.cmake`**, only a `.pc` file, so pkg-config is
   the load-bearing detection path in `cmake/audio.cmake`. A `find_package(RtAudio
   CONFIG)`-only design would look right and never fire on any apt-based box.
-- **Two forges.** term-game and HTML-Games are gitea (`tea`); termforge and
+- **Two forges.** glyphcade and HTML-Games are gitea (`tea`); termforge and
   cpp-template are GitHub (`gh`). See [AGENTS.md](AGENTS.md).
 - **github.com over HTTPS, git.gobha.me over SSH.** There is no GitHub SSH key
   here, which is why the termforge FetchContent URL is HTTPS.

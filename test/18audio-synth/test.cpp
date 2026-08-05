@@ -51,11 +51,11 @@
 #include <string_view>
 #include <vector>
 
-#include <termgame/audio/synth.hpp>
+#include <glyphcade/audio/synth.hpp>
 
 namespace {
 
-using namespace termgame::audio;
+using namespace glyphcade::audio;
 
 constexpr int kRate = 48000;
 

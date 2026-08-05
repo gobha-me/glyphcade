@@ -12,7 +12,7 @@ endif ()
 
 # Two TUs, minesweeper's shape. There is no anim.cpp: Snake occupies whole cells,
 # and a sub-cell tween in a character grid is a feel decision with no reference
-# behind it. Headers stay in include/termgame/games/snake/ — cmake/install.cmake
+# behind it. Headers stay in include/glyphcade/games/snake/ — cmake/install.cmake
 # ships public headers with one install(DIRECTORY include/ ...), so a header that
 # leaves include/ leaves the package.
 add_library(${PROJECT_NAME}_game_snake STATIC
@@ -30,7 +30,7 @@ target_link_libraries(${PROJECT_NAME}_game_snake
   PUBLIC ${PROJECT_NAME}_core
 )
 
-# ⚠ No TERMGAME_WITH_AUDIO, no rtaudio, no link to ${PROJECT_NAME}_lib. A game
+# ⚠ No GLYPHCADE_WITH_AUDIO, no rtaudio, no link to ${PROJECT_NAME}_lib. A game
 # plays a sound by asking GameContext for the Player; it never learns whether the
-# sink is real. And core sits BELOW the games, so termgame::Shell is not on this
+# sink is real. And core sits BELOW the games, so glyphcade::Shell is not on this
 # target's link line — a game cannot reach the Shell even by accident.

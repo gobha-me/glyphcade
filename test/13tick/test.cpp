@@ -6,10 +6,10 @@
 // N-period frame, the carried remainder, dt exactness, the first frame's dt==0,
 // the clamp's numeric value, quit() from inside a tick. Do not duplicate it.
 //
-// What term-game owns, and what this file is for, is the routing: that the
+// What glyphcade owns, and what this file is for, is the routing: that the
 // Shell actually configures the accumulator, that ticks reach Game::tick only
 // while a game is running and not paused, that dt is passed through untouched,
-// and that the clamp's term-game-visible consequence — a bounded tick count
+// and that the clamp's glyphcade-visible consequence — a bounded tick count
 // after a stall — holds. AGENTS.md makes both the fixed timestep and the clamp
 // hard project rules, so a regression has to be red HERE and not only upstream.
 //
@@ -26,13 +26,13 @@
 
 #include <termforge/core/types.hpp>
 
-#include <termgame/arcade/registry.hpp>
-#include <termgame/arcade/shell.hpp>
-#include <termgame/games/minesweeper/minesweeper.hpp>
+#include <glyphcade/arcade/registry.hpp>
+#include <glyphcade/arcade/shell.hpp>
+#include <glyphcade/games/minesweeper/minesweeper.hpp>
 
 namespace {
 
-using termgame::Shell;
+using glyphcade::Shell;
 using Seconds = std::chrono::duration<double>;
 using namespace std::chrono_literals;
 
@@ -90,14 +90,14 @@ class TickProbe : public Shell {
       termforge::KeyEvent{.key = termforge::Key::Char, .ch = c}};
 }
 
-[[nodiscard]] auto game_of(const Shell& shell) -> const termgame::Minesweeper* {
-  return dynamic_cast<const termgame::Minesweeper*>(shell.current_game());
+[[nodiscard]] auto game_of(const Shell& shell) -> const glyphcade::Minesweeper* {
+  return dynamic_cast<const glyphcade::Minesweeper*>(shell.current_game());
 }
 
 auto enter_game(TickProbe& app) -> void {
   app.step();
   int index = -1;
-  const auto games = termgame::all_games();
+  const auto games = glyphcade::all_games();
   for (std::size_t i = 0; i < games.size(); ++i) {
     if (games[i].meta.slug == "minesweeper") index = static_cast<int>(i);
   }

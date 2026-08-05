@@ -13,11 +13,26 @@ endif()
 
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/version.cmake)
 
-# https://stackoverflow.com/questions/12344368/automatically-use-the-directory-as-the-project-name-in-cmake
-get_filename_component(ProjectId ${CMAKE_CURRENT_LIST_DIR} NAME)
-string(REPLACE " " "_" ProjectId ${ProjectId})
-
-project(${ProjectId}
+# The name is written literally, NOT derived from the directory name, and that is a
+# deliberate divergence from cpp-template — see the divergences table in STATUS.md.
+#
+# Deriving it (get_filename_component(... NAME)) makes every target, every
+# -D<name>_* option, the install prefix, <name>Config.cmake and PROGRAM_NAME a
+# function of whatever the checkout happens to be called. Three ways that bites a
+# published library, none of them hypothetical:
+#
+#   - FetchContent unpacks us into _deps/glyphcade-src, so targets would become
+#     glyphcade-src_lib and find_package(glyphcade) would resolve nothing. Our own
+#     dependency hardcodes project(termforge ...) for exactly this reason — see the
+#     note in cmake/deps/termforge.cmake.
+#   - `git clone <url> anything-else`, or a renamed fork, breaks
+#     test/00bootstrap's PROGRAM_NAME assertion with a message that names the
+#     directory and points nowhere near the cause. This already happened here once,
+#     in a checkout called "src".
+#   - CI runners choose their own workspace paths.
+#
+# check_artifacts rule B6 asserts this name and test/00bootstrap's still agree.
+project(glyphcade
   VERSION ${VERSION}
   LANGUAGES CXX
 )
@@ -64,7 +79,7 @@ set(${PROJECT_NAME}_DEPS
 # find_package-then-clone-a-git-repo, and rtaudio is a system library that needs
 # ALSA/Pulse/JACK dev headers of its own — fetching it only moves the problem.
 # Keeping it off the list also keeps check_artifacts rule B2 honest, which would
-# otherwise flag it "fetched but unused" on every TERMGAME_WITH_AUDIO=OFF build.
+# otherwise flag it "fetched but unused" on every GLYPHCADE_WITH_AUDIO=OFF build.
 # Detection lives in cmake/audio.cmake, included below.
 
 # Component gating: a dependency that exists only to serve a target we are not
@@ -84,14 +99,14 @@ endif ()
 
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/dependencies.cmake)
 
-# TERMGAME_WITH_AUDIO. After project() (it needs PkgConfig) and before src/lib
+# GLYPHCADE_WITH_AUDIO. After project() (it needs PkgConfig) and before src/lib
 # (which reads the option to set a compile definition).
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/audio.cmake)
 
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/src/lib)
 
 if (${PROJECT_NAME}_BUILD_BIN)
-  # Gated on BUILD_BIN, not on TERMGAME_WITH_AUDIO: the target exists in both
+  # Gated on BUILD_BIN, not on GLYPHCADE_WITH_AUDIO: the target exists in both
   # arms and only its source file changes (see src/audio_backend/CMakeLists.txt).
   # The binary is its only consumer, so with no binary there is nothing to link
   # it — and it is never installed, so nothing else can want it.

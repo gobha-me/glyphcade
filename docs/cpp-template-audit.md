@@ -23,14 +23,14 @@ export(EXPORT ${PROJECT_NAME}Targets
 ```
 
 `export(EXPORT)` requires every non-imported dependency to be in a **build**
-export set. term-game links termforge **publicly** — the `Shell` derives from
+export set. glyphcade links termforge **publicly** — the `Shell` derives from
 `termforge::App` and exposes it through our headers, so `PRIVATE` was never
 available — and at audit time termforge registered *no* export sets at all. The
 predicted failure, at CMake *generate* time:
 
 ```
 CMake Error in CMakeLists.txt:
-  export called with target "term-game_lib" which requires target
+  export called with target "glyphcade_lib" which requires target
   "termforge_lib" that is not in any export set.
 ```
 
@@ -91,7 +91,7 @@ only live in the README, so the `.*` makes it structurally impossible for a fork
 to document its own provenance — which NEW_PROJECT.md Step 1 explicitly
 instructs you to do ("Scaffolded from cpp-template").
 
-term-game names the slug legitimately eight times across `AGENTS.md`,
+glyphcade names the slug legitimately eight times across `AGENTS.md`,
 `DESIGN.md`, `STATUS.md` and this file. Our copy narrows the path filter to
 `^README\.md$`. Accepted cost: a stale slug outside the README is no longer
 caught — outside the README it is prose, not wiring.
@@ -109,13 +109,13 @@ caught — outside the README it is prose, not wiring.
   artifact rule B5.
 - **`cmake/version.cmake` runs `git describe` from inside `cmake/`**, and git
   walks *upward*. A tree without its own `.git` inherits an enclosing repo's
-  tags with no warning. Not an issue here — term-game has its own history — but
+  tags with no warning. Not an issue here — glyphcade has its own history — but
   it is why `fetch-depth: 0` in CI is load-bearing.
 - **`check_artifacts` reads `git ls-files`.** Mid-bootstrap, before anything is
   staged, rules B2 and B3 fail for the mechanical reason that the files they
   correlate are untracked. `git add` first, then judge the output.
 - **CT-12** ([#25](https://github.com/gobha-me/cpp-template/issues/25)) — headers
-  install flat. We sidestep it by putting ours under `include/termgame/`, but we
+  install flat. We sidestep it by putting ours under `include/glyphcade/`, but we
   still hit its tail: `install.cmake` lands the generated `version.hpp`, which
   declares unprefixed globals (`PROGRAM_NAME`, `VERSION_MAJOR`, …), flat in
   `${prefix}/include`. termforge deliberately never installs its own. Left alone
@@ -129,4 +129,4 @@ template hygiene and drift docs. No impact on us.
 
 `.github/workflows/ci.yml` is **not** carried over despite NEW_PROJECT.md's
 "copy verbatim, zero edits" — that instruction assumes a GitHub fork, and
-term-game is on gitea. See [.gitea/workflows/ci.yaml](../.gitea/workflows/ci.yaml).
+glyphcade is on gitea. See [.gitea/workflows/ci.yaml](../.gitea/workflows/ci.yaml).

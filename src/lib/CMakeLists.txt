@@ -1,12 +1,12 @@
 # ── Library targets ─────────────────────────────────────────────────────────
-# The shared arcade library: everything term-game is, minus a main(). Disable
+# The shared arcade library: everything glyphcade is, minus a main(). Disable
 # with:
-#   cmake -B build -Dterm-game_BUILD_LIB=OFF
+#   cmake -B build -Dglyphcade_BUILD_LIB=OFF
 #
 # OFF removes all four targets outright, so nothing can link them — including the
 # auto-discovered tests, which pick ${PROJECT_NAME}::lib up automatically when it
 # exists (see test/CMakeLists.txt), and src/bin, which links it too. Pair OFF with
-# -Dterm-game_TESTS=OFF and -Dterm-game_BUILD_BIN=OFF; src/bin/CMakeLists.txt
+# -Dglyphcade_TESTS=OFF and -Dglyphcade_BUILD_BIN=OFF; src/bin/CMakeLists.txt
 # says so at configure time if you forget.
 #
 # (cpp-template offers a header-only INTERFACE variant here as a commented
@@ -39,9 +39,9 @@
 # Read it as a chain of undefined symbols, because that is what a static archive
 # resolves by. These were measured with nm, not assumed:
 #
-#   shell.cpp        → termgame::all_games()                    → the roster
-#   all_games.cpp    → termgame::Minesweeper::Minesweeper()      → the game
-#   minesweeper.cpp  → termgame::audio::Engine::play(SfxId)      → core
+#   shell.cpp        → glyphcade::all_games()                    → the roster
+#   all_games.cpp    → glyphcade::Minesweeper::Minesweeper()      → the game
+#   minesweeper.cpp  → glyphcade::audio::Engine::play(SfxId)      → core
 #
 # ⚠ Do NOT tidy arcade/shell.cpp down into ${PROJECT_NAME}_core. It is the only
 # translation unit in the repo that references all_games() (three sites), so its
@@ -50,7 +50,7 @@
 # closes into a cycle, core → roster → game → core, which a single-pass linker
 # cannot resolve. There is no warning; there is
 #
-#   undefined reference to `termgame::all_games()'
+#   undefined reference to `glyphcade::all_games()'
 #
 # on every test binary and on src/bin, in every configuration.
 #
@@ -62,7 +62,7 @@
 #
 #   lib roster game core        (core ONCE, no duplication)
 #
-# and both fail with `undefined reference to termgame::all_games()`. That is the
+# and both fail with `undefined reference to glyphcade::all_games()`. That is the
 # good news: the wrong layering has no configuration in which it silently works,
 # so this is a mistake you cannot ship. It is also why the fix is to move the
 # FILE rather than to reorder anything.
@@ -79,21 +79,17 @@
 # ── Where the sources live ──────────────────────────────────────────────────
 # Sources are listed explicitly, never globbed — a glob is not re-evaluated until
 # something else forces a re-configure, so a new file silently is not built.
-# Public headers live under include/termgame/.
-#
-# Note the spelling split, and do not "fix" it: the project, the repo and the
-# CMake targets are term-game; the include dir and the C++ namespace are
-# termgame, because a hyphen is illegal in a namespace.
+# Public headers live under include/glyphcade/.
 #
 # ⚠ games/<name>/ is the game's NAMESPACE, which is not always its slug. A slug
 # is a user-visible id and may start with a digit; a namespace may not.
 #
 # ⚠ DESIGN.md used to say this split would collapse src/lib/games/<name>/ and
-# include/termgame/games/<name>/ into a single top-level games/<name>/. It does
+# include/glyphcade/games/<name>/ into a single top-level games/<name>/. It does
 # not, and DESIGN.md now records why: cmake/install.cmake ships public headers
 # with one install(DIRECTORY include/ FILES_MATCHING PATTERN "*.hpp"), so a
 # header that leaves include/ leaves the package, and .clangd plus every
-# #include <termgame/games/...> in the tree would have to move with it.
+# #include <glyphcade/games/...> in the tree would have to move with it.
 
 option(${PROJECT_NAME}_BUILD_LIB "Build the compiled library targets" ON)
 
@@ -122,7 +118,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
   # decision rather than an omission. Only the abstract AudioSink, NullSink and
   # WavFileSink live here; the RtAudio backend is a separate, never-installed
   # target in src/audio_backend/. Linking PkgConfig::RTAUDIO into this library
-  # would write that imported target's name into term-gameTargets.cmake — a
+  # would write that imported target's name into glyphcadeTargets.cmake — a
   # PRIVATE link still counts, as $<LINK_ONLY:...> — and the installed package
   # would then be unresolvable anywhere pkg_check_modules had not run. See the
   # rule spelled out in cmake/project-config.cmake.in.
@@ -162,7 +158,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
   target_compile_features(${PROJECT_NAME}_core PUBLIC cxx_std_23)
 
   # PUBLIC, and on core for the same transitivity reason:
-  # include/termgame/audio/sink.hpp names termforge types, arcade/game_meta.hpp
+  # include/glyphcade/audio/sink.hpp names termforge types, arcade/game_meta.hpp
   # uses termforge's width helpers, and arcade/shell.hpp derives from
   # termforge::App and holds termforge widgets by value. Every layer above needs
   # termforge's headers and its archive, and so does anything downstream — which
@@ -170,8 +166,8 @@ if (${PROJECT_NAME}_BUILD_LIB)
   target_link_libraries(${PROJECT_NAME}_core PUBLIC termforge::lib)
 
   # PRIVATE: how this library was compiled is not part of its public interface.
-  # Nothing in include/termgame/ is #ifdef'd on this — the build's audio config
-  # is reported at runtime through termgame::build_has_audio() instead, which is
+  # Nothing in include/glyphcade/ is #ifdef'd on this — the build's audio config
+  # is reported at runtime through glyphcade::build_has_audio() instead, which is
   # what makes it assertable from a test (see test/00bootstrap).
   #
   # On core because build_info.cpp is here, and build_info.cpp is the ONE
@@ -183,8 +179,8 @@ if (${PROJECT_NAME}_BUILD_LIB)
   # reaching build_info.cpp, build_has_audio() would answer false in an audio-ON
   # build, and test/00bootstrap would go red — which is precisely the tripwire
   # this definition exists to arm.
-  if (TERMGAME_WITH_AUDIO)
-    target_compile_definitions(${PROJECT_NAME}_core PRIVATE TERMGAME_WITH_AUDIO)
+  if (GLYPHCADE_WITH_AUDIO)
+    target_compile_definitions(${PROJECT_NAME}_core PRIVATE GLYPHCADE_WITH_AUDIO)
   endif ()
 
   # ── the games: one static library each ───────────────────────────────────
@@ -218,7 +214,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
   # the reason self-registering statics are banned. Mutation-tested: commenting
   # minesweeper.cpp out of the add_library in games/minesweeper/CMakeLists.txt
   # fails the link of every binary with
-  # `undefined reference to termgame::Minesweeper::Minesweeper()`, plus the vtable
+  # `undefined reference to glyphcade::Minesweeper::Minesweeper()`, plus the vtable
   # and typeinfo for the type.
   add_library(${PROJECT_NAME}_roster STATIC
     arcade/all_games.cpp
@@ -226,7 +222,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
 
   # PUBLIC, and the games only: core's usage requirements arrive through them,
   # since each game links core PUBLIC, which is how all_games.cpp finds
-  # <termgame/arcade/registry.hpp>. Keeping this line "the games, and nothing
+  # <glyphcade/arcade/registry.hpp>. Keeping this line "the games, and nothing
   # else" is what makes adding a game one entry in the list above.
   target_link_libraries(${PROJECT_NAME}_roster PUBLIC ${_game_targets})
 

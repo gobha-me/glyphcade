@@ -29,17 +29,17 @@
 
 #include <termforge/core/types.hpp>
 
-#include <termgame/arcade/registry.hpp>
-#include <termgame/arcade/shell.hpp>
-#include <termgame/games/snake/glyphs.hpp>
-#include <termgame/games/snake/snake.hpp>
+#include <glyphcade/arcade/registry.hpp>
+#include <glyphcade/arcade/shell.hpp>
+#include <glyphcade/games/snake/glyphs.hpp>
+#include <glyphcade/games/snake/snake.hpp>
 
 namespace {
 
-using termgame::Shell;
-using termgame::Snake;
-using termgame::audio::SfxId;
-using namespace termgame::snake;
+using glyphcade::Shell;
+using glyphcade::Snake;
+using glyphcade::audio::SfxId;
+using namespace glyphcade::snake;
 
 class Probe final : public Shell {
  public:
@@ -64,7 +64,7 @@ class Probe final : public Shell {
 }
 
 [[nodiscard]] auto snake_index() -> int {
-  const auto games = termgame::all_games();
+  const auto games = glyphcade::all_games();
   for (std::size_t i = 0; i < games.size(); ++i) {
     if (games[i].meta.slug == "snake") {
       return static_cast<int>(i);
@@ -102,8 +102,8 @@ auto enter_snake(Probe& app, int cols = 80, int rows = 24) -> void {
 }
 
 [[nodiscard]] auto game_of(Shell& shell) -> Snake* {
-  return dynamic_cast<Snake*>(const_cast<termgame::Game*>(
-      static_cast<const termgame::Game*>(shell.current_game())));
+  return dynamic_cast<Snake*>(const_cast<glyphcade::Game*>(
+      static_cast<const glyphcade::Game*>(shell.current_game())));
 }
 
 [[nodiscard]] auto row_text(Probe& app, int y) -> std::string {
@@ -480,7 +480,7 @@ TEST_CASE("the wall mode the player chose is the one that runs",
 // ── Sound ──────────────────────────────────────────────────────────────────
 //
 // Asserted through Shell::audio().play_count(), which counts INTENT rather than
-// samples — so these cases pass identically on a TERMGAME_WITH_AUDIO=OFF build.
+// samples — so these cases pass identically on a GLYPHCADE_WITH_AUDIO=OFF build.
 // ⚠ Through the SHELL's engine, never the Game's: the Game may already be gone.
 
 TEST_CASE("an accepted turn clicks", "[snake][audio]") {

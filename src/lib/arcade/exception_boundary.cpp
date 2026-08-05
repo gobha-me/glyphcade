@@ -1,9 +1,9 @@
-#include <termgame/arcade/exception_boundary.hpp>
+#include <glyphcade/arcade/exception_boundary.hpp>
 
 #include <cstdio>
 #include <exception>
 
-namespace termgame {
+namespace glyphcade {
 
 // What this function is for, and — because it used to be for something else
 // entirely — what it is no longer for.
@@ -49,12 +49,12 @@ auto run_or_report(const std::function<int()>& body) noexcept -> int {
   } catch (const std::exception& e) {
     // fprintf, not std::cerr: matches termforge, and keeps this path free of
     // anything that could itself throw or allocate.
-    std::fprintf(stderr, "term-game: fatal: %s\n", e.what());
+    std::fprintf(stderr, "glyphcade: fatal: %s\n", e.what());
     return 1;
   } catch (...) {
-    std::fprintf(stderr, "term-game: fatal: unknown exception\n");
+    std::fprintf(stderr, "glyphcade: fatal: unknown exception\n");
     return 1;
   }
 }
 
-}  // namespace termgame
+}  // namespace glyphcade

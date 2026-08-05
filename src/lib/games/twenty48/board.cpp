@@ -1,9 +1,9 @@
-#include <termgame/games/twenty48/board.hpp>
+#include <glyphcade/games/twenty48/board.hpp>
 
 #include <algorithm>
 #include <cstddef>
 
-namespace termgame::twenty48 {
+namespace glyphcade::twenty48 {
 
 namespace {
 
@@ -286,4 +286,4 @@ auto Board::load(std::span<const int> cells, int score) -> void {
   m_undo_cells.clear();
 }
 
-}  // namespace termgame::twenty48
+}  // namespace glyphcade::twenty48

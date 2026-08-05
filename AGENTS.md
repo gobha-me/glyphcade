@@ -4,7 +4,7 @@ If you're an LLM (or an LLM-driven editor) about to make changes here, read this
 first, then [DESIGN.md](DESIGN.md) for the architecture and
 [STATUS.md](STATUS.md) for what is actually true right now.
 
-This is **term-game**: a TUI arcade suite in C++23, built on
+This is **glyphcade**: a TUI arcade suite in C++23, built on
 [TermForge](https://github.com/gobha-me/termforge) for UI and
 [RtAudio](https://github.com/thestk/rtaudio) for sound.
 
@@ -14,7 +14,7 @@ This is the single easiest mistake to make here.
 
 | Repo | Forge | Tool | What goes there |
 |---|---|---|---|
-| **term-game** (this) | gitea `xcaliber/term-game` | `tea` | project work, game epics |
+| **glyphcade** (this) | gitea `xcaliber/term-game` | `tea` | project work, game epics |
 | **termforge** | GitHub `gobha-me/termforge` | `gh` | framework gaps/bugs |
 
 Gitea repos live under the **user** `xcaliber`, not an org — `tea repos create
@@ -32,18 +32,14 @@ half the point of this repo.
 - Scaffolded from [cpp-template](https://github.com/gobha-me/cpp-template);
   compiler respects the environment, clang and the sanitizers are opt-in
   toolchains.
-- Project name is **`term-game`** and follows the directory name — it becomes the
-  target, `term-game_lib`, and every `-Dterm-game_*` option. Directory, gitea
-  repo, and CMake project name must agree.
-- **rtaudio is optional.** `TERMGAME_WITH_AUDIO` auto-detects and defaults OFF
+- Project name is **`glyphcade`**, written literally in `project()` and *not*
+  derived from the directory name — it becomes the target, `glyphcade_lib`, and
+  every `-Dglyphcade_*` option. The checkout directory can be called anything.
+- **rtaudio is optional.** `GLYPHCADE_WITH_AUDIO` auto-detects and defaults OFF
   when absent. The repo must always build and test without it.
 
 ## Hard rules (project-specific)
 
-- **`term-game` and `termgame` are both correct. Do not "fix" either.** The
-  project, the gitea repo, the CMake project and every `-Dterm-game_*` option are
-  **`term-game`**; the include directory and the C++ namespace are **`termgame`**,
-  because a hyphen is illegal in a namespace. This trips everyone once.
 - **One `App`, many `Game`s.** The Shell is the only `termforge::App` — it owns
   the terminal, the loop, and the audio engine. Games are **not** `App`
   subclasses and never touch `App`, `Terminal`, or each other. Shared services
@@ -56,12 +52,12 @@ half the point of this repo.
 - **One static library per game.** A game is
   `src/lib/games/<name>/` with its own `CMakeLists.txt`, listed by
   `add_subdirectory` **and** in `src/lib`'s `_game_targets` list; its public
-  headers stay under `include/termgame/games/<name>/`, because
+  headers stay under `include/glyphcade/games/<name>/`, because
   `cmake/install.cmake` ships them with one `install(DIRECTORY include/ …)`.
   `<name>` is the game's **namespace**, which is not always its slug — a slug may
   begin with a digit and a namespace may not.
-- **A game links `term-game_core` and nothing else in this repo.** Not
-  `term-game_lib`, not another game. Because core sits *below* the games in the
+- **A game links `glyphcade_core` and nothing else in this repo.** Not
+  `glyphcade_lib`, not another game. Because core sits *below* the games in the
   link chain, a game physically cannot reference the Shell — that is the previous
   rule enforced by the linker instead of by review. If a game needs something the
   Shell has, it belongs in `GameContext`, or in core.
@@ -118,10 +114,10 @@ half the point of this repo.
 - **A game's slug and its namespace need not match, and for 2048 they do not.**
   The slug is `"2048"` — a user-visible stable id that keys the menu and the score
   file — while the directory, namespace and class are `twenty48`/`Twenty48`,
-  because a C++ identifier may not begin with a digit. Same shape of deliberate
-  split as `term-game`/`termgame`. The directory follows the **namespace**, so
-  `#include <termgame/games/twenty48/board.hpp>` matches
-  `termgame::twenty48::Board`.
+  because a C++ identifier may not begin with a digit. The directory follows the
+  **namespace**, so
+  `#include <glyphcade/games/twenty48/board.hpp>` matches
+  `glyphcade::twenty48::Board`.
 - **Every `GameMeta` text field except the icon must be 7-bit ASCII**, and that is
   a `static_assert` in `src/lib/arcade/all_games.cpp`, not a convention. The
   selector prints slug, title, tag and description on the no-colour tier, which by
@@ -183,7 +179,7 @@ cmake -B build -DCMAKE_CXX_FLAGS=-Werror && cmake --build build \
   && ctest --test-dir build --output-on-failure
 
 # 2. GCC, audio explicitly OFF
-cmake -B build-noaudio -DTERMGAME_WITH_AUDIO=OFF -DCMAKE_CXX_FLAGS=-Werror \
+cmake -B build-noaudio -DGLYPHCADE_WITH_AUDIO=OFF -DCMAKE_CXX_FLAGS=-Werror \
   && cmake --build build-noaudio \
   && ctest --test-dir build-noaudio --output-on-failure
 
@@ -264,7 +260,7 @@ terminal-restore change is unverifiable:
 
 ```bash
 { sleep 3; printf '\033'; sleep 2; } | timeout 20 \
-  script -q -c "$PWD/build/src/bin/term-game" /tmp/pty.raw
+  script -q -c "$PWD/build/src/bin/glyphcade" /tmp/pty.raw
 # entered and left the alternate screen?
 grep -c $'\033\[?1049h' /tmp/pty.raw   # 1
 grep -c $'\033\[?1049l' /tmp/pty.raw   # 1  <- terminal was restored
@@ -282,7 +278,7 @@ into a game, back out, quit:
 
 ```bash
 { sleep 3; printf '\r'; sleep 3; printf '\033'; sleep 2; printf '\033'; sleep 2; } | \
-  timeout 30 script -q -c "$PWD/build/src/bin/term-game" /tmp/pty.raw
+  timeout 30 script -q -c "$PWD/build/src/bin/glyphcade" /tmp/pty.raw
 ```
 
 Then check both tiers, because they render differently and CI only ever sees
@@ -321,7 +317,7 @@ characters. Drive it — note the *two* `\r`, because Minesweeper is roster entr
 ```bash
 { sleep 3; printf '\r'; sleep 1; printf '\r'; sleep 1; printf 'p'; sleep 3;
   printf '\033'; sleep 1; printf '\033'; sleep 1; printf '\033'; sleep 2; } | \
-  timeout 40 script -q -c "$PWD/build/src/bin/term-game" /tmp/pause.raw
+  timeout 40 script -q -c "$PWD/build/src/bin/glyphcade" /tmp/pause.raw
 ```
 
 Then, on the **stripped** text: `grep -c 'Paused'` and `grep -c 'Resume'` must
@@ -347,7 +343,7 @@ correct and had to stay so:
 { sleep 3; printf '\r'; sleep 3; printf '\033'; sleep 1; printf '\033';
   sleep 2; } | \
   TERM=xterm-256color COLORTERM=truecolor timeout 30 \
-  script -q -c "$PWD/build/src/bin/term-game" /tmp/cycler.raw
+  script -q -c "$PWD/build/src/bin/glyphcade" /tmp/cycler.raw
 ```
 
 On the stripped text, `grep -ac 'Level:'` and `grep -ac '╭'` must both be ≥ 1
@@ -368,7 +364,7 @@ An intermittently-silent count is worse than a wrong one, so pass `-a` always.
 **The throw path is automated** — `ctest -R pty-restore -V`, or by hand
 `cmake/pty_restore.sh build/test/pty-restore-probe`. It drives a
 deliberately-throwing binary through the same harness and asserts one `?1049h`,
-one `?1049l`, and that the leave sequence appears *before* `term-game: fatal:` in
+one `?1049l`, and that the leave sequence appears *before* `glyphcade: fatal:` in
 the byte stream. The headless suite cannot reach any of that: nothing there
 enters the alternate screen, so there are no escape bytes to look at.
 
@@ -385,7 +381,7 @@ and count repaints:
 ```bash
 { sleep 3; printf '\033[B\033[B'; sleep 1; printf '\r'; sleep 1; printf 'm'; \
   sleep 8; printf '\033'; sleep 1; printf '\033'; sleep 2; } | \
-  timeout 40 script -q -c "$PWD/build/src/bin/term-game" /tmp/idle.raw
+  timeout 40 script -q -c "$PWD/build/src/bin/glyphcade" /tmp/idle.raw
 perl -pe 's/\e\][^\a\e]*(\a|\e\\)//g; s/\e_[^\e]*\e\\//g; s/\e\[[0-9;?]*[a-zA-Z]//g' \
   /tmp/idle.raw | grep -o '@@' | wc -l    # 91 over 8 s == ~11.4/s
 ```
@@ -437,7 +433,7 @@ audio needs a human to hear it. Say so rather than guessing.
 **But audio can at least be captured for someone who can hear it.** Since Epic 2:
 
 ```bash
-TERMGAME_AUDIO_WAV=/tmp/session.wav ./build/src/bin/term-game
+GLYPHCADE_AUDIO_WAV=/tmp/session.wav ./build/src/bin/glyphcade
 ```
 
 returns a `WavFileSink` instead of a device, in **both** audio arms, and

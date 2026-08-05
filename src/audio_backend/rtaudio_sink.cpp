@@ -1,8 +1,8 @@
-// The make_device_sink() implementation compiled when TERMGAME_WITH_AUDIO=ON.
+// The make_device_sink() implementation compiled when GLYPHCADE_WITH_AUDIO=ON.
 //
 // ⚠ This is the ONLY translation unit in the repo that includes <RtAudio.h> or
 // links rtaudio, and it belongs to a target that is never installed and never
-// exported (gitea #13). Nothing under include/termgame/ knows this file exists.
+// exported (gitea #13). Nothing under include/glyphcade/ knows this file exists.
 //
 // ⚠ AND IT HAS NEVER BEEN RUN AGAINST A DEVICE. This container has
 // librtaudio-dev 5.2.0 and no /dev/snd, so what IS exercised here — every time,
@@ -10,7 +10,7 @@
 // is found, open() reports it, and the Shell degrades to silence with a notice.
 // The success path needs hardware. Say so rather than implying otherwise.
 
-#include <termgame/audio/device_sink.hpp>
+#include <glyphcade/audio/device_sink.hpp>
 
 #include <cstdlib>
 #include <memory>
@@ -18,7 +18,7 @@
 
 #include <RtAudio.h>
 
-namespace termgame::audio {
+namespace glyphcade::audio {
 
 namespace {
 
@@ -46,9 +46,9 @@ namespace {
 // through the error callback instead — two different mechanisms for what reads
 // as one concern.
 #if defined(RTAUDIO_VERSION_MAJOR) && RTAUDIO_VERSION_MAJOR >= 6
-#  define TERMGAME_RTAUDIO6 1
+#  define GLYPHCADE_RTAUDIO6 1
 #else
-#  define TERMGAME_RTAUDIO6 0
+#  define GLYPHCADE_RTAUDIO6 0
 #endif
 
 class RtAudioSink final : public AudioSink {
@@ -71,7 +71,7 @@ class RtAudioSink final : public AudioSink {
     // engine would have been told the requested size instead of the real one.
     unsigned int granted = static_cast<unsigned int>(want.frames_per_buffer);
 
-#if TERMGAME_RTAUDIO6
+#if GLYPHCADE_RTAUDIO6
     m_dac = std::make_unique<RtAudio>(
         RtAudio::UNSPECIFIED,
         [](RtAudioErrorType, const std::string&) {
@@ -183,7 +183,7 @@ class RtAudioSink final : public AudioSink {
     return 0;  // 0 == keep streaming
   }
 
-#if !TERMGAME_RTAUDIO6
+#if !GLYPHCADE_RTAUDIO6
   static auto stream_error(RtAudioError::Type /*type*/,
                            const std::string& /*text*/) -> void {
     // Same reasoning as the 6.x lambda above: this can arrive on the audio
@@ -201,7 +201,7 @@ class RtAudioSink final : public AudioSink {
 }  // namespace
 
 auto wav_path_from_env() -> const char* {
-  const char* path = std::getenv("TERMGAME_AUDIO_WAV");  // NOLINT(concurrency-mt-unsafe)
+  const char* path = std::getenv("GLYPHCADE_AUDIO_WAV");  // NOLINT(concurrency-mt-unsafe)
   return (path != nullptr && path[0] != '\0') ? path : nullptr;
 }
 
@@ -215,4 +215,4 @@ auto make_device_sink() -> std::unique_ptr<AudioSink> {
   return std::make_unique<RtAudioSink>();
 }
 
-}  // namespace termgame::audio
+}  // namespace glyphcade::audio

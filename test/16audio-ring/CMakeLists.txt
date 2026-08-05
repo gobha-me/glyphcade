@@ -22,7 +22,7 @@
   )
 
   # Same guard as the loop, same reason — the target does not exist under
-  # -Dterm-game_BUILD_LIB=OFF. (ring.hpp is header-only, so this test would
+  # -Dglyphcade_BUILD_LIB=OFF. (ring.hpp is header-only, so this test would
   # actually link without it; kept so the dir behaves like every other one.)
   if (TARGET ${PROJECT_NAME}::lib)
     target_link_libraries(${TEST_NAME}

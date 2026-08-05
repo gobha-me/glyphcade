@@ -2,7 +2,7 @@
 // file. This is AGENTS.md's "drive the model, assert state" tier.
 //
 // ⚠ Note what is NOT included below: no termforge header, and no
-// termgame/arcade header. board.hpp names no termforge type, so a Screen
+// glyphcade/arcade header. board.hpp names no termforge type, so a Screen
 // cannot be constructed here even by accident. If a case in this file ever
 // needs one, the model and the view have grown together and the fix belongs
 // upstream of the test.
@@ -24,12 +24,12 @@
 #include <set>
 #include <vector>
 
-#include <termgame/games/minesweeper/board.hpp>
-#include <termgame/games/minesweeper/layout.hpp>
+#include <glyphcade/games/minesweeper/board.hpp>
+#include <glyphcade/games/minesweeper/layout.hpp>
 
 namespace {
 
-using namespace termgame::minesweeper;
+using namespace glyphcade::minesweeper;
 using Seconds = std::chrono::duration<double>;
 
 constexpr Seconds kTick{1.0 / 60.0};

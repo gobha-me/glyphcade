@@ -1,4 +1,4 @@
-#include <termgame/arcade/options_screen.hpp>
+#include <glyphcade/arcade/options_screen.hpp>
 
 #include <algorithm>
 #include <string>
@@ -8,9 +8,9 @@
 #include <termforge/widgets/glyphs.hpp>
 #include <termforge/widgets/theme.hpp>
 
-#include <termgame/arcade/hud.hpp>
+#include <glyphcade/arcade/hud.hpp>
 
-namespace termgame {
+namespace glyphcade {
 namespace {
 
 // ⚠ Widest first, zero floor last — hud::tiers_are_total() is what enforces
@@ -298,4 +298,4 @@ auto OptionsScreen::draw(termforge::Screen& screen) -> void {
   }
 }
 
-}  // namespace termgame
+}  // namespace glyphcade

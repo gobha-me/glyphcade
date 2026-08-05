@@ -1,4 +1,4 @@
-#include <termgame/arcade/shell.hpp>
+#include <glyphcade/arcade/shell.hpp>
 
 #include <algorithm>
 #include <string>
@@ -6,11 +6,11 @@
 
 #include <termforge/widgets/theme.hpp>
 
-#include <termgame/arcade/hud.hpp>
-#include <termgame/arcade/registry.hpp>
-#include <termgame/build_info.hpp>
+#include <glyphcade/arcade/hud.hpp>
+#include <glyphcade/arcade/registry.hpp>
+#include <glyphcade/build_info.hpp>
 
-namespace termgame {
+namespace glyphcade {
 namespace {
 
 constexpr termforge::Rgb kAccent{0x00, 0xFF, 0x80};
@@ -109,7 +109,7 @@ Shell::Shell(std::unique_ptr<audio::AudioSink> sink)
 Shell::Shell(std::unique_ptr<audio::AudioSink> sink,
              std::filesystem::path scores)
     : m_scores_store(std::move(scores)),
-      m_title("term-game " + std::string(version_string())) {
+      m_title("glyphcade " + std::string(version_string())) {
   // ⚠ Nothing here may touch driver(), terminal() or screen(). App::m_driver is
   // a null unique_ptr until setup() (or test_run_frames) builds one, and
   // driver() dereferences it — a capability query in this constructor is a null
@@ -912,9 +912,9 @@ auto Shell::draw_too_small(termforge::Screen& screen) -> void {
   // Deliberately the crudest possible path: no widgets, no Rect arithmetic.
   // This runs precisely when the geometry the rest of the selector assumes does
   // not hold, so it must not depend on any of it.
-  const std::string msg = "term-game needs " + std::to_string(kMinCols) + "x" +
+  const std::string msg = "glyphcade needs " + std::to_string(kMinCols) + "x" +
                           std::to_string(kMinRows);
   screen.write_text(0, 0, msg, termforge::theme::kFg, termforge::theme::kBg);
 }
 
-}  // namespace termgame
+}  // namespace glyphcade

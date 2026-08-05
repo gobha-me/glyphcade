@@ -33,11 +33,11 @@
 #include <thread>
 #include <vector>
 
-#include <termgame/audio/ring.hpp>
+#include <glyphcade/audio/ring.hpp>
 
 namespace {
 
-using termgame::audio::SpscRing;
+using glyphcade::audio::SpscRing;
 
 // A payload with a redundant field, so a torn read is detectable.
 //

@@ -1,4 +1,4 @@
-# TermForge — the TUI framework term-game is built on (gobha-me/termforge).
+# TermForge — the TUI framework glyphcade is built on (gobha-me/termforge).
 #
 # This is the "linked into the library" case from the annotated recipe in
 # cmake/deps/catch2.cmake, which is three things and not one:
@@ -58,9 +58,9 @@
 # ⚠ From 0.1.11 this is also an ABI floor, not only an API one. That release
 # added members to ListWidget (a style, a marker-enabled flag and a std::string
 # marker), so sizeof(ListWidget) changed — and Shell holds one BY VALUE in
-# include/termgame/arcade/shell.hpp, which we install. A consumer that resolves
+# include/glyphcade/arcade/shell.hpp, which we install. A consumer that resolves
 # an older 0.2.x compiles our public header against a different object layout
-# than term-game_lib was built with. That is not a link error; it is a silent
+# than glyphcade_lib was built with. That is not a link error; it is a silent
 # one. cmake/project-config.cmake.in carries the same floor for that reason.
 #
 # v0.2.1 did it again — ListWidget gained m_track_fg and m_thumb_fg for #21's

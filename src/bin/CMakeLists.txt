@@ -2,7 +2,7 @@ add_executable(${PROJECT_NAME}
   main.cpp
 )
 
-# term-game IS the library plus a main(), so -Dterm-game_BUILD_LIB=OFF with the
+# glyphcade IS the library plus a main(), so -Dglyphcade_BUILD_LIB=OFF with the
 # binary still ON is not a supported configuration. Say so at configure time
 # rather than letting it surface as an undefined-symbol wall at link time.
 #
@@ -27,7 +27,7 @@ target_include_directories(${PROJECT_NAME}
 # ⚠ The audio backend is linked SEPARATELY and by name, not through
 # ${PROJECT_NAME}::lib, and that separation is gitea #13's decision made
 # structural: the library must never reference rtaudio, or the imported target's
-# name lands in the exported term-gameTargets.cmake and an installed package
+# name lands in the exported glyphcadeTargets.cmake and an installed package
 # cannot resolve it. See src/audio_backend/CMakeLists.txt.
 #
 # It carries ${PROJECT_NAME}::lib PUBLIC, so the line below would be enough on

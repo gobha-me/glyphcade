@@ -1,4 +1,4 @@
-// term-game — THE registry. Adding a game is one line here and nothing
+// glyphcade — THE registry. Adding a game is one line here and nothing
 // anywhere else.
 //
 // ⚠ Never replace this with self-registering statics. The tempting shape is
@@ -17,18 +17,18 @@
 // name, which requires including its header, which requires the type to be
 // complete — so a typo, a renamed class or a deleted game is a compile error.
 
-#include <termgame/arcade/registry.hpp>
+#include <glyphcade/arcade/registry.hpp>
 
 #include <cstddef>
 #include <iterator>
 
-#include <termgame/games/minesweeper/minesweeper.hpp>
-#include <termgame/games/snake/snake.hpp>
-#include <termgame/games/sokoban/sokoban.hpp>
-#include <termgame/games/tetris/tetris.hpp>
-#include <termgame/games/twenty48/twenty48.hpp>
+#include <glyphcade/games/minesweeper/minesweeper.hpp>
+#include <glyphcade/games/snake/snake.hpp>
+#include <glyphcade/games/sokoban/sokoban.hpp>
+#include <glyphcade/games/tetris/tetris.hpp>
+#include <glyphcade/games/twenty48/twenty48.hpp>
 
-namespace termgame {
+namespace glyphcade {
 namespace {
 
 // Menu order is this order.
@@ -151,4 +151,4 @@ static_assert(all_geometry_is_declared(),
 
 auto all_games() noexcept -> std::span<const GameEntry> { return kGames; }
 
-}  // namespace termgame
+}  // namespace glyphcade

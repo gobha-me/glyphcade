@@ -1,4 +1,4 @@
-#include <termgame/games/twenty48/twenty48.hpp>
+#include <glyphcade/games/twenty48/twenty48.hpp>
 
 #include <algorithm>
 #include <array>
@@ -7,10 +7,10 @@
 
 #include <termforge/widgets/theme.hpp>
 
-#include <termgame/arcade/hud.hpp>
-#include <termgame/games/twenty48/glyphs.hpp>
+#include <glyphcade/arcade/hud.hpp>
+#include <glyphcade/games/twenty48/glyphs.hpp>
 
-namespace termgame {
+namespace glyphcade {
 
 namespace {
 
@@ -477,4 +477,4 @@ auto Twenty48::draw_too_small(termforge::Screen& screen) -> void {
   }
 }
 
-}  // namespace termgame
+}  // namespace glyphcade

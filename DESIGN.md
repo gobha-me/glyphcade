@@ -1,11 +1,11 @@
-# term-game — Design
+# glyphcade — Design
 
 A TUI arcade suite in C++23. **TermForge** renders it, **RtAudio** sounds it.
 
 Sibling to [HTML-Games](https://git.gobha.me/xcaliber/HTML-Games) — same
 arcade-of-small-games idea, same roster to raid, but TUI and C++ instead of
 HTML/CSS/JS. Where HTML-Games is a browser launcher over static directories,
-term-game is a single binary hosting compiled-in games.
+glyphcade is a single binary hosting compiled-in games.
 
 ---
 
@@ -116,7 +116,7 @@ up.
 
 **Games are self-contained**, per the HTML-Games convention that has already
 proven out: one directory, one static library target, no cross-game includes. A
-game may use the shared services in `include/termgame/`, but never another
+game may use the shared services in `include/glyphcade/`, but never another
 game's headers.
 
 **Shipped** — deferred through Epic 1–3, landed ahead of Epic 4 as its own
@@ -124,13 +124,13 @@ change, because a build restructure bundled with a new game makes a red CI run
 ambiguous between the two. `src/lib` is four static libraries:
 
 ```
-term-game_lib      arcade/shell.cpp, arcade/exception_boundary.cpp
+glyphcade_lib      arcade/shell.cpp, arcade/exception_boundary.cpp
   ↓                the ALIAS, the export, the only spelling outside src/lib
-term-game_roster   arcade/all_games.cpp — the registry table
+glyphcade_roster   arcade/all_games.cpp — the registry table
   ↓
-term-game_game_<name>   one per game
+glyphcade_game_<name>   one per game
   ↓
-term-game_core     build_info.cpp, audio/*.cpp — what a game MAY call
+glyphcade_core     build_info.cpp, audio/*.cpp — what a game MAY call
 ```
 
 **Which file sits in which target is the design, and it was measured rather than
@@ -142,10 +142,10 @@ single-pass linker cannot resolve. It fails unconditionally, in every link
 declaration order, because CMake emits the topological order and `game → core`
 pins core last; so the fix is always to move a *file*, never to reorder a link
 line. The rule: **if a game may call it, it belongs in core; if it drives the
-roster or owns the terminal, it belongs in `term-game_lib`.**
+roster or owns the terminal, it belongs in `glyphcade_lib`.**
 
 Two guarantees fall out of the layering rather than being maintained by hand. A
-game **cannot** reach the Shell — core sits below the games, so `termgame::Shell`
+game **cannot** reach the Shell — core sits below the games, so `glyphcade::Shell`
 is not on a game's link line, which makes "games never touch `App`, `Terminal`,
 or each other" a link error. And every target must join the export set, because
 `install(EXPORT)` refuses to name a target it cannot resolve — so adding a game
@@ -153,10 +153,10 @@ and forgetting to list it stops *generation* rather than shipping a package with
 a game missing.
 
 ⚠ One thing this deliberately did **not** do, contrary to what this section used
-to promise: `src/lib/games/<name>/` and `include/termgame/games/<name>/` did not
+to promise: `src/lib/games/<name>/` and `include/glyphcade/games/<name>/` did not
 collapse into a top-level `games/<name>/`. `cmake/install.cmake` ships public
 headers with a single `install(DIRECTORY include/ …)`, so a header that leaves
-`include/` leaves the package; `.clangd` and every `#include <termgame/games/…>`
+`include/` leaves the package; `.clangd` and every `#include <glyphcade/games/…>`
 in the tree assume that root too. The CMake target is what buys the isolation.
 The directory move would buy nothing and cost a tree-wide rewrite.
 
@@ -220,7 +220,7 @@ UI thread                    lock-free SPSC ring                 audio thread
 ```
 
 - **`AudioSink`** abstracts the device. Three implementations:
-  - `RtAudioSink` — the real thing. Compiled only when `TERMGAME_WITH_AUDIO=ON`.
+  - `RtAudioSink` — the real thing. Compiled only when `GLYPHCADE_WITH_AUDIO=ON`.
   - `NullSink` — consumes and discards. Lets the whole repo build and run on a
     box with no sound hardware.
   - `WavFileSink` — renders the mix to disk. This is the interesting one: it
@@ -239,7 +239,7 @@ diagram, all with their full argument at the implementation site:
   amended to say so. Drop-oldest cannot be done inside the SPSC contract: it
   means the producer advancing the consumer's index, which turns a lock-free
   queue into a CAS problem and puts a retry loop on the audio thread. See
-  `include/termgame/audio/ring.hpp`.
+  `include/glyphcade/audio/ring.hpp`.
 - **Integer phase, integer sweeps, linear envelopes — no `sin`, no `exp`.** Not
   for speed: glibc's transcendentals are not correctly-rounded and move between
   versions, and `-ffp-contract` defaults differ between compilers. The same
@@ -257,8 +257,8 @@ The mixer and voice pool live in `audio/engine.hpp` and the SFX bank in
 
 **Development reality:** the dev container has `librtaudio-dev` installed but no
 `/dev/snd` and no PulseAudio — the *library* is present, the *hardware* is not.
-So `TERMGAME_WITH_AUDIO` auto-detects to **ON** there, and the no-audio arm has
-to be built explicitly (`-DTERMGAME_WITH_AUDIO=OFF`, which is what CI runs) or it
+So `GLYPHCADE_WITH_AUDIO` auto-detects to **ON** there, and the no-audio arm has
+to be built explicitly (`-DGLYPHCADE_WITH_AUDIO=OFF`, which is what CI runs) or it
 rots unnoticed. Either way nothing can be heard from that container, so CI tests
 the mixer through `WavFileSink` and real-device verification happens on the
 maintainer's own machine. The abstraction is therefore not speculative — it is
@@ -266,7 +266,7 @@ load-bearing from the first commit.
 
 ### Graphics tiers
 
-term-game inherits TermForge's degradation contract rather than inventing one:
+glyphcade inherits TermForge's degradation contract rather than inventing one:
 capability tier picks the glyph family (`BorderStyle::Ascii` on a bare TTY) and
 decides sprite-vs-glyph tiles. Degradation surfaces as an `ErrorEvent`, never a
 silent downgrade.
@@ -292,9 +292,9 @@ second is the one that keeps being relearned:
   releases twice: the detail pane's scrollbar (Epic 6) and the pause dialog's
   frame and title delimiters (gitea #44).
 
-Venice-generated PNG art is decoded via a vendored `stb_image` in term-game.
+Venice-generated PNG art is decoded via a vendored `stb_image` in glyphcade.
 TermForge's stdlib-only policy is *its* constraint and correctly keeps decode out
-of `Image`; term-game has no such policy and is the right place for it.
+of `Image`; glyphcade has no such policy and is the right place for it.
 
 ---
 
@@ -341,7 +341,7 @@ this design pass.
 | [#63](https://github.com/gobha-me/termforge/issues/63) | `Image` has no blit/alpha compositing | sprite games |
 | [#64](https://github.com/gobha-me/termforge/issues/64) | MapWidget (Epic 3.6) | ~~Sokoban~~ — **glyph tier fixed in v0.1.19 and spent by Epic 7.** Still open upstream against the SPRITE tier, which does not exist at any tag through v0.5.1 |
 
-Of these, #27, #58, #59 and #61 were the first done, and term-game pins a tag far
+Of these, #27, #58, #59 and #61 were the first done, and glyphcade pins a tag far
 enough forward to get them (plus #71, #72 and #73 — see below). #62/#63 degrade
 rather than block, which is why the design never waited on them.
 
@@ -378,14 +378,14 @@ and the stopgaps had exit conditions written the day they were added.
 
 **This is the destination, not a checklist to stub out.** Epic 0 built only what
 it needed; a header that does not exist yet is better than an empty one, because
-an empty `include/termgame/audio/` makes the audio engine look done. `✓` marks
+an empty `include/glyphcade/audio/` makes the audio engine look done. `✓` marks
 what exists today.
 
 ```
-term-game/
+glyphcade/
 ├── CMakeLists.txt            # ✓ from cpp-template
 ├── DESIGN.md  AGENTS.md  README.md  STATUS.md         # ✓
-├── include/termgame/
+├── include/glyphcade/
 │   ├── build_info.hpp        # ✓ version + build_has_audio()
 │   ├── arcade/   exception_boundary.hpp ✓                      (Epic 0)
 │   │              game.hpp ✓  game_meta.hpp ✓  context.hpp ✓
@@ -408,10 +408,9 @@ term-game/
 ```
 
 Bootstrapped from [cpp-template](https://github.com/gobha-me/cpp-template) per
-its `NEW_PROJECT.md` checklist. Project name follows the directory name, so the
-directory, the gitea repo, and the CMake project must all read `term-game` —
-while the include dir and namespace read `termgame`, because a hyphen is illegal
-in a C++ namespace.
+its `NEW_PROJECT.md` checklist, with one divergence: the project name is written
+literally in `project()` rather than derived from the directory name, so the
+checkout can be called anything. See the divergences table in STATUS.md.
 
 ---
 
@@ -429,5 +428,5 @@ without a terminal.**
 - **The ring buffer** — TSan-clean producer/consumer test. This is the one piece
   where a bug is a heisenbug, so it gets the most adversarial treatment.
 
-CI runs GCC + Clang, ASan/UBSan, and `TERMGAME_WITH_AUDIO=OFF` (no sound
+CI runs GCC + Clang, ASan/UBSan, and `GLYPHCADE_WITH_AUDIO=OFF` (no sound
 hardware on runners) — mirroring termforge's matrix.

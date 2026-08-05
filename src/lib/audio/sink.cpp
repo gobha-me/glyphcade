@@ -1,11 +1,11 @@
-#include <termgame/audio/sink.hpp>
+#include <glyphcade/audio/sink.hpp>
 
 #include <algorithm>
 #include <array>
 #include <cstring>
 #include <utility>
 
-namespace termgame::audio {
+namespace glyphcade::audio {
 
 namespace {
 
@@ -184,4 +184,4 @@ auto WavFileSink::write_header(std::uint32_t data_bytes) -> void {
   m_out.write(h.data(), static_cast<std::streamsize>(h.size()));
 }
 
-}  // namespace termgame::audio
+}  // namespace glyphcade::audio

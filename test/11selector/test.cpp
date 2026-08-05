@@ -66,13 +66,13 @@
 
 #include <termforge/core/types.hpp>
 
-#include <termgame/arcade/registry.hpp>
-#include <termgame/arcade/shell.hpp>
-#include <termgame/games/minesweeper/minesweeper.hpp>
+#include <glyphcade/arcade/registry.hpp>
+#include <glyphcade/arcade/shell.hpp>
+#include <glyphcade/games/minesweeper/minesweeper.hpp>
 
 namespace {
 
-using termgame::Shell;
+using glyphcade::Shell;
 
 class Probe final : public Shell {
  public:
@@ -261,7 +261,7 @@ struct Hit {
 // Looked up rather than hardcoded — the roster will grow, and menu order is
 // registry order.
 [[nodiscard]] auto game_index(std::string_view slug) -> int {
-  const auto games = termgame::all_games();
+  const auto games = glyphcade::all_games();
   for (std::size_t i = 0; i < games.size(); ++i) {
     if (games[i].meta.slug == slug) return static_cast<int>(i);
   }
@@ -272,8 +272,8 @@ struct Hit {
   return game_index("minesweeper");
 }
 
-[[nodiscard]] auto game_of(const Shell& shell) -> const termgame::Minesweeper* {
-  return dynamic_cast<const termgame::Minesweeper*>(shell.current_game());
+[[nodiscard]] auto game_of(const Shell& shell) -> const glyphcade::Minesweeper* {
+  return dynamic_cast<const glyphcade::Minesweeper*>(shell.current_game());
 }
 
 // Enter Minesweeper from a fresh selector.
@@ -305,7 +305,7 @@ auto enter_game(Probe& app) -> void {
 
 TEST_CASE("the selector lists every linked game", "[selector]") {
   Probe app;
-  REQUIRE(app.selector_item_count() == termgame::all_games().size());
+  REQUIRE(app.selector_item_count() == glyphcade::all_games().size());
   REQUIRE(app.selector_item_count() > 0);
   REQUIRE(app.state() == Shell::State::Selector);
   REQUIRE(app.current_game() == nullptr);
@@ -319,12 +319,12 @@ TEST_CASE("arrow keys move the selection", "[selector]") {
 
   app.dispatch_event(key(termforge::Key::End));
   REQUIRE(app.selector_index() ==
-          static_cast<int>(termgame::all_games().size()) - 1);
+          static_cast<int>(glyphcade::all_games().size()) - 1);
 
   app.dispatch_event(key(termforge::Key::Home));
   REQUIRE(app.selector_index() == 0);
 
-  if (termgame::all_games().size() > 1) {
+  if (glyphcade::all_games().size() > 1) {
     app.dispatch_event(key(termforge::Key::Down));
     REQUIRE(app.selector_index() == 1);
     app.dispatch_event(key(termforge::Key::Up));
@@ -361,14 +361,14 @@ TEST_CASE("the selected row is marked in TEXT and not colour",
 
   // Anchor the row rather than trusting the constant: if the layout moves, this
   // fails loudly instead of quietly comparing two blank cells.
-  REQUIRE(row_text(app, kRow0).find(termgame::all_games().front().meta.title) !=
+  REQUIRE(row_text(app, kRow0).find(glyphcade::all_games().front().meta.title) !=
           std::string::npos);
 
   // '>' and not '▸' because the fallback tier is the ASCII tier — mark_glyphs()
   // keys off BorderStyle, and Shell::draw_selector passes the one it probed.
   REQUIRE(cell_text(app, kMarkX, kRow0) == ">");
 
-  if (termgame::all_games().size() > 1) {
+  if (glyphcade::all_games().size() > 1) {
     // ⚠ .empty(), not " ". fill_rect leaves Cell::text empty; it does not write
     // a space. Asserting " " here fails against a correct implementation.
     REQUIRE(cell_text(app, kMarkX, kRow0 + 1).empty());
@@ -403,7 +403,7 @@ TEST_CASE("a click in the marker gutter selects its row", "[selector][mark]") {
   REQUIRE(app.state() == Shell::State::InGame);
   REQUIRE(app.current_game() != nullptr);
   REQUIRE(app.current_game()->meta().slug ==
-          termgame::all_games().front().meta.slug);
+          glyphcade::all_games().front().meta.slug);
 }
 
 TEST_CASE("real escape sequences reach the list", "[selector]") {
@@ -411,7 +411,7 @@ TEST_CASE("real escape sequences reach the list", "[selector]") {
   // would keep passing if the decoder broke. "\x1b[B" is Down.
   Probe app;
   app.step();
-  if (termgame::all_games().size() < 2) return;  // nothing to move to yet
+  if (glyphcade::all_games().size() < 2) return;  // nothing to move to yet
 
   REQUIRE(app.selector_index() == 0);
   app.test_pump({"\x1b[B"});
@@ -774,9 +774,9 @@ TEST_CASE("a game can end itself", "[selector][lifetime]") {
   // opening the single mine loses immediately — no dependence on the RNG.
   Probe app;
   enter_game(app);
-  auto* game = const_cast<termgame::Minesweeper*>(game_of(app));
+  auto* game = const_cast<glyphcade::Minesweeper*>(game_of(app));
   REQUIRE(game != nullptr);
-  const termgame::minesweeper::Coord mines[]{{3, 3}};
+  const glyphcade::minesweeper::Coord mines[]{{3, 3}};
   game->board().load_mines(mines);
   game->board().reveal({.row = 3, .col = 3});
   REQUIRE(game->board().finished());
@@ -825,7 +825,7 @@ TEST_CASE("the selector survives entering and leaving repeatedly",
 // Asserted through Shell::audio().play_count(), which counts INTENT rather than
 // sound. Two consequences worth knowing before extending these:
 //
-//   * they pass identically on the TERMGAME_WITH_AUDIO=OFF arm CI runs, because
+//   * they pass identically on the GLYPHCADE_WITH_AUDIO=OFF arm CI runs, because
 //     a NullSink Shell still records what was asked for; and
 //   * no sink injection is needed anywhere, so nothing here touches the disk.
 //
@@ -852,13 +852,13 @@ TEST_CASE("the selector survives entering and leaving repeatedly",
 // is 20x8, which leaves the list three interior rows. all_games() is a
 // file-local constexpr table with no injection seam. Revisit when the roster
 // reaches four entries (Epic 6), or when a test-only substitute for the
-// term-game_roster target earns its keep — src/lib/CMakeLists.txt already makes
+// glyphcade_roster target earns its keep — src/lib/CMakeLists.txt already makes
 // the roster its own archive, so the seam exists at the link level. Until then
 // the negative half is the whole assertion, and it is the load-bearing one:
 // what changed under us is that the selection stopped moving.
 
 TEST_CASE("entering a game plays the select sound", "[selector][audio]") {
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   app.step();
@@ -877,7 +877,7 @@ TEST_CASE("a click that enters a game plays select, not move",
   // not move the selection, so MenuMove stays silent either way. What it does
   // pin is that entering by mouse and entering by Enter agree, which is the
   // property that would break if the two paths ever grew separate bindings.
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   app.step();  // ListWidget::rect() is only set inside on_render — trap 2
@@ -908,9 +908,9 @@ TEST_CASE("a click on a NON-selected row plays select and not move",
   // time control returns the Shell is already InGame. Without the state guard that
   // one gesture emits BOTH sounds; with it, only MenuSelect. One gesture, one
   // sound.
-  if (termgame::all_games().size() < 2) return;
+  if (glyphcade::all_games().size() < 2) return;
 
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   app.step();  // ListWidget::rect() is only set inside on_render — trap 2
@@ -923,7 +923,7 @@ TEST_CASE("a click on a NON-selected row plays select and not move",
   // It entered the SECOND game, which is also what proves the click landed on
   // row 1 rather than being clamped back to row 0.
   REQUIRE(app.current_game()->meta().slug ==
-          termgame::all_games()[1].meta.slug);
+          glyphcade::all_games()[1].meta.slug);
 
   REQUIRE(app.audio().play_count(SfxId::MenuSelect) == 1);
   REQUIRE(app.audio().play_count(SfxId::MenuMove) == 0);
@@ -965,7 +965,7 @@ TEST_CASE("the wheel plays no sound", "[selector][wheel][audio]") {
   // must be silent. Binding the sound to the gesture instead — the mistake the
   // key path's comment warns about — would blip on every notch of a wheel that
   // did nothing at all.
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   app.step();
@@ -982,7 +982,7 @@ TEST_CASE("a key that moves nothing makes no sound", "[selector][audio]") {
   // however long the roster grows, because Up at the top and Down at the bottom
   // always clamp. Binding the arrow keys directly instead of edge-detecting the
   // selection would make every one of these blip.
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   app.step();
@@ -994,7 +994,7 @@ TEST_CASE("a key that moves nothing makes no sound", "[selector][audio]") {
   REQUIRE(app.audio().play_count(SfxId::MenuMove) == 0);
 
   app.dispatch_event(key(termforge::Key::End));
-  if (termgame::all_games().size() == 1) {
+  if (glyphcade::all_games().size() == 1) {
     // End on a one-item list is also a no-op, so still silent.
     REQUIRE(app.audio().play_count(SfxId::MenuMove) == 0);
   }
@@ -1003,9 +1003,9 @@ TEST_CASE("a key that moves nothing makes no sound", "[selector][audio]") {
 TEST_CASE("moving the selection plays the move sound", "[selector][audio]") {
   // Behind the roster guard — see the note above. This is the positive half,
   // and it starts running for free the moment a second game is registered.
-  if (termgame::all_games().size() < 2) return;
+  if (glyphcade::all_games().size() < 2) return;
 
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   app.step();
@@ -1025,7 +1025,7 @@ TEST_CASE("a silent build still records what was asked for",
   // NullSink, so play() posts nothing and the ring stays empty — but the intent
   // counters still move. If Engine::play() ever stopped short-circuiting, the
   // dropped() counter here would start climbing instead.
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
 
   Probe app;
   app.step();
@@ -1128,7 +1128,7 @@ TEST_CASE("a repeated arrow still moves the selection, a released one does not",
   // cannot insert twice per keystroke. If a future pin bump changed that, the
   // selection would move on the way up as well as the way down, and this is
   // where that would surface.
-  if (termgame::all_games().size() < 2) return;
+  if (glyphcade::all_games().size() < 2) return;
 
   Probe app;
   app.step();
@@ -1198,7 +1198,7 @@ TEST_CASE("the keyboard tier is the game's, and is given back on the way out",
   // And the consumer.
   const int index = game_index("tetris");
   REQUIRE(index >= 0);
-  REQUIRE(termgame::all_games()[static_cast<std::size_t>(index)].meta.keyboard ==
+  REQUIRE(glyphcade::all_games()[static_cast<std::size_t>(index)].meta.keyboard ==
           termforge::KeyboardMode::Enhanced);
 
   while (app.selector_index() < index) {
@@ -1285,9 +1285,9 @@ TEST_CASE("a wheel notch scrolls the view without moving the selection",
   // stays put and may scroll out of sight. The negative half — that the
   // selection does NOT move and no MenuMove sounds — has been asserted since
   // the bump. This is the half that needs a roster longer than the pane.
-  if (termgame::all_games().size() < 4) return;
+  if (glyphcade::all_games().size() < 4) return;
 
-  using termgame::audio::SfxId;
+  using glyphcade::audio::SfxId;
   Probe app;
   app.step(1, 60, 8);  // three interior rows, four entries: it overflows
 
@@ -1314,7 +1314,7 @@ TEST_CASE("the scrollbar is 7-bit when the roster overflows the pane",
   // Until a roster overflowed its pane no scrollbar was ever drawn at any size
   // the 7-bit sweep could reach, so "the bottom-tier case passes without that
   // line" was not evidence of anything. It is now.
-  if (termgame::all_games().size() < 4) return;
+  if (glyphcade::all_games().size() < 4) return;
 
   Probe app;
   app.step(1, 60, 8);
@@ -1623,7 +1623,7 @@ TEST_CASE("the footer warns when the selected game will not fit",
     // The assertion is deliberately NOT "the full sentence is present" — the
     // point of a cascade is that it is not. It is that whatever appears
     // contains the whole size, never a prefix of it.
-    for (const auto& entry : termgame::all_games()) {
+    for (const auto& entry : glyphcade::all_games()) {
       const std::string wh =
           std::to_string(entry.meta.geometry.cols) + "x" +
           std::to_string(entry.meta.geometry.rows);

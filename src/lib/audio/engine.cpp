@@ -1,9 +1,9 @@
-#include <termgame/audio/engine.hpp>
+#include <glyphcade/audio/engine.hpp>
 
 #include <algorithm>
 #include <utility>
 
-namespace termgame::audio {
+namespace glyphcade::audio {
 
 // ── Mixer ───────────────────────────────────────────────────────────────────
 
@@ -210,4 +210,4 @@ auto Engine::sink_name() const noexcept -> std::string_view {
   return m_sink != nullptr ? m_sink->name() : "none";
 }
 
-}  // namespace termgame::audio
+}  // namespace glyphcade::audio

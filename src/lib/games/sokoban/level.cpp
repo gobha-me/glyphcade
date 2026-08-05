@@ -1,11 +1,11 @@
-// term-game — Sokoban: the level parser.
+// glyphcade — Sokoban: the level parser.
 
-#include <termgame/games/sokoban/level.hpp>
+#include <glyphcade/games/sokoban/level.hpp>
 
 #include <algorithm>
 #include <cstddef>
 
-namespace termgame::sokoban {
+namespace glyphcade::sokoban {
 
 auto describe(ParseError e) noexcept -> std::string_view {
   // ⚠ 7-bit ASCII, fixed literals. These reach the screen on the no-colour
@@ -106,4 +106,4 @@ auto parse(std::span<const std::string_view> rows, std::string_view name,
   return lv;
 }
 
-}  // namespace termgame::sokoban
+}  // namespace glyphcade::sokoban

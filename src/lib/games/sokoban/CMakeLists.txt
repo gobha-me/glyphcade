@@ -14,7 +14,7 @@ endif ()
 # separate from board.cpp because the format is separable from the rules: a
 # level file is validated once, at load, and the rules never look at a character
 # again. It is also the only part of this game a future level-file loader would
-# reuse unchanged. Headers stay in include/termgame/games/sokoban/ —
+# reuse unchanged. Headers stay in include/glyphcade/games/sokoban/ —
 # cmake/install.cmake ships public headers with one install(DIRECTORY include/
 # ...), so a header that leaves include/ leaves the package.
 add_library(${PROJECT_NAME}_game_sokoban STATIC
@@ -33,9 +33,9 @@ target_link_libraries(${PROJECT_NAME}_game_sokoban
   PUBLIC ${PROJECT_NAME}_core
 )
 
-# ⚠ No TERMGAME_WITH_AUDIO, no rtaudio, no link to ${PROJECT_NAME}_lib. A game
+# ⚠ No GLYPHCADE_WITH_AUDIO, no rtaudio, no link to ${PROJECT_NAME}_lib. A game
 # plays a sound by asking GameContext for the Player; it never learns whether the
-# sink is real. And core sits BELOW the games, so termgame::Shell is not on this
+# sink is real. And core sits BELOW the games, so glyphcade::Shell is not on this
 # target's link line — a game cannot reach the Shell even by accident.
 #
 # ⚠ termforge::lib arrives through core, PUBLIC. This is the first game to use a
