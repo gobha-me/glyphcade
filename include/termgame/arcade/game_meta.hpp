@@ -18,6 +18,7 @@
 // goes out of scope, and nothing here can detect it.
 
 #include <cstddef>
+#include <cstdint>
 #include <span>
 #include <string_view>
 
@@ -57,6 +58,81 @@ inline constexpr std::size_t kMaxGameOptions = 4;
 // COUNT rather than the joined list, because twenty names is five wrapped rows
 // of a pane that only has 48 columns to begin with.
 inline constexpr std::size_t kInlineChoiceMax = 6;
+
+// What kind of fact a game's size floor is. gitea #15 + #42.
+//
+// ⚠ THIS ENUM IS THE WHOLE REASON #15 TOOK SIX DEFERRALS. The obvious shape —
+// a bare `min_cols` / `min_rows` pair — was refused for a reason that is worth
+// keeping in front of whoever edits this next, and it is written out at
+// games/sokoban/layout.hpp:23: Minesweeper needs 21 columns because nine cells
+// at two columns each plus three of chrome is 21, and the terminal either has
+// them or the board cannot be drawn. Sokoban's 34 is nothing of the kind. It
+// has a CAMERA, so no level is ever undrawable at any size; 34x12 is a
+// judgement that below sixteen tiles across you cannot see enough of a room to
+// plan a push. A single field would sit those two numbers side by side and
+// invite the selector to treat them as the same fact.
+//
+// So the kind travels with the number.
+//
+// ⚠ WHAT THE KIND IS NOT: A PROMISE ABOUT BEHAVIOUR. Both kinds REFUSE below
+// their floor — Sokoban's compute_layout sets `fits = cols >= kNeedCols && rows
+// >= kNeedRows` and its draw() falls through to draw_too_small() exactly as the
+// other four do. An earlier draft of this enum had the selector print
+// "recommended" for Playable and "minimum" for Drawable, which read as "you may
+// go below this one"; a player then pressed Enter and got a hard refusal
+// screen. That is the same binary disagreeing with itself one keystroke apart —
+// the defect gitea #42 was filed about — reintroduced by the change meant to
+// fix it. Three independent reviews caught it and it reproduced on a 30x10 pty.
+//
+// What the kind actually records is whether the NUMBER is derivable or chosen,
+// which is a fact about how it may be revised: 21x13 falls out of the board and
+// cannot move, 34x12 is an argument about seeing enough of a room and could be
+// argued down. The selector says "needed" for both and adds "to play well" for
+// a Playable one — the *reason* differs, the force does not.
+enum class SizeFloor : std::uint8_t {
+  // Below this the game cannot be drawn. Arithmetic, derived from the board.
+  Drawable,
+  // Below this it could be drawn but is not worth playing, so the game refuses
+  // anyway. A judgement, and only a game that can always draw itself — i.e.
+  // one with a camera — is entitled to one.
+  Playable,
+};
+
+// The smallest terminal a game asks for, and what kind of ask it is.
+//
+// ⚠ THE CONTRACT IS "PLAYABLE AT ALL", NOT "PLAYABLE AT EVERY SETTING", and
+// Minesweeper is the case that makes the difference. Its Hard preset needs
+// 63x20; its Easy preset needs 21x13; and on a 40x15 terminal you can play
+// Minesweeper perfectly well, you just cannot play it on Hard. So it declares
+// 21x13. The in-game screen that names what the CHOSEN board needs and keeps
+// the level keys live (minesweeper.cpp's draw_too_small) is the right
+// behaviour, it stays, and this field is not a replacement for it — #15 is
+// about finding out one screen earlier, never about refusing.
+//
+// ⚠ NEVER TYPE THESE NUMBERS. Every registered game initialises this from the
+// constants in its own games/<name>/layout.hpp, which are the same constants
+// its compute_layout compares against. A hand-copied literal is a second
+// source of truth that drifts silently the first time a board changes size,
+// and test/34geometry exists to assert the number is the actual boundary
+// rather than merely present.
+struct GameGeometry {
+  int cols{0};  // 0x0 == no floor beyond the Shell's own kMinCols x kMinRows
+  int rows{0};
+  SizeFloor floor{SizeFloor::Drawable};
+};
+
+// Does a terminal of this size clear the game's floor? An undeclared floor
+// ({0,0}) clears everything, which is what makes the field optional.
+//
+// ⚠ BOTH COMPARISONS ARE >=, and the boundary is inclusive: a game declaring
+// 58x20 is asking to be given 58x20, not 59x21. test/34geometry pins that by
+// asserting the declared size is exactly where the game's own compute_layout
+// flips, so an off-by-one here disagrees with the game rather than merely
+// looking different.
+[[nodiscard]] constexpr auto meets_floor(const GameGeometry& g, int cols,
+                                         int rows) noexcept -> bool {
+  return cols >= g.cols && rows >= g.rows;
+}
 
 struct GameMeta {
   std::string_view slug;         // stable id, kebab-case: "minesweeper"
@@ -108,10 +184,26 @@ struct GameMeta {
   // mechanism that taxed the game with nothing to ask would be the wrong
   // mechanism.
   //
-  // ⚠ DECLARED LAST, and that is not arbitrary. Designated initialisers must
-  // follow declaration order, so a field added above `keyboard` would force an
-  // edit to Tetris's kMeta, which already sets it. Add the next one here too.
   std::span<const OptionSpec> options{};
+
+  // The smallest terminal this game asks for, and what kind of ask it is. See
+  // GameGeometry above for why the kind is part of it. gitea #15 + #42.
+  //
+  // ⚠ THE SHELL ONLY READS THIS TOO, and it never refuses. The detail pane
+  // names the size, and the selector's footer says so when the current
+  // terminal is below it — which is one screen earlier than the player used to
+  // find out, and that is the whole of the fix. Nothing here greys a row,
+  // disables Enter, or stops a game starting: a player who wants to launch
+  // Tetris on a 30-row terminal and read its own message about it is not doing
+  // anything wrong.
+  //
+  // ⚠ DECLARED LAST, and that is not arbitrary. Designated initialisers must
+  // follow declaration order, so a field inserted ABOVE this one forces an edit
+  // to every kMeta that sets anything below it. As of this field the blast
+  // radius is the whole roster — all five games set `.geometry`, four set
+  // `.options`, two set `.keyboard` — plus the eleven locally-declared metas in
+  // test/33options and the six in test/34geometry. Add the next one HERE.
+  GameGeometry geometry{};
 };
 
 // Columns the selector reserves for an icon, so a game without one still lines
@@ -243,6 +335,34 @@ inline constexpr int kIconCols = 2;
   // A list-rendered option needs every row on the screen, so it cannot share
   // one. See kInlineChoiceMax above.
   return !has_list || m.options.size() == 1;
+}
+
+// Three ways a size floor can be wrong, none of them visible at the call site.
+//
+// ⚠ SAME PLACEMENT ARGUMENT AS options_are_well_formed ABOVE, and it is why
+// this is public and per-meta rather than a loop inside all_games.cpp: every
+// registered game declares a correct geometry, so a correct registry can never
+// witness a check for an incorrect one. The negatives live in test/34geometry.
+// If you add a clause, add its negative there too.
+//
+// ⚠ WHAT IS DELIBERATELY NOT HERE: any comparison against the Shell's own
+// kMinCols / kMinRows. GameMeta is in term-game_core, which sits BELOW the
+// Shell in the link chain precisely so a game cannot reach it (AGENTS.md, "a
+// game links term-game_core and nothing else"), and reaching for shell.hpp
+// here to tighten one assert would invert that. test/34geometry makes the
+// comparison instead, where both headers are legal to include.
+[[nodiscard]] constexpr auto geometry_is_well_formed(
+    const GameMeta& m) noexcept -> bool {
+  const GameGeometry& g = m.geometry;
+  // Neither may be negative, and a floor is declared in both axes or in
+  // neither. A half-declared floor reads as "no floor" on one axis and is
+  // almost certainly a forgotten edit rather than an intention.
+  if (g.cols < 0 || g.rows < 0) return false;
+  if ((g.cols == 0) != (g.rows == 0)) return false;
+  // Playable is a judgement ABOUT a number. Without one there is nothing to
+  // judge, and the selector would have a kind to print and no size to print
+  // beside it.
+  return !(g.cols == 0 && g.floor == SizeFloor::Playable);
 }
 
 }  // namespace termgame

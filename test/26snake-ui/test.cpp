@@ -673,6 +673,18 @@ TEST_CASE("the board does not move while the options screen is up",
   REQUIRE(g != nullptr);
   const auto head_before = g->board().head();
 
+  // ⚠ A BASELINE, NOT ZERO, and this used to be an absolute `ticks() == 120`.
+  // ticks() counts EVERY tick the game receives, and the two app.step() calls
+  // above deliver some: test_run_frames deliberately does not reset the tick
+  // clock, so real wall time spent drawing selector frames becomes ticks the
+  // Shell's accumulator hands over. On a quiet machine that is zero and the
+  // absolute form passed for six releases. It is not a property of the code
+  // under test — gitea #42 added a few string builds to draw_selector and this
+  // case went red five runs in six on the loaded TSan build, pointing at Snake
+  // for something Snake had no part in. What the case means is that the 120
+  // ticks below ARRIVED, so that is what it now measures.
+  const int ticks_before = g->ticks();
+
   // ⚠ Far ENOUGH. Snake's step interval is hundreds of milliseconds, so a small
   // dt passes against the mutant and proves nothing. Two seconds is several
   // steps at every difficulty.
@@ -681,7 +693,8 @@ TEST_CASE("the board does not move while the options screen is up",
   }
   CHECK(g->board().head() == head_before);
   CHECK(g->board().state() == State::Running);
-  CHECK(g->ticks() == 120);  // the ticks ARRIVED; the gate is why they did nothing
+  // The ticks ARRIVED; the gate above is why they did nothing.
+  CHECK(g->ticks() - ticks_before == 120);
 
   // ⚠ THE CONTROL. Without it this case passes against a Snake whose board
   // cannot move at all -- a broken tick(), a frozen board, a wrong fixture.

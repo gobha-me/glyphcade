@@ -2,16 +2,35 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-07-31** (gitea #46 — the exported package is now *resolved*
-by a ctest rather than read as text, closing the one gap in the install story;
-before it #45 — the options cycler joins the glyph tier, and the suite renders
-above the ASCII tier for the first time; #44 — the pause dialog joins the border
-tier; plus the first maintainer feel report, see
+**Last updated: 2026-08-05** (gitea #42 + #15 — the geometry block: every game
+declares the smallest terminal it wants *and what kind of ask that is*, and the
+selector gets the suite's first ceiling; before it #46 — the exported package is
+now *resolved* by a ctest rather than read as text, closing the one gap in the
+install story; #45 — the options cycler joins the glyph tier, and the suite
+renders above the ASCII tier for the first time; #44 — the pause dialog joins the
+border tier; plus the first maintainer feel report, see
 [Feel and the container](#feel-and-the-container))
 
 ---
 
 ## Where the project actually is
+
+**The selector no longer disagrees with the games about size.** gitea
+[#42](https://git.gobha.me/xcaliber/term-game/issues/42) and
+[#15](https://git.gobha.me/xcaliber/term-game/issues/15), designed and landed
+together because they are the same struct field seen from two ends. A game now
+declares the smallest terminal it wants in `GameMeta::geometry`, the menu says so
+before you press Enter, and the selector's own body stops widening at 120 columns
+and centres — which is what every game already did. See "What the geometry block
+is" below.
+
+⚠ **#15 took six deferrals and the last one was right.** The objection recorded
+in `games/sokoban/layout.hpp` was not "not yet" but "the field is the wrong
+shape": a bare `min_cols` would sit Minesweeper's 21x13 — arithmetic — next to
+Sokoban's 34x12 — an opinion, because Sokoban has a camera and no level is ever
+undrawable — and invite the selector to treat them as the same fact. So the kind
+travels with the number, and the player sees the difference: **"minimum" against
+"recommended"**.
 
 **Games now ask before they start.** gitea
 [#38](https://git.gobha.me/xcaliber/term-game/issues/38) — pressing Enter on a
@@ -391,6 +410,287 @@ is never set, and nothing puts `lib/cmake/termforge/` into the scratch prefix.
 Here it is legitimately `termforge_DIR-NOTFOUND` and the script ignores that
 spelling. Without the forwarding, that machine would see a red test with a
 diagnosis pointing at the floor, which is the wrong answer.
+
+---
+
+## What the geometry block is (gitea #42 + #15)
+
+### The rule, written down for the first time
+
+**Rules extent never scales; presentation may, and has a ceiling as well as a
+floor.** It is now a hard rule in AGENTS.md, next to "every game is playable at
+the bottom tier", because it is the same kind of statement.
+
+Board size **is** the game — Minesweeper's board size is its difficulty, 2048 is
+4x4, Tetris is 10x20 — so a bigger terminal must never buy a bigger board. What
+may scale is the *cell*.
+
+⚠ **For Snake this is correctness rather than taste.** `score_key(Level, Walls)`
+does not include the field size, so growing the field would silently make every
+stored record incomparable with every new one — the exact failure the
+wrap-vs-solid split exists to prevent, arriving through geometry instead.
+
+⚠ **No per-game scaling mechanism was built**, deliberately. Nothing on the
+roster wants one, and a `cell_scale` field nothing reads is the speculative seam
+this repo has twice refused (`context.hpp`'s "no reserved seams left",
+`game_meta.hpp`'s "empty is the cheap case on purpose"). The policy is written;
+the mechanism is built when a game asks. Which is also why **Sokoban's click
+hit-test needed no change** — #42 warns that any change to how a view scales has
+to be made there too, and the answer here is that no view scales.
+
+### The floor has a kind — and the kind is a REASON, not a promise
+
+`GameMeta::geometry` is a `GameGeometry{cols, rows, SizeFloor}`, declared **last**
+(designated initialisers must follow declaration order — the note that used to
+sit on `options` moved down to it, with a corrected blast radius: all five games
+set `.geometry`, four set `.options`, only two set `.keyboard`).
+
+| game | floor | kind | detail pane reads |
+|---|---|---|---|
+| Minesweeper | 21x13 | `Drawable` | `size: 21x13 needed` |
+| 2048 | 29x19 | `Drawable` | `size: 29x19 needed` |
+| Snake | 58x20 | `Drawable` | `size: 58x20 needed` |
+| Tetris | 35x24 | `Drawable` | `size: 35x24 needed` |
+| Sokoban | 34x12 | **`Playable`** | `size: 34x12 needed to play well` |
+
+⚠ **THE FIRST DRAFT PRINTED "recommended" FOR SOKOBAN AND "minimum" FOR THE
+REST, AND THAT WAS WRONG.** It read as "you may go below this one" — and Sokoban
+refuses below 34x12 exactly as hard as the other four: its `compute_layout` sets
+`fits = cols >= kNeedCols && rows >= kNeedRows` and its `draw()` falls through to
+`draw_too_small()`. So the menu made a promise the game does not keep, one
+keystroke apart, which is **the exact defect gitea #42 was filed about**,
+reintroduced by the change meant to fix it. Reproduced on a 30x10 pty: soft
+advice, then a hard refusal with no board on it and arrow keys still incrementing
+the move counter.
+
+What the kind actually records is whether the NUMBER is derivable or chosen —
+21x13 falls out of the board and cannot move, 34x12 is an argument about seeing
+enough of a room and could be argued down. Both say **"needed"**; only the
+`Playable` one adds **why**. The reason differs, the force does not.
+
+⚠ **Minesweeper declares EASY's 21x13, not Hard's 63x20** — the contract is *the
+smallest terminal at which the game is playable at all*, not at every setting.
+And it is derived from `kMinesweeperOptions[0].default_index` via a new
+`minesweeper::default_preset()`, **not** from a typed `Level::Easy`: which level
+a fresh game starts on had three copies, and change the default to Medium and the
+menu would keep advertising 21x13 while the game that starts needs 35x20. Every
+test would have stayed green, because they all re-derived from the same hardcoded
+Easy.
+
+⚠ **Every other number is derived too**, from the constants in each game's own
+`layout.hpp` — the same ones its `compute_layout` compares against.
+
+⚠ **The selector warns; it never refuses.** Minesweeper's in-game screen naming
+what the chosen board needs and keeping the level keys live stays. #15 was always
+about finding out one screen earlier.
+
+⚠ **Declared is enforced separately from well-formed.** `{0,0}` is deliberately
+legal in the schema, so `geometry_is_well_formed` cannot catch a game that simply
+forgot one — a sixth game would compile clean in all four configurations and
+silently never warn. `all_geometry_is_declared()` is a second `static_assert` for
+exactly that, which is what makes AGENTS.md's "that is a static_assert, not a
+convention" true of this rule as well as its neighbours.
+
+### Two channels split by width, so neither can swallow the other
+
+The detail pane names the size. The pane is **dropped below 48 columns**, which
+is very nearly the band in which games stop fitting — so below that width, and
+only below it, the warning takes the footer row instead. Above it the pane is
+already saying so and the row stays the degradation notice's.
+
+⚠ **Both orderings of a SHARED row were wrong, and the tests found both.**
+
+- *Notice wins.* `m_notice` is **sticky** — it holds the most recent `ErrorEvent`
+  until the next game entry clears it — and `FallbackDriver` reports no colour
+  during setup, so on a bare terminal the footer is never free. The warning was
+  unreachable for a whole session at the bottom tier, the tier this repo promises
+  always works. `test/11selector` failed on the first run with the footer reading
+  `no colour capability: ASCII bo`.
+- *Warning wins.* That swallowed a **fresh** degradation: leaving Tetris on a
+  terminal with no kitty protocol raises the report one frame before the selector
+  redraws, and if Tetris also did not fit the warning took the row. The notice is
+  one-shot in practice, so that is a lost event — against "degradation is an
+  event, never a silent downgrade".
+
+Splitting by width dissolves it rather than picking a loser. The evidence that it
+is the better design and not merely a third option: `test/11selector`'s
+pre-existing keyboard case had to be moved off the probe's default 60x20 to keep
+passing under *warning-wins*, and the split let it move **back**.
+
+### The footer is a cascade, because one string cut a number in half
+
+`hud::pick_that_fits` is a new runtime sibling of `pick_for_width`, next to it in
+core. A `Tier` holds a `string_view` into a literal and a hand-written floor,
+which is what makes a table `static_assert`able; a sentence built from
+`std::to_string` has neither, so it is measured rather than declared.
+
+⚠ **The one-string version shipped an argument backed by a measurement one column
+above the cliff.** It read: the wanted size comes first, so only the tail is lost
+— "measured on a 30-column pty". The Shell draws the selector from **20**
+columns. On a real 22-column pty the footer read
+
+```
+Minesweeper needs 21x1
+```
+
+a truncated number that reads as a complete and wrong one. At 20-28 columns the
+old Playable arm lost its number entirely. Now three forms, widest first, and the
+narrowest is 11 characters:
+
+```
+40 cols:  Sokoban needs 34x12; you have 40x10
+30 cols:  Sokoban needs 34x12
+20 cols:  needs 21x13            (Minesweeper — its title alone is too wide)
+```
+
+⚠ **Sweeping ONE game could not see this.** The first sweep used Sokoban, whose
+title is short enough that even the widest form clips *after* the size — so
+collapsing the cascade to its widest entry survived mutation testing. The failure
+needs the longest title on the roster. The sweep now covers every game at every
+width from `kMinCols` to `kDetailPaneMinCols`.
+
+### The ceiling: 120 columns, columns only, and ALL of the chrome
+
+`Shell::kSelectorMaxCols = 120`. Past it the body stops widening and is
+**centred** — what a game does. Measured on a real 240x40 pty: the body spans
+columns **60..179**. At 120x40 it spans **0..119**, byte-identical to before.
+
+⚠ **The title, footer and hint rows are offset too**, and a first draft left them
+at x=0 arguing they were "chrome, not a measure". At 240 columns that stranded
+them sixty columns from the panes they describe — the same screen disagreeing
+with itself, which is one better than the two-screens version #42 is about and no
+more defensible. Mutation testing confirmed the gap was invisible: the span check
+reads row 1, the frames' top border, so moving the title and hint row back to x=0
+survived the entire suite.
+
+⚠ **Columns only.** Rows past a floor are *capacity* — more roster visible, and
+for the game #43 is about, more of a pile. There is no `kSelectorMaxRows`.
+
+⚠ Two `static_assert`s now tie the ceiling to the two floors it silently owns:
+below `kDetailPaneMinCols` the pane vanishes at *every* width, and in the 48..59
+band `list_w` clamps everywhere so "120 splits as 48 + 72" stops being true.
+
+Also named while the line was being touched: `kListPaneMinCols = 24`, a bare
+literal for six releases that bites from 48 to 60 columns (`48 * 2 / 5 == 19`).
+
+### A render path that allocates per frame is measurable from two suites away
+
+The sharpest thing this change taught, and it arrived as a red test in a suite
+that has nothing to do with geometry.
+
+`test/26snake-ui`'s "the board does not move while the options screen is up"
+asserted `ticks() == 120` after calling `tick()` 120 times by hand. That is only
+true if the two `app.step()` calls above it delivered **zero** ticks — and
+`test_run_frames` deliberately does not reset the tick clock, so real wall time
+spent drawing selector frames becomes ticks the accumulator hands over.
+
+The first draft rebuilt the footer warning **every frame**: three `std::string`s
+constructed and concatenated for an answer that changes only when the selection or
+the terminal does. Measured, under three CPU hogs on the TSan build: **main
+passed 6/6, the branch failed 5/6** (121, 121, 123, 121, 123 against 120).
+
+Both halves were wrong and both are fixed. The warning is cached on
+`(index, cols, rows)`, and the assertion is now a **delta** from a baseline taken
+before the loop — which is what the case always meant ("the ticks ARRIVED"). Same
+load, after: **6/6**.
+
+⚠ The lesson generalises past this change: an absolute tick count in a
+`test_run_frames` suite is a latent trap that fires for whoever next makes a
+frame slower, and points at the wrong file when it does.
+
+### Sixteen mutations, sixteen killed — after four survivors sent me back
+
+| mutation | result |
+|---|---|
+| ceiling removed (`min` → `max`) | killed — `11selector` |
+| centring dropped (`body_x` → 0) | killed — `11selector` |
+| title left unoffset | killed — `11selector` |
+| hint row left unoffset | killed — `11selector` |
+| `Playable` suffix dropped | killed — `11selector` |
+| `Playable` suffix applied to all | killed — `11selector` |
+| footer never warns | killed — `11selector` |
+| warning also fires above the pane width | killed — `11selector` |
+| cascade collapsed to its widest form | killed — `11selector` |
+| `pick_that_fits` off by one (+4 slack) | killed — `11selector`, `26snake-ui`, `28tetris-ui` |
+| `meets_floor` off by one (`>=` → `>`) | killed — `11selector`, `34geometry` |
+| `meets_floor` ignores rows | killed — `11selector`, `26snake-ui`, `34geometry` |
+| Snake's floor overstated by one column | killed — `11selector`, `34geometry` |
+| Sokoban's kind flipped to `Drawable` | killed — `11selector`, `34geometry` |
+| Minesweeper's floor pinned to Easy by hand | killed — `11selector`, `34geometry` |
+| the both-or-neither schema clause relaxed | killed — **compile error** |
+| the list's rect desynced from its painted frame | killed — `11selector` |
+
+⚠ **Four of these SURVIVED the first run, and every one was a weak test rather
+than weak code** — the title and hint offsets, the cascade collapse, and the
+`pick_that_fits` slack. Three of the four were invisible for the same reason: the
+assertion was pointed at the wrong row, or at a game whose title was too short to
+cut. Mutation testing was the only thing that said so.
+
+⚠ **A "BUILD FAILED" line is a kill when the negatives are `static_assert`s.**
+`test/34geometry`'s malformed-schema cases fail the *build*, the shape
+`test/33options` uses. Both mirror arms fired, which is the evidence that writing
+the second one was not symmetry: with only the cols-set case, rewriting the clause
+as `g.rows == 0` still rejects it and the file stays green.
+
+⚠ The usual trap did not bite but is worth restating: removing a clamp normally
+leaves an unused local, `-Werror` kills the build, and that reads as a kill with
+no assertion having run. Keep the value live (`* 0` rather than deletion).
+
+### A wide pty is now reachable, and it was not before
+
+`script(1)` sizes its pty from stdin, which is a pipe in an agent's hands, so
+every capture in this file before now was **80x24** — none of them could have seen
+a ceiling that bites past 120 columns, or a truncation that bites below 30. A
+~50-line `pty.fork()` + `ioctl(TIOCSWINSZ)` harness fixes that and is how the
+240x40, 30x10, 22x10 and 20x8 numbers above were measured. Worth rebuilding
+rather than working around the next time a size-dependent claim needs checking.
+
+The bare-tier session at 30x10 is **zero bytes ≥ 0x80** over the whole capture —
+the whole-session analogue of `all_seven_bit()`, covering the new footer strings.
+
+### What test/34geometry is for, and what it is not
+
+The tautology it refuses to be: `CHECK(Snake::kMeta.geometry.cols ==
+snake::kNeedCols)` asserts that a line of code says what it says. What it asserts
+instead is that **the declared floor is the actual boundary** — at that size the
+game's own `compute_layout` reports `fits`, and one column narrower or one row
+shorter it does not.
+
+⚠ **Both directions, or it proves half of nothing.** "It fits at the declared
+size" alone is satisfied by any floor at or above the truth, so a game claiming
+200x200 would sail through; the narrower-does-not-fit half pins it from the other
+side. That is the mutation "Snake's floor overstated by one column" catches.
+
+⚠ The Shell comparison (`no game asks for less than the Shell itself needs`)
+lives in the test and **not** in `game_meta.hpp`, because `GameMeta` is in
+`term-game_core`, which sits below the Shell in the link chain precisely so a
+game cannot reach it. A test is above both.
+
+**32 suites, up from 31.** Four configurations green — GCC with audio
+auto-detected, GCC with audio OFF, Clang, TSan — with `-Werror` throughout,
+`artifact-check` printing `CLEAN`, and `pty-restore`, `audio-export-clean` and
+`consumer-resolves` registered in all four.
+
+⚠ **And `34geometry` itself was ABSENT from the TSan build for one run**, because
+that build directory had been reconfigured while the new test dir was stashed, so
+the `file(GLOB)` never saw it. It reported `32/32` on the other three and `31/31`
+under TSan, which looks like a pass. AGENTS.md's "absent means skipped, not
+passed" is about the three conditional tests; it applies to a brand-new suite
+just as hard, and the way to catch it is to diff `ctest -N` between builds rather
+than to read the totals.
+
+### One thing deliberately not fixed here
+
+The detail pane is a `TextBox`, a chat-scrollback widget that **auto-scrolls to
+the bottom**, so once its content overflows, the game's description scrolls off
+the top and the first visible line starts mid-word. That is pre-existing — the
+"detail pane's scrollbar is 7-bit too" case drives rows 8..12 precisely because
+the description already overflowed — but the new `size:` line is one more row, so
+it becomes reachable one terminal size earlier (at 80x16 rather than 80x15).
+Filed as [#53](https://git.gobha.me/xcaliber/term-game/issues/53) rather than
+bundled: fixing the scroll position needs its own cases, and a pane that pins to
+the bottom of a description is a different defect from a pane that lacks a size
+line.
 
 ---
 
@@ -1002,6 +1302,13 @@ deferred a **fifth** time, and for a new reason rather than the same one. A
 34 — an opinion — and invite the selector to treat them as the same kind of fact.
 The four earlier deferrals said "not yet"; this one says the field is the wrong
 shape.
+
+⚠ **Superseded, and the objection above is what shaped the answer.** #15 landed
+with #42 in v0.18.0: the kind travels with the number (`SizeFloor::Drawable`
+against `Playable`), Sokoban is the roster's one `Playable`, and the selector
+prints "recommended" here where it prints "minimum" everywhere else. See "What
+the geometry block is" above. The reason this section gives for deferring was
+right — it was a specification of the field, not an argument against having one.
 
 ### Audio: one new id, the fewest of any game
 

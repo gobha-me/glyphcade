@@ -53,6 +53,12 @@ class Twenty48 final : public Game {
           "going as long as you can. One level of undo.",
       .tag = "Puzzle Sliding",
       .icon = "\U0001F522",
+      // 29x19. One board size, so this is the only number there is — and note
+      // it is still declared AFTER .options even though 2048 sets no options,
+      // because designated initialisers must follow declaration order.
+      .geometry = {.cols = twenty48::needed_cols(),
+                   .rows = twenty48::needed_rows(),
+                   .floor = SizeFloor::Drawable},
   };
 
   Twenty48();

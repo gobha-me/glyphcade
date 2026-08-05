@@ -24,6 +24,16 @@ namespace termgame::twenty48 {
 // 6 columns is not a look-nice number: kMaxTile is 131072, six digits, so a
 // narrower tile could not draw the widest legal board. glyphs.hpp asserts that.
 //
+// ⚠ THAT IS A FLOOR, AND THIS IS WHERE A READER LOOKS FOR A CEILING — so here
+// is the other half, which gitea #42 asked for. Nothing caps kTileCols. A wider
+// tile is a legal change: under the suite's rule (AGENTS.md) the board extent
+// is the game and may not move, while the CELL is presentation and may. 2048 is
+// 4x4 and stays 4x4 (board.hpp says why); the six columns each of those tiles
+// gets are a minimum with no maximum beside it. Nothing wants a larger one
+// today, so nothing derives one — but a future reader wondering whether they
+// are allowed to has an answer here rather than an argument in the other
+// direction.
+//
 // 3 rows puts the number on a middle row with a blank row above and below, which
 // is what makes a colour-filled tile read as a block rather than a line. It also
 // gives the vertical tween 4 rows of travel per cell instead of 2.
@@ -43,8 +53,10 @@ inline constexpr int kChromeRows = 4;
 }
 
 // 29x19. Above the Shell's 20x8 floor, so the selector can still launch a board
-// this terminal cannot draw — the same gap minesweeper has, tracked as gitea #15
-// and answered here the same way, with an in-game too-small screen.
+// this terminal cannot draw. Since gitea #15 it at least SAYS so first — kMeta
+// declares this pair as its geometry and the menu warns — but the warning is
+// not a refusal, so the in-game too-small screen below is still the thing that
+// catches it, exactly as before.
 [[nodiscard]] constexpr auto needed_cols() noexcept -> int {
   return grid_cols() + kChromeCols;
 }

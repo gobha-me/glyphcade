@@ -71,8 +71,34 @@ half the point of this repo.
 - **Every game is playable at the bottom tier.** Pixel sprites are an
   enhancement over a glyph fallback that always exists — the same relationship
   `Widget::draw_pixels` has to `Widget::draw`. A game that needs Kitty is a bug.
+- **Rules extent never scales; presentation may, and has a ceiling as well as a
+  floor.** Board size **is** the game — Minesweeper's board size is its
+  difficulty, 2048 is 4x4, Tetris is 10x20 — so a bigger terminal must never buy
+  a bigger board. ⚠ For Snake that is **correctness, not taste**:
+  `score_key(Level, Walls)` does not include the field size, so growing the
+  field silently makes every stored record incomparable with every new one. What
+  may scale is the *cell*; `kCellCols = 2` is already an aspect-ratio correction
+  rather than a unit. Every game declares its floor in `GameMeta::geometry`
+  **with its kind** — `SizeFloor::Drawable` is arithmetic (the board has one
+  size and the terminal has room or does not), `Playable` is a judgement (only a
+  game that can always draw itself, i.e. Sokoban's camera, is entitled to one) —
+  and the selector states them with the same **force** — both say "needed",
+  because both kinds refuse below their floor — differing only in the **reason**
+  a `Playable` one adds ("to play well"). ⚠ A draft that printed "recommended"
+  for the `Playable` game read as "you may go below this one", and the game then
+  refused anyway: the menu promising what the game does not keep, one keystroke
+  apart, which is the very defect this rule exists to prevent. ⚠ The ceiling is
+  on **columns only**: rows past a floor are
+  *capacity* (more roster visible in a scrolling list, more of a pile in a card
+  game), columns past a prose measure are not. There is no `kSelectorMaxRows`
+  and there should not be one.
 - **Degradation is an event** (inherited from TermForge). Any fallback raises an
-  `ErrorEvent`, never a silent downgrade.
+  `ErrorEvent`, never a silent downgrade. ⚠ But `Shell::m_notice` is **sticky** —
+  it holds the most recent event until the next game entry clears it, so on a
+  no-colour terminal the capability report sits in the footer for the whole
+  session. That is why the selector's size warning takes that row while it
+  applies rather than deferring to the notice; the other order made the warning
+  unreachable at the bottom tier entirely.
 - **Fixed timestep, clamped delta.** Game logic advances in constant-`dt` ticks,
   and the real frame delta is clamped so a breakpoint or a laptop suspend cannot
   deliver one enormous `dt`. Determinism here is what makes logic testable.
