@@ -2,7 +2,9 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-08-05** (gitea #42 + #15 — the geometry block: every game
+**Last updated: 2026-08-05** (gitea #55 — Tetris's next-up preview is now the
+spawn stream rather than a dead-end copy of it, the first defect here found by
+playing on hardware; before it #42 + #15 — the geometry block: every game
 declares the smallest terminal it wants *and what kind of ask that is*, and the
 selector gets the suite's first ceiling; before it #46 — the exported package is
 now *resolved* by a ctest rather than read as text, closing the one gap in the
@@ -14,6 +16,12 @@ border tier; plus the first maintainer feel report, see
 ---
 
 ## Where the project actually is
+
+**Tetris's next-up preview shows the pieces that are actually coming — for the
+first time.** gitea [#55](https://git.gobha.me/xcaliber/term-game/issues/55),
+the first defect in this repo found by *playing it on hardware* rather than by
+reading it. The panel was not stale; it was **unrelated**. See "The preview was
+a dead-end copy" below.
 
 **The selector no longer disagrees with the games about size.** gitea
 [#42](https://git.gobha.me/xcaliber/term-game/issues/42) and
@@ -275,6 +283,129 @@ without it. **Deletion condition: termforge
 accessor. Commented at the site, and item 2 of the feedback below. Saying "we
 have no workarounds" while carrying one would be the kind of claim this file
 exists to prevent.
+
+---
+
+## The preview was a dead-end copy (gitea #55)
+
+Reported by the maintainer playing on real hardware: **the next-up preview does
+not update.** Reading it made the report worse rather than better. `m_next` was
+filled by `reset()` and then read by nothing except `hold()`, while every spawn
+site — `reset()`, `lock_active()`, `clear_full_rows()` — called
+`spawn(take_next())` and pulled straight off the bag. The three pieces on the
+panel were never going to arrive.
+
+And it was skewed from the first frame. `reset()` drew `kPreview` pieces into
+`m_next` and *then* drew one more for the active piece, so the opening panel
+advertised draws 1-3 while draw 4 was already falling and draw 5 was next.
+
+⚠ **The root cause is not three wrong expressions.** It is that `spawn(Piece)`
+let each call site *choose* its piece, so "the preview is the spawn stream" was
+a convention repeated at three sites rather than a fact. Three sites is three
+chances to disagree, and they all took it. The fix is
+`spawn_next()` — pop `m_next.front()`, `advance_preview()`, `spawn()` — and
+after it **`spawn(Piece)` has exactly one caller in the file**. That is the
+whole change; the sequences are now the same sequence by construction.
+
+`hold()` keeps its own path, because it must: it peeks at the head to build a
+candidate, the fit check can still refuse the whole swap, and only then does the
+queue advance. Three touches of one queue straddling a guard — structurally the
+shape of the bug just fixed — and it is safe only because `fits()` is `const`
+and `spawn_x()` is pure. That is now written at the site rather than inferred.
+
+### Why five tests and a bag check never saw it
+
+`test/27tetris`'s seven-bag case read `[active] + preview()` as one window. That
+window was draws **4, 1, 2, 3** — a *permutation* of the first four — and the
+case counts a multiset rather than an order. **It could not have failed.** The
+seed-determinism case compared two boards to each other, and two frozen queues
+are equally frozen. Both were real properties, correctly written, and blind to
+this by construction.
+
+The two claims a preview actually makes were asserted by nothing:
+
+1. after a lock, `preview()` has **shifted**;
+2. `preview()[0]` **is** the piece that spawns next.
+
+⚠ The second cannot be tested from `preview()` alone — it needs `preview()` read
+*before* a lock compared against `active()` read *after* it. That is the reason
+a file with thirty-two cases missed it.
+
+⚠ **The bag case now reads the SPAWN stream**, which is what it always meant to
+test. It clears the stack with `load()` on each iteration: pieces spawn at rot 0
+into columns 3-6 and never complete a row, so an un-cleared board tops out
+around the tenth drop and a naive thirteen-drop loop asserts against a dead
+board. `load()` deliberately leaves the bag and the preview alone, which is what
+makes that safe — now noted on `load()` itself, because two cases depend on it.
+
+### Twelve mutations, twelve killed — and five have exactly one killer
+
+| mutation | killed by |
+|---|---|
+| `advance_preview()` shifts but does not refill the tail | bag case, the pinned opening, the panel case |
+| it shifts by two | six cases |
+| it does not shift at all | six cases |
+| `spawn_next()` pops `m_next[1]` | four cases |
+| `clear_full_rows` reverted to `spawn(take_next())` | **the line-clear case only** |
+| `lock_active` reverted to `spawn(take_next())` | window case, bag case, panel case |
+| `hold()` never advances | the empty-slot hold case |
+| `hold()` advances **above** the fit guard | **the "refused whole" case only** |
+| `hold()` advances unconditionally | **the occupied-slot hold case only** |
+| `reset()` burns a fourth draw again | pinned opening, bag case |
+| the panel draws `preview()[0]` three times | **the panel case only** |
+| the panel drops its `y += 3` | **the panel case only** |
+
+The five single-killer rows are why those cases exist. `clear_full_rows` is a
+**separate spawn call** — `lock_active` awards and returns while the rows are
+still on the board — so a fix applied to one and not the other is invisible
+everywhere else. And the two panel-only rows are the answer to "is a UI case
+redundant with the model cases": no. The model cases pin `preview()` and never
+reach the loop that draws it.
+
+⚠ **Two predictions about which mutation had a unique killer were wrong** — the
+missing refill and the restored fourth draw were each caught by more cases than
+expected. Predicting the killer set is not the same as measuring it, and only
+the measurement is evidence.
+
+⚠ **The pass had to be run twice**, because review moved `advance_preview()` to
+`std::shift_left` and rewrote how the panel case slices the screen. A mutation
+result is evidence about the code that was mutated; changing either the code or
+the tests afterwards retires it. The second run is the one in the table.
+
+### The pty run had a control, and needed one
+
+Three hard drops under `script(1)`, with the capture replayed into a grid and
+the NEXT panel snapshotted whenever it settled:
+
+- **before the fix: one panel state.** Frozen across all three drops, exactly as
+  reported.
+- **after: four states**, each one a single-step shift — every box *k* becoming
+  what box *k+1* held before the lock.
+
+⚠ The control is the point. "The panel changes" is only evidence if the same
+harness can show it *not* changing, and it was cheap: stash the two source
+files, rebuild, capture, pop.
+
+### What is verified, and what is not
+
+Green in all four configurations, `-Werror` throughout, and the symptom the
+maintainer reported is confirmed fixed in a pty. ⚠ What is **not** verified is
+whether a three-deep preview is the right depth to play with, or whether the
+panel reads well at speed — the same feel question every game here has.
+
+⚠ **The seeded piece order changed**, deliberately: a board's active piece is
+now draw 1 rather than draw 4. No fixture pinned a literal sequence, so nothing
+had to be re-derived — but the opening is now pinned on purpose for seed 1234,
+because it is the only assertion in the file that can see `reset()` burning a
+draw.
+
+⚠ **`Tetris` calls `entropy()` twice** (`tetris.cpp:82-83`), so the
+constructor's board carries a seed that `m_seed` does not describe. Harmless —
+`start()` opens the options screen and dismissing it rebuilds the board from
+`m_seed`, so the orphan is never played or drawn — and it is a suite-wide
+convention, identical in `snake.cpp`, `twenty48.cpp` and `minesweeper.cpp`.
+**Deliberately not touched here**: fixing it changes every game's opening board
+and does not belong inside a preview fix.
 
 ---
 

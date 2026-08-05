@@ -24,6 +24,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
 #include <string>
 #include <utility>
 
@@ -268,6 +269,76 @@ TEST_CASE("the panel shows the hold and next boxes", "[tetris][render]") {
   REQUIRE(all.find("HOLD") != std::string::npos);
   REQUIRE(all.find("NEXT") != std::string::npos);
   REQUIRE(all.find("score") != std::string::npos);
+}
+
+TEST_CASE("the NEXT panel advances when a piece locks", "[tetris][render]") {
+  // ⚠ gitea #55 was reported VISUALLY — "the preview does not update" — and the
+  // model cases in test/27tetris pin preview() without ever reaching the loop
+  // that DRAWS it. Three failure modes live only here: painting preview()[0]
+  // into all three boxes, dropping the y advance so they overwrite each other,
+  // and feeding held() into the NEXT slot.
+  //
+  // ⚠ Relational, and it has to be: the board is seeded from entropy(), so no
+  // case in this file may name a piece. It does not need to — box k after a
+  // lock must be box k+1 from before it.
+  //
+  // At the bottom tier colour is discarded by the fallback driver, so what is
+  // being compared is the rotation-0 FOOTPRINT. All seven are distinct in the
+  // top two box rows (I is four across, O is a 2x2, T/J/L put one cell over a
+  // bar at three different offsets, S and Z are mirrors), which is what makes a
+  // text comparison exact here rather than approximate.
+  Probe app;
+  enter_tetris(app);
+  app.step();
+
+  // Located by the label rather than by hard-coded coordinates, so the panel is
+  // free to move. Found once: it cannot move between the two reads below, and a
+  // second scan would be a second chance to find a different "NEXT".
+  int label_y = -1;
+  int label_x = -1;
+  for (int y = 0; y < app.screen().rows() && label_y < 0; ++y) {
+    const std::size_t at = row_text(app, y).find("NEXT");
+    if (at != std::string::npos) {
+      label_y = y;
+      label_x = static_cast<int>(at);
+    }
+  }
+  REQUIRE(label_y >= 0);
+
+  // ⚠ SLICED TO THE PANEL, not the whole row. Box k and box k+1 are on
+  // different rows, so a full-width capture would also be comparing whatever
+  // the well holds at those rows — passing today only because a board one drop
+  // old is blank up there, and going red for a reason with nothing to do with
+  // the preview as soon as anything is drawn behind it.
+  const auto boxes = [&app, label_y, label_x] {
+    std::array<std::string, kPreview> out{};
+    for (int k = 0; k < kPreview; ++k) {
+      for (int r = 0; r < 2; ++r) {
+        out[static_cast<std::size_t>(k)] +=
+            row_text(app, label_y + 1 + (k * 3) + r)
+                .substr(static_cast<std::size_t>(label_x), kPanelCols);
+      }
+    }
+    return out;
+  };
+
+  const auto before = boxes();
+  // ⚠ Three DIFFERENT boxes, asserted without knowing the seed: an opening
+  // preview is always three pieces from within ONE bag permutation, so they
+  // cannot repeat. A panel drawing preview()[0] three times passes every other
+  // assertion in this file.
+  REQUIRE(before[0] != before[1]);
+  REQUIRE(before[1] != before[2]);
+  REQUIRE(before[0] != before[2]);
+
+  app.dispatch_event(ch(U' '));  // hard drop: locks and spawns
+  app.step();
+
+  // One drop onto an empty field cannot clear a line or top out, so there is no
+  // path here that skips the spawn.
+  const auto after = boxes();
+  REQUIRE(after[0] == before[1]);
+  REQUIRE(after[1] == before[2]);
 }
 
 TEST_CASE("the status row drops whole fields rather than truncating one",

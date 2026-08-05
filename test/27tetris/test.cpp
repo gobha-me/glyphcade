@@ -25,6 +25,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <string_view>
@@ -53,6 +54,17 @@ constexpr std::chrono::duration<double> kTick{1.0 / 60.0};
   Board b(StartLevel::One, hold, 1234);
   REQUIRE(b.load(rows, p, rot, x, y));
   return b;
+}
+
+// ⚠ A COPY, not the span. preview() returns a view onto the board's own queue,
+// so a case that held the span across a lock would be comparing the queue with
+// itself and could never see a shift — the exact blindness gitea #55 lived in.
+// ⚠ And it copies kPreview entries rather than three, so raising the preview
+// depth widens these cases instead of leaving them checking a prefix.
+[[nodiscard]] auto preview_of(const Board& b) -> std::array<Piece, kPreview> {
+  std::array<Piece, kPreview> out{};
+  std::ranges::copy(b.preview(), out.begin());
+  return out;
 }
 
 [[nodiscard]] auto occupied_cells(const Board& b) -> int {
@@ -217,24 +229,33 @@ TEST_CASE("a piece that fits no kick does not rotate at all",
 
 // ── The 7-bag ───────────────────────────────────────────────────────────────
 
-TEST_CASE("every seven pieces contain each tetromino exactly once",
+TEST_CASE("every seven spawned pieces contain each tetromino exactly once",
           "[tetris][bag]") {
   // ⚠ THE PROPERTY THAT MAKES IT A BAG rather than seven random draws. A
   // uniform sampler passes any "all seven appear eventually" check and fails
   // this one on the first bag.
   //
-  // Read through the preview plus the active piece, which is the only view a
-  // player has and the only one this class exposes.
+  // ⚠ THE SPAWN STREAM, not the preview. This case used to read [active] +
+  // preview() as its first four entries, and gitea #55 is why that could not
+  // fail: the preview was a dead-end copy, so those four were draws 4,1,2,3 —
+  // a PERMUTATION of the first four — and the check below counts a multiset
+  // rather than an order. It passed by arithmetic accident of the exact
+  // disconnection it should have caught. The bag is a property of what SPAWNS.
+  //
+  // ⚠ load() clears the stack and deliberately leaves m_bag and m_next alone,
+  // which is the only reason this can run thirteen locks: pieces spawn at rot 0
+  // into columns 3-6 and never complete a row, so an un-cleared board tops out
+  // around the tenth drop and the loop would assert against a dead board.
   Board b(StartLevel::One, HoldSupport::Held, 99);
   std::vector<Piece> seen;
   seen.push_back(b.active().piece);
-  for (const Piece p : b.preview()) seen.push_back(p);
 
-  // Drain further by hard-dropping onto an empty board, which locks and spawns.
-  while (static_cast<int>(seen.size()) < 14) {
+  while (static_cast<int>(seen.size()) < 2 * kPieceCount) {
+    REQUIRE(b.load(empty_rows(), b.active().piece, 0, 3, kHiddenRows));
     b.hard_drop();
-    // A hard drop on an empty column never clears a line, so the next piece is
-    // live immediately.
+    // ⚠ Without this a top-out would be masked by the next load(), and every
+    // later entry would be a piece that never spawned.
+    REQUIRE(b.state() == State::Running);
     seen.push_back(b.active().piece);
   }
 
@@ -270,6 +291,120 @@ TEST_CASE("the same seed produces the same sequence", "[tetris][bag]") {
       a.preview()[0] != c.preview()[0] || a.preview()[1] != c.preview()[1] ||
       a.preview()[2] != c.preview()[2];
   REQUIRE(differs_somewhere);
+}
+
+// ── The preview ─────────────────────────────────────────────────────────────
+//
+// ⚠ gitea #55. m_next was filled once by reset() and read by nothing except
+// hold(), while every spawn drew a piece straight from the bag — so the NEXT
+// panel advertised three pieces the player would never receive, and it never
+// moved. Neither half of that is observable from preview() ALONE, which is why
+// a file with a bag case and a determinism case still missed it: it takes
+// preview() read BEFORE a lock, compared against active() read AFTER it.
+
+TEST_CASE("the preview is the next three spawns, in order",
+          "[tetris][preview]") {
+  Board b(StartLevel::One, HoldSupport::Held, 99);
+
+  // Ten locks, not one. A shift that is right on the first lock and wrong on
+  // the second — a refill that writes the wrong slot, say — needs more than one
+  // sample to show itself.
+  for (int i = 0; i < 10; ++i) {
+    // ⚠ Clears the stack, not the queue. Same reason as the bag case above.
+    REQUIRE(b.load(empty_rows(), b.active().piece, 0, 3, kHiddenRows));
+    const auto before = preview_of(b);
+
+    b.hard_drop();
+    REQUIRE(b.state() == State::Running);
+    REQUIRE(b.clearing().empty());  // the plain-lock spawn path, not the clear
+
+    REQUIRE(b.active().piece == before[0]);  // the head IS what spawned
+    REQUIRE(b.preview()[0] == before[1]);    // and the queue moved up by one
+    REQUIRE(b.preview()[1] == before[2]);
+  }
+}
+
+TEST_CASE("a line clear spawns the preview's head too", "[tetris][preview]") {
+  // ⚠ A SECOND SPAWN SITE, and a second chance to get it wrong. lock_active
+  // awards and RETURNS while the rows are still vanishing, so the piece that
+  // follows a clear comes from clear_full_rows — a different call. A fix
+  // applied to one and not the other is invisible to every other case here.
+  auto rows = empty_rows();
+  rows[19] = ".#########";
+  // ⚠ x == -2. Trap 2, as at "a completed row clears after the freeze".
+  Board b = fixture(rows, Piece::I, 1, -2, kHiddenRows);
+  const auto before = preview_of(b);
+
+  b.hard_drop();
+  REQUIRE(b.clearing().size() == 1);
+  // ⚠ NOTHING has been consumed yet, and that is the assertion. A queue that
+  // advanced here as well would advance TWICE per line clear.
+  REQUIRE(b.active().piece == Piece::I);
+  REQUIRE(preview_of(b) == before);
+
+  b.tick(ms(kLineClearMs + 10));
+  REQUIRE(b.clearing().empty());
+  REQUIRE(b.active().piece == before[0]);
+  REQUIRE(b.preview()[0] == before[1]);
+  REQUIRE(b.preview()[1] == before[2]);
+}
+
+TEST_CASE("holding into an empty slot consumes the preview's head",
+          "[tetris][preview][hold]") {
+  // The one path that always moved the queue, even before #55 — and therefore
+  // why the panel appeared to lurch exactly once per game and then freeze
+  // again, rather than reading as broken from the first frame.
+  Board b(StartLevel::One, HoldSupport::Held, 11);
+  const Piece current = b.active().piece;
+  const auto before = preview_of(b);
+
+  REQUIRE(b.hold());
+  REQUIRE(b.active().piece == before[0]);
+  REQUIRE(b.held() != nullptr);
+  REQUIRE(*b.held() == current);
+  REQUIRE(b.preview()[0] == before[1]);
+  REQUIRE(b.preview()[1] == before[2]);
+}
+
+TEST_CASE("a hold with a piece already in the slot leaves the queue alone",
+          "[tetris][preview][hold]") {
+  // ⚠ THE ASYMMETRY, as a rule. The first hold takes a piece OUT of the stream;
+  // every later one is a swap with the slot and takes nothing. Advancing on
+  // both paths silently eats one piece per hold — which no bag case can see,
+  // because a bag with a piece missing from the middle still counts as a bag
+  // seven entries later.
+  Board b(StartLevel::One, HoldSupport::Held, 11);
+  REQUIRE(b.hold());  // fills the slot, consuming the head
+  b.hard_drop();      // re-arms hold, and spawns
+  REQUIRE(b.can_hold());
+
+  const Piece current = b.active().piece;
+  const Piece swapped_in = *b.held();
+  const auto before = preview_of(b);
+
+  REQUIRE(b.hold());
+  REQUIRE(b.active().piece == swapped_in);
+  REQUIRE(*b.held() == current);
+  REQUIRE(preview_of(b) == before);
+}
+
+TEST_CASE("a fresh board's active piece is the head of its own stream",
+          "[tetris][preview][bag]") {
+  // ⚠ PINNED VALUES, deliberately, and the only case here that can see reset()
+  // burning a draw. Before #55 reset() filled the preview with three draws and
+  // then spawned a FOURTH, and that extra draw is invisible to every structural
+  // property in this file: the bag case counts a set, and the window case above
+  // starts one lock too late to see the opening. rng.hpp says a pinned sequence
+  // surfacing a generator change is the tripwire working, and test/14minesweeper
+  // pins placements against fixed seeds for the same reason.
+  //
+  // Seed 1234 is the fixture() seed, so this also records what every fixture
+  // board's queue holds — see the note on load() in board.hpp.
+  Board b(StartLevel::One, HoldSupport::Held, 1234);
+  REQUIRE(b.active().piece == Piece::J);
+  REQUIRE(b.preview()[0] == Piece::Z);
+  REQUIRE(b.preview()[1] == Piece::I);
+  REQUIRE(b.preview()[2] == Piece::S);
 }
 
 // ── Gravity, and the clock ──────────────────────────────────────────────────
@@ -609,11 +744,19 @@ TEST_CASE("a hold that would not fit is refused whole", "[tetris][hold]") {
   }
   Board b = fixture(rows, Piece::I, 1, -2, kHiddenRows);
   const Piece before = b.active().piece;
+  const auto queue = preview_of(b);
 
   REQUIRE_FALSE(b.hold());
   REQUIRE(b.held() == nullptr);
   REQUIRE(b.active().piece == before);
   REQUIRE(b.can_hold());
+
+  // ⚠ REFUSED WHOLE means the QUEUE too. hold() peeks at the preview's head to
+  // build its candidate and advances the queue only after the fit check, so the
+  // two touches straddle the guard; hoisting the advance above it would eat a
+  // piece on every refusal, and every assertion above this line would still
+  // pass.
+  REQUIRE(preview_of(b) == queue);
 }
 
 // ── DAS, and the degraded arm ───────────────────────────────────────────────
