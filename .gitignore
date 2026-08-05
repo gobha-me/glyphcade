@@ -46,3 +46,14 @@ include/version.hpp
 *.exe
 *.out
 *.app
+
+# Core dumps. Not hypothetical: a 1.1 MB `core.121788` from a crashing test
+# binary was committed once and lived in this repo's history until it was
+# stripped before the first public push. A core dump is process memory — it
+# embeds the whole environment of whoever produced it (usernames, $HOME, socket
+# paths, session ids) — so it is never a thing to commit, and the default
+# `core.<pid>` name matches no other rule here.
+core
+core.*
+vgcore.*
+*.core
