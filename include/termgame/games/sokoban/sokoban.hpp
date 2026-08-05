@@ -77,6 +77,17 @@ class Sokoban final : public Game {
       // per press, so Legacy is not a fallback, it is the right tier.
       .keyboard = termforge::KeyboardMode::Legacy,
       .options = kSokobanOptions,
+      // ⚠ THE ONE Playable ON THE ROSTER, and it is the reason SizeFloor
+      // exists at all. Sokoban has a camera: a level larger than the window
+      // scrolls rather than being refused, so there is no size at which this
+      // game cannot be DRAWN. 34x12 is sixteen tiles across and eight down,
+      // which is a judgement about seeing enough of a room to plan a push —
+      // see layout.hpp for why it is deliberately not derived from the level
+      // pack. The selector prints it as "recommended" where the other four say
+      // "minimum", which is that distinction reaching the player.
+      .geometry = {.cols = sokoban::kNeedCols,
+                   .rows = sokoban::kNeedRows,
+                   .floor = SizeFloor::Playable},
   };
 
   Sokoban();

@@ -535,9 +535,11 @@ auto Sokoban::draw_too_small(termforge::Screen& screen) -> void {
   const auto bg = termforge::theme::kBg;
   const auto fg = termforge::theme::kFg;
 
-  // Same answer the other four games give, and the same open issue behind it
-  // (gitea #15) — but a different REASON, which layout.hpp explains: this floor
-  // is about being able to plan a push, not about being able to draw the level.
+  // Same answer the other four games give — but a different REASON, which
+  // layout.hpp explains: this floor is about being able to plan a push, not
+  // about being able to draw the level. That difference is no longer only a
+  // comment: gitea #15 shipped SizeFloor, this is the roster's one Playable,
+  // and the selector says "recommended" here where it says "minimum" elsewhere.
   const std::string need = "Sokoban needs " + num(sokoban::kNeedCols) + "x" +
                            num(sokoban::kNeedRows);
   const int mid = screen.rows() / 2;

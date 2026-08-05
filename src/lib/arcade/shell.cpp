@@ -6,6 +6,7 @@
 
 #include <termforge/widgets/theme.hpp>
 
+#include <termgame/arcade/hud.hpp>
 #include <termgame/arcade/registry.hpp>
 #include <termgame/build_info.hpp>
 
@@ -46,6 +47,56 @@ constexpr termforge::Rgb kAccent{0x00, 0xFF, 0x80};
 [[nodiscard]] constexpr auto shell_may_act(
     const termforge::KeyEvent& key) noexcept -> bool {
   return key.action != termforge::KeyAction::Release;
+}
+
+// ── The size sentences (gitea #15 + #42) ─────────────────────────────────────
+
+[[nodiscard]] auto size_text(int cols, int rows) -> std::string {
+  return std::to_string(cols) + "x" + std::to_string(rows);
+}
+
+// The detail pane's line. This is the one place the KIND is visible, and the
+// difference is a reason rather than a force: both kinds refuse below their
+// floor (see SizeFloor in arcade/game_meta.hpp for the draft that got this
+// wrong and what it cost), so both say "needed" and only the Playable one adds
+// why its number is where it is.
+[[nodiscard]] auto size_phrase(const GameGeometry& g) -> std::string {
+  const std::string wh = size_text(g.cols, g.rows) + " needed";
+  return g.floor == SizeFloor::Playable ? wh + " to play well" : wh;
+}
+
+// The footer warning, widest form first, or empty when the terminal clears the
+// floor. Empty is also the answer for an undeclared floor, because
+// meets_floor({0,0}, ...) is true at every size.
+//
+// ⚠ A CASCADE, NOT ONE STRING, and hud.hpp states the general reason: write_text
+// clips at the screen edge, so a single long sentence ends mid-word and reads
+// as a rendering bug rather than as a narrow terminal. Here it was worse than
+// that. This started as one string on the argument that the wanted size comes
+// first so only the tail is lost — an argument backed by one measurement at 30
+// columns, which turned out to be one column above the cliff. The Shell draws
+// the selector from kMinCols == 20, and on a real 22-column pty the footer read
+//
+//     Minesweeper needs 21x1
+//
+// a truncated number that reads as a complete and wrong one. The narrowest form
+// below is 11 characters at its longest, so it fits kMinCols with room to
+// spare.
+//
+// ⚠ Both strings are 7-bit ASCII. They are built from std::to_string and a
+// meta's own title, which meta_text_is_ascii() already static_asserts — but
+// that is a property of what goes IN, so do not reach for a nicer dash.
+[[nodiscard]] auto size_warning(const GameMeta& meta, int cols, int rows)
+    -> std::string {
+  if (meets_floor(meta.geometry, cols, rows)) return {};
+  const std::string wh = size_text(meta.geometry.cols, meta.geometry.rows);
+  const std::string title{meta.title};
+  const std::string candidates[]{
+      title + " needs " + wh + "; you have " + size_text(cols, rows),
+      title + " needs " + wh,
+      "needs " + wh,
+  };
+  return hud::pick_that_fits(candidates, cols);
 }
 
 }  // namespace
@@ -653,6 +704,9 @@ auto Shell::refresh_detail() -> void {
   m_detail.append("");
   m_detail.append("tag:  " + std::string(meta.tag));
   m_detail.append("slug: " + std::string(meta.slug));
+  if (meta.geometry.cols > 0) {
+    m_detail.append("size: " + size_phrase(meta.geometry));
+  }
 
   if (meta.options.empty()) return;
 
@@ -682,6 +736,23 @@ auto Shell::refresh_detail() -> void {
   }
 }
 
+auto Shell::refresh_footer_warning(int cols, int rows) -> void {
+  const int index = m_list.selected();
+  if (index == m_footer_index && cols == m_footer_cols &&
+      rows == m_footer_rows) {
+    return;
+  }
+  m_footer_index = index;
+  m_footer_cols = cols;
+  m_footer_rows = rows;
+  m_footer_warning.clear();
+
+  const auto games = all_games();
+  if (index < 0 || static_cast<std::size_t>(index) >= games.size()) return;
+  m_footer_warning =
+      size_warning(games[static_cast<std::size_t>(index)].meta, cols, rows);
+}
+
 auto Shell::draw_selector(termforge::Screen& screen) -> void {
   refresh_detail();
 
@@ -690,18 +761,36 @@ auto Shell::draw_selector(termforge::Screen& screen) -> void {
   const auto style = m_ctx.border_style();
   const bool ascii = style == termforge::BorderStyle::Ascii;
 
-  m_title.set_geometry({0, 0, w, 1});
-  m_title.draw(screen);
-
   // Rows 1 .. h-3 are the panes; h-2 is the notice, h-1 the hints.
   const int body_y = 1;
   const int body_h = h - 3;
 
-  const bool with_detail = w >= kDetailPaneMinCols;
-  const int list_w = with_detail ? std::max(24, w * 2 / 5) : w;
+  // ⚠ THE CEILING, and the two lines that make the selector obey the rule
+  // every game already obeys. See kSelectorMaxCols in shell.hpp for why it is
+  // columns only and why 120. Below the cap body_w == w and body_x == 0, so
+  // every Rect below is what it has always been — this is a no-op at every
+  // size the suite drove before gitea #42.
+  //
+  // ⚠ THE CHROME ROWS ARE OFFSET TOO, and an earlier draft left them at x=0 on
+  // the argument that they are chrome rather than a measure. Three reviews
+  // called it and they were right: at 240 columns that put the title, the
+  // footer and the hint row hard against the left edge with the panes they
+  // describe starting 60 columns away — the *same* screen disagreeing with
+  // itself, which is one better than the two-screens version gitea #42 is about
+  // and no more defensible. Everything in the selector positions against the
+  // body.
+  const int body_w = std::min(w, kSelectorMaxCols);
+  const int body_x = (w - body_w) / 2;
+
+  m_title.set_geometry({body_x, 0, body_w, 1});
+  m_title.draw(screen);
+
+  const bool with_detail = body_w >= kDetailPaneMinCols;
+  const int list_w =
+      with_detail ? std::max(kListPaneMinCols, body_w * 2 / 5) : body_w;
 
   m_list_frame.set_style(style);
-  m_list_frame.set_geometry({0, body_y, list_w, body_h});
+  m_list_frame.set_geometry({body_x, body_y, list_w, body_h});
   m_list_frame.draw(screen);
 
   const termforge::Rect inner = m_list_frame.content_rect();
@@ -749,7 +838,8 @@ auto Shell::draw_selector(termforge::Screen& screen) -> void {
 
   if (with_detail) {
     m_detail_frame.set_style(style);
-    m_detail_frame.set_geometry({list_w, body_y, w - list_w, body_h});
+    m_detail_frame.set_geometry(
+        {body_x + list_w, body_y, body_w - list_w, body_h});
     m_detail_frame.draw(screen);
     const termforge::Rect dinner = m_detail_frame.content_rect();
     if (dinner.w > 0 && dinner.h > 0) {
@@ -778,11 +868,41 @@ auto Shell::draw_selector(termforge::Screen& screen) -> void {
     }
   }
 
-  if (!m_notice.empty()) {
-    screen.write_text(0, h - 2, m_notice, termforge::theme::kDim,
+  // ⚠ TWO CHANNELS SPLIT BY WIDTH, SO THEY NEVER COMPETE. The detail pane
+  // names every game's size requirement — but the pane is dropped below
+  // kDetailPaneMinCols, which is very nearly the band in which games stop
+  // fitting, so on the terminals where the answer matters most it is not there
+  // to give it. Below that width, and ONLY below it, the warning takes this row
+  // instead. Above it the pane is already saying so and this row stays the
+  // notice's.
+  //
+  // ⚠ AN EARLIER DRAFT HAD THEM SHARE THE ROW AT EVERY WIDTH, and both orders
+  // were wrong. Notice-wins made the warning unreachable for a whole session at
+  // the bottom tier: m_notice is STICKY — it holds the most recent ErrorEvent
+  // until the next game entry clears it, and FallbackDriver reports no colour
+  // during setup, so on a bare terminal the footer is never free. Warning-wins
+  // then swallowed a *fresh* degradation: leaving Tetris on a terminal with no
+  // kitty protocol raises the report one frame before this redraws, and the
+  // warning took the row from it — losing a one-shot event, since entering
+  // another game clears m_notice for good.
+  //
+  // Splitting by width dissolves it rather than picking a loser. Each message
+  // owns the band where it is the only one with somewhere to go.
+  //
+  // ⚠ It does NOT write into m_notice, and that is not tidiness. The three
+  // drains around it are order-load-bearing (see on_render), and a size warning
+  // assigned there would outlive its cause and be indistinguishable from a real
+  // degradation. This is a draw-time choice and nothing else.
+  std::string footer = m_notice;
+  if (!with_detail) {
+    refresh_footer_warning(w, h);
+    if (!m_footer_warning.empty()) footer = m_footer_warning;
+  }
+  if (!footer.empty()) {
+    screen.write_text(body_x, h - 2, footer, termforge::theme::kDim,
                       termforge::theme::kBg);
   }
-  screen.write_text(0, h - 1,
+  screen.write_text(body_x, h - 1,
                     ascii ? "Up/Down select  Enter play  Esc quit"
                           : "↑↓ select · Enter play · Esc quit",
                     termforge::theme::kDim, termforge::theme::kBg);
