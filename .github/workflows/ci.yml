@@ -1,0 +1,184 @@
+# GitHub Actions.
+#
+# Every compiling job runs in a pinned debian:trixie container rather than on
+# the runner image, and that is not tidiness. The floor here is clang 19+:
+# termforge requires C++23, and clang 18 and earlier cannot compile
+# std::expected against libstdc++. GitHub's ubuntu-24.04 image ships clang 18.
+# Pinning the image in this file means a runner-image refresh cannot silently
+# move the toolchain under us, and the `toolchain` job below asserts the floor
+# so a drift fails on the right line instead of somewhere in the build.
+#
+# This file was ported from a Gitea Actions workflow. Two of its steps looked
+# like clutter and are load-bearing on any runner; one was Gitea-specific and
+# is gone. See the comments at each.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # Fail fast, loudly, and on the right line. Asserts the container we chose,
+  # so it is deterministic — if it ever fails, the base image moved under us.
+  toolchain:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:trixie
+    steps:
+      - name: Install toolchain
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            build-essential clang cmake
+
+      - name: Toolchain floor
+        run: |
+          set -euo pipefail
+
+          fail=0
+          check() {  # name  actual  minimum
+            printf '%-8s %s (need >= %s)\n' "$1" "$2" "$3"
+            if [ "$(printf '%s\n%s\n' "$3" "$2" | sort -V | head -1)" != "$3" ]; then
+              echo "  ^ TOO OLD"
+              fail=1
+            fi
+          }
+
+          check cmake   "$(cmake --version | head -1 | awk '{print $3}')"  3.28
+          check g++     "$(g++ -dumpversion)"                              13
+          check clang++ "$(clang++ --version | head -1 | grep -oE '[0-9]+(\.[0-9]+)*' | head -1)" 19
+
+          if [ "$fail" -ne 0 ]; then
+            echo
+            echo "debian:trixie no longer clears glyphcade's toolchain floor."
+            echo "Pin a newer image in this file rather than lowering the floor."
+            echo "C++23 is not optional here: termforge requires it, and clang"
+            echo "18 and earlier cannot compile std::expected against libstdc++."
+            exit 1
+          fi
+
+  build:
+    needs: toolchain
+    runs-on: ubuntu-latest
+    container:
+      image: debian:trixie
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: gcc / default
+            cxx: g++
+            toolchain: default.cmake
+          - name: clang / default
+            cxx: clang++
+            toolchain: clang.cmake
+          - name: gcc / asan
+            cxx: g++
+            toolchain: address.cmake
+          - name: gcc / ubsan
+            cxx: g++
+            toolchain: undefined.cmake
+          # The only job with a build_type. TSan is usually built at -O2 for
+          # usable performance and readable stacks, and cmake/toolchain/
+          # thread.cmake deliberately does NOT force one (that would clobber the
+          # Debug default's -O0 -g), so the choice has to be made here.
+          #
+          # Also the only job that lowers the parallel level: TSan's shadow
+          # memory makes each TU far more expensive, and 2 is what AGENTS.md
+          # prescribes for the same arm locally.
+          #
+          # ⚠ Not composable with asan or ubsan — TSan is its own job, never a
+          # flag added to another one.
+          - name: gcc / tsan
+            cxx: g++
+            toolchain: thread.cmake
+            build_type: RelWithDebInfo
+            jobs: 2
+    name: ${{ matrix.name }}
+    steps:
+      # ⚠ This step runs BEFORE the checkout, and the order is load-bearing:
+      # actions/checkout falls back to a tarball download when git is missing.
+      # That leaves no .git, `git describe --tags` in cmake/version.cmake finds
+      # nothing, and every build silently reports 0.0.0. Same failure that
+      # fetch-depth: 0 exists to prevent, arriving by a different road.
+      #
+      # The Gitea workflow also installed nodejs here, because act_runner needs
+      # an interpreter INSIDE the container to execute actions/checkout (a
+      # JavaScript action). GitHub mounts its own node into container jobs, so
+      # that line is dropped. If checkout ever fails with a missing node,
+      # that assumption is what changed.
+      - name: Install toolchain
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            build-essential clang cmake git ca-certificates
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Leave this alone. cmake/version.cmake runs `git describe --tags`; a
+          # shallow clone finds no tags and every build silently reports 0.0.0.
+          fetch-depth: 0
+
+      # actions/checkout leaves the workspace owned by a different uid than the
+      # one the steps run as, and git refuses to operate on it. Without this,
+      # `git describe --tags` fails and the version silently falls back to 0.0.0
+      # — same symptom as a shallow clone, different cause.
+      - name: Trust the workspace
+        run: git config --global --add safe.directory "$PWD"
+
+      # GLYPHCADE_WITH_AUDIO=OFF on every job. Runners have no sound hardware,
+      # and OFF is the configuration this repo promises always works — it is not
+      # the auto-detected default on a box that happens to have librtaudio-dev,
+      # so it has to be asked for explicitly or the arm rots.
+      - name: Configure
+        env:
+          CXX: ${{ matrix.cxx }}
+        run: |
+          cmake -B build \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain/${{ matrix.toolchain }} \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type || 'Debug' }} \
+            -DCMAKE_CXX_FLAGS=-Werror \
+            -DGLYPHCADE_WITH_AUDIO=OFF
+
+      # cpp-template's toolchain/default.cmake replaces CMAKE_CXX_FLAGS rather
+      # than appending to it, which silently discards the -Werror above and
+      # leaves CI green while enforcing nothing. We fixed that in our copy; this
+      # asserts the fix is still there. One grep, and it fails the moment
+      # somebody re-syncs the toolchain file from upstream.
+      - name: -Werror reached the compiler
+        run: grep -q -- '-Werror' build/compile_commands.json
+
+      # ⚠ `--parallel` with a VALUE, never bare. `cmake --build` consults
+      # CMAKE_BUILD_PARALLEL_LEVEL only when --parallel is absent, and this
+      # project uses the Unix Makefiles generator — so a bare `--parallel`
+      # becomes `make -j` with no limit at all and whatever cap the environment
+      # set is silently discarded. On a container-limited runner that is an
+      # OOM kill at exit 137, reported as a mysterious build failure.
+      - name: Build
+        run: cmake --build build --parallel ${{ matrix.jobs || 4 }}
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  # No compiler and no network needed: pure CMake script that unit-tests the
+  # git-describe parser. It still needs the container, because cmake is exactly
+  # what a bare runner image may not have at the version we require.
+  version-selftest:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:trixie
+    steps:
+      - name: Install toolchain
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            cmake git ca-certificates
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Version parser selftest
+        run: cmake -P cmake/version_selftest.cmake
