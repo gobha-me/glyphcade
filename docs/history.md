@@ -546,7 +546,7 @@ the top and the first visible line starts mid-word. That is pre-existing — the
 "detail pane's scrollbar is 7-bit too" case drives rows 8..12 precisely because
 the description already overflowed — but the new `size:` line is one more row, so
 it becomes reachable one terminal size earlier (at 80x16 rather than 80x15).
-Filed as [#53](https://git.gobha.me/xcaliber/term-game/issues/53) rather than
+Filed as [#13](https://github.com/gobha-me/glyphcade/issues/13) rather than
 bundled: fixing the scroll position needs its own cases, and a pane that pins to
 the bottom of a description is a different defect from a pane that lacks a size
 line.
@@ -602,7 +602,7 @@ from "the screen stopped drawing".
 **`test/33options` is now the only place in the repo that renders above the
 ASCII tier.** Every other suite goes through `test_run_frames`, which is nailed
 to a `FallbackDriver` whose `capabilities()` is an all-false literal — that is
-gitea **#48**, and this issue routed around it rather than waiting: `OptionsScreen`
+[#11](https://github.com/gobha-me/glyphcade/issues/11), and this issue routed around it rather than waiting: `OptionsScreen`
 takes a `GameContext*`, `set_border_style` is public plumbing, and the screen is
 directly constructible. Before #45, `draw_cycler`'s and `draw_list`'s non-ASCII
 branch had **never been executed by a test**.
@@ -752,7 +752,7 @@ Reading the tags rather than their titles:
 | v0.5.0 | #122 — `Widget::reset_transient()` at a Dialog showing boundary | ⚠ **yes**, and it is v0.4.0's cure |
 | v0.5.1 | #123 — container overloads for `route_mouse`/`tick_widgets`, `route_mouse` skips nulls | no. Our one call passes a braced list of one non-null pointer; the `initializer_list` overload still wins |
 | v0.5.2 | #102 — `Screen::fill_rect` clips via `Rect::intersect` instead of `x + w` in `int` | no. Our three call sites pass small in-bounds values, so the arithmetic is identical for every input we produce |
-| v0.6.0 | #22 — `TabBar`, and `MarkGlyphs` grew `arrow_left`/`arrow_right` (`all()` 9 → 11) | no. We read `.selector` **by name**, never `all()`, never an aggregate initialiser. ⚠ The options cycler hardcodes `<`/`>`, which is what the new fields are for — correct at the ASCII tier, wrong above it. gitea [#45](https://git.gobha.me/xcaliber/term-game/issues/45) |
+| v0.6.0 | #22 — `TabBar`, and `MarkGlyphs` grew `arrow_left`/`arrow_right` (`all()` 9 → 11) | no. We read `.selector` **by name**, never `all()`, never an aggregate initialiser. ⚠ The options cycler hardcodes `<`/`>`, which is what the new fields are for — correct at the ASCII tier, wrong above it. `term-game#45` |
 
 ### ⚠ The one thing that reached us, and the issue is wrong about it twice
 
@@ -831,13 +831,13 @@ background does render, which is what shows the grep can match a Button's own
 colour at all.
 
 ✅ **`find_dependency(termforge 0.6.0)` used to be exercised by nothing in
-`ctest`.** That was gitea
-[#46](https://git.gobha.me/xcaliber/term-game/issues/46), closed by the
+`ctest`.** That was 
+`term-game#46`, closed by the
 `consumer-resolves` check below.
 
 ### The pause dialog was the one widget the tier never reached — fixed
 
-gitea [#44](https://git.gobha.me/xcaliber/term-game/issues/44), landed on its
+`term-game#44`, landed on its
 own after #36. `Dialog` owns a `Frame` privately, that `Frame` defaults to
 `BorderStyle::Single`, and nothing in `Shell` ever called `set_border_style` —
 so the pause dialog painted U+250C/U+2500/U+2502 onto terminals that had just
@@ -928,7 +928,7 @@ driver's `capabilities()` is an all-false literal, so `TERM=` in a ctest
 environment does nothing. The only seam that would work is a private virtual
 capability probe on `Shell` — real production code, and out of scope for a
 focused fix. Filed as
-[#48](https://git.gobha.me/xcaliber/term-game/issues/48); it would unlock the
+[#11](https://github.com/gobha-me/glyphcade/issues/11); it would unlock the
 `▸` marker, the
 `↑↓ select` hint row, the *absence* of the colour notice, and the notice-ordering
 contract as well, all of which are pty-only today. Trap 3 in `test/11selector`
@@ -956,7 +956,7 @@ over `map_widget.*`, `image.cpp`, `image_loader.*` and their suites is empty. So
 the bump buys Epic 7 nothing, and it was deliberately not bundled into it: the
 whole signal of a pin bump is "nothing else moved", and burying it in an epic
 destroys that. Same reasoning that made term-game#24 its own issue — and it became
-gitea [term-game#36](https://git.gobha.me/xcaliber/term-game/issues/36), which also
+`term-game#36`, which also
 carried the `Widget::on_tick` audit the bump needed.
 
 ⚠ **The `MapWidget` sprite tier still does not exist at any tag.** Its gates
@@ -1124,7 +1124,7 @@ a level larger than the window scrolls. What is left is a floor on being
 *playable*: below about sixteen tiles across you cannot see enough of a room to
 plan a push. That is a judgement.
 
-gitea [#15](https://git.gobha.me/xcaliber/term-game/issues/15) is therefore
+`term-game#15` is therefore
 deferred a **fifth** time, and for a new reason rather than the same one. A
 `GameMeta::min_cols` would sit Minesweeper's 63 — derivable — next to Sokoban's
 34 — an opinion — and invite the selector to treat them as the same kind of fact.
@@ -1271,7 +1271,7 @@ twenty cells tall *before* any chrome, so this one needs **24** — the classic
 Any chrome beyond the status and hint rows and it stops fitting the terminal
 most people still have.
 
-gitea [#15](https://git.gobha.me/xcaliber/term-game/issues/15) (a minimum size
+`term-game#15` (a minimum size
 in `GameMeta`) is deferred a **fourth** time, and the answer is the same as the
 other three games': a game-owned "does not fit" screen.
 
@@ -1485,7 +1485,7 @@ capabilities are all false, so every arm exercised anywhere is the degraded one.
 
 ## What the v0.2.2 bump brought
 
-gitea [#24](https://git.gobha.me/xcaliber/term-game/issues/24). Landed on its own,
+`term-game#24`. Landed on its own,
 before Epic 5, for the reason term-game#22 landed before Epic 4: a dependency bump
 carrying a breaking change, bundled with a new game, makes a red CI run ambiguous
 between the two.
@@ -1579,8 +1579,8 @@ v0.1.16's `Cell::attrs` is the one tag with a concrete win: Minesweeper's cursor
 is a **pair of brackets** costing a column per cell, so Hard needs 63 columns
 where reverse video would need ~33. It is deliberately **not** in this bump — it
 rewrites `layout.hpp`'s `kCellCols`, six geometry cases in `test/14minesweeper`
-and two cursor cases in `test/15minesweeper-ui`, and it interacts with gitea
-[#15](https://git.gobha.me/xcaliber/term-game/issues/15) (`GameMeta` minimum
+and two cursor cases in `test/15minesweeper-ui`, and it interacts with 
+`term-game#15` (`GameMeta` minimum
 size). Its own issue.
 
 ⚠ One correction for whoever picks it up, because #24 states the opposite:
@@ -1598,7 +1598,7 @@ argument.
 ## What Epic 0 built
 
 - **CMake scaffold** from cpp-template, project name `glyphcade` (follows the
-  directory name, as does the gitea repo).
+  directory name, as did the repo at the time).
 - **termforge consumed** via [cmake/deps/termforge.cmake](cmake/deps/termforge.cmake)
   — `find_package(termforge ... CONFIG)` first, FetchContent as the fallback.
   Epic 0 pinned v0.1.7; the pin is now **v0.6.0** — see below.
@@ -1615,8 +1615,8 @@ argument.
   terminal down before the throw reached us, and our boundary turned it into
   exit 1), `pty-restore` (the same claim in a real pty, where the escape bytes
   are visible — added by term-game#16).
-- **CI** at [.gitea/workflows/ci.yaml](.gitea/workflows/ci.yaml) — **green since
-  gitea [#10](https://git.gobha.me/xcaliber/term-game/issues/10)**; see the CI
+- **CI** (then Gitea Actions, since ported to GitHub) — **green since
+  `term-game#10`**; see the CI
   section below for what it runs and why it took three epics to get there.
 
 Epic 0's `BootApp` no longer exists — Epic 1 replaced it with the Shell.
@@ -1658,11 +1658,11 @@ Every one of these is a decision with a condition attached, not an oversight.
 | Deferred | Condition to revisit |
 |---|---|
 | Audio in `GameContext` | **shipped in Epic 2** as `audio() -> const audio::Player&`, additively, exactly as the seam promised |
-| High-score persistence | **shipped after Epic 4** as `scores() -> const scores::Recorder&`, additively, exactly as the seam promised — and the "second scoring game, not the first" condition is what kept it from shipping as one integer. gitea [#14](https://git.gobha.me/xcaliber/term-game/issues/14) |
+| High-score persistence | **shipped after Epic 4** as `scores() -> const scores::Recorder&`, additively, exactly as the seam promised — and the "second scoring game, not the first" condition is what kept it from shipping as one integer. `term-game#14` |
 | One static library target per game | **done** — landed ahead of Epic 4 as its own change, since a build restructure bundled with a new game makes a red CI run ambiguous. `src/lib` is now `glyphcade_lib` → `_roster` → `_game_<name>` → `_core`; see the section below |
 | `StubGame` | **done** — deleted by Epic 3 |
-| `Shell::quit_requested()` | **done** — retired by gitea [#17](https://git.gobha.me/xcaliber/term-game/issues/17); termforge [#73](https://github.com/gobha-me/termforge/issues/73) shipped `App::running()` in v0.1.14. ⚠ Not a drop-in: see the section below |
-| The selector's gutter marker | **done** — retired by gitea [#17](https://git.gobha.me/xcaliber/term-game/issues/17); termforge [#72](https://github.com/gobha-me/termforge/issues/72) shipped in v0.1.11 and the two columns went back to the list |
+| `Shell::quit_requested()` | **done** — retired by `term-game#17`; termforge [#73](https://github.com/gobha-me/termforge/issues/73) shipped `App::running()` in v0.1.14. ⚠ Not a drop-in: see the section below |
+| The selector's gutter marker | **done** — retired by `term-game#17`; termforge [#72](https://github.com/gobha-me/termforge/issues/72) shipped in v0.1.11 and the two columns went back to the list |
 
 ---
 
@@ -1883,7 +1883,7 @@ did.
 |---|---|
 | A **mouse** gesture | Snake's only verb is a direction. There is nothing a click could mean that a key does not already say, and `layout.hpp` therefore has no `cell_at` at all |
 | A **tween** between cells | See above. Half-block sub-cell motion is possible at the colour tier and impossible at the 7-bit floor, so it would be a tier-only feel change — and feel is the one thing this container cannot judge |
-| A minimum terminal size in `GameMeta` | gitea [#15](https://git.gobha.me/xcaliber/term-game/issues/15), the same answer Epics 3 and 4 gave: the game ships its own too-small screen (needs 58x20; the Shell's floor is 20x8) |
+| A minimum terminal size in `GameMeta` | `term-game#15`, the same answer Epics 3 and 4 gave: the game ships its own too-small screen (needs 58x20; the Shell's floor is 20x8) |
 | A **tuned** speed curve | The reference's numbers, ported exactly, as named constants in `board.hpp`. Whoever can play it has one place to change them |
 | `best_length` | Affine in `best_score` — see above. Revisit if a rule ever makes them independent (a bonus food worth more than one segment would) |
 
@@ -2119,9 +2119,9 @@ unfixed description first.
 
 | Deferred | Condition to revisit |
 |---|---|
-| **High-score persistence** | **done**, immediately after Epic 4 — gitea [#14](https://git.gobha.me/xcaliber/term-game/issues/14). Wired into *both* games, and that is what proved the record is not one integer |
+| **High-score persistence** | **done**, immediately after Epic 4 — `term-game#14`. Wired into *both* games, and that is what proved the record is not one integer |
 | A **mouse** gesture | 2048 is four directions and an undo. Nothing a click could mean that a key does not already say, and inventing one is a feel decision with no reference behind it |
-| A minimum terminal size in `GameMeta` | gitea [#15](https://git.gobha.me/xcaliber/term-game/issues/15), same answer as Epic 3: the game ships its own too-small screen (needs 29×19; the Shell's floor is 20×8) |
+| A minimum terminal size in `GameMeta` | `term-game#15`, same answer as Epic 3: the game ships its own too-small screen (needs 29×19; the Shell's floor is 20×8) |
 | A **tuned** tween | 90 ms slide, 70 ms pop, linear. Named constants in `anim.hpp` rather than inline, precisely so whoever can play it has one place to change. An ease curve is a feel decision |
 | **In-game pop at the ASCII tier** | A character cell cannot scale a glyph, and a merge can produce a six-digit label in a six-column tile, so there is no room for decoration. The pop is colour-tier emphasis; at the bottom tier the number changed, which is the information |
 
@@ -2186,8 +2186,8 @@ Clang builds.
 | Deferred | Condition to revisit |
 |---|---|
 | **SFX** (reveal, flag, explode, win) | **shipped in Epic 2.** Bound in `minesweeper.cpp` via `announce()`, which compares board state across the verb — `Board` learned nothing about audio. |
-| **High-score persistence** | **done** — gitea [#14](https://git.gobha.me/xcaliber/term-game/issues/14), after Epic 4 met its "second scoring game" condition. The diagnosis here was right: a fresh `Game` per entry is exactly why the store had to live on the Shell. Minesweeper now shows `BEST nnn` beside the timer. |
-| A minimum terminal size in `GameMeta` | Hard needs 63x20 and the Shell's floor is 20x8, so the selector will launch a board the terminal cannot show. Epic 3 ships the in-game too-small screen instead — gitea [#15](https://git.gobha.me/xcaliber/term-game/issues/15). |
+| **High-score persistence** | **done** — `term-game#14`, after Epic 4 met its "second scoring game" condition. The diagnosis here was right: a fresh `Game` per entry is exactly why the store had to live on the Shell. Minesweeper now shows `BEST nnn` beside the timer. |
+| A minimum terminal size in `GameMeta` | Hard needs 63x20 and the Shell's floor is 20x8, so the selector will launch a board the terminal cannot show. Epic 3 ships the in-game too-small screen instead — `term-game#15`. |
 
 ---
 
