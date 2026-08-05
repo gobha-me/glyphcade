@@ -38,8 +38,14 @@ inline constexpr int kChromeRows = 4;
 // 28*2 + 2 = 58 columns, 16 + 4 = 20 rows. Inside minesweeper Hard's 63x20
 // envelope, and well above the Shell's 20x8 floor — so the "does not fit" path
 // is reachable in practice and has to be a real screen rather than an assert.
-// Same answer Epics 3 and 4 gave; a minimum size in GameMeta is gitea #15 and
-// stays there.
+// Same answer Epics 3 and 4 gave. gitea #15 has since put this pair into
+// kMeta's geometry so the menu warns first, but it warns rather than refuses,
+// so the screen below is still what a player who presses Enter anyway sees.
+//
+// ⚠ THESE TWO NUMBERS MUST NEVER GROW WITH THE TERMINAL, and for this game
+// that is correctness rather than taste: score_key(Level, Walls) in snake.cpp
+// does not include the field size, so a bigger field would silently make every
+// stored record incomparable with every new one. See AGENTS.md's rule.
 inline constexpr int kNeedCols = (kCellCols * kCols) + kChromeCols;
 inline constexpr int kNeedRows = kRows + kChromeRows;
 

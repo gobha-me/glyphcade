@@ -21,6 +21,11 @@
 #include <string_view>
 #include <vector>
 
+// For OptionSpec: default_preset() below reads the level default out of the
+// options schema, so "which level a fresh game starts on" has one definition
+// rather than one here and one in minesweeper.hpp's kMeta.
+#include <termgame/arcade/game_meta.hpp>
+
 // The only termgame header this file includes, and still no termforge one — which
 // is what makes test/14minesweeper unable to construct a Screen rather than
 // merely not doing so.
@@ -72,6 +77,24 @@ inline constexpr std::string_view kLevelNames[]{"Easy", "Medium", "Hard"};
 static_assert(std::size(kLevelNames) == std::size(kLevels),
               "every minesweeper::Level needs a name on the options screen, "
               "in the enum's own order — the chosen index is cast to Level");
+
+// The preset a fresh game starts on, read out of the options schema rather than
+// named — so "which level is the default" has exactly one definition.
+//
+// ⚠ Takes the whole span rather than an index so it is total: an empty or
+// malformed schema falls back to preset()'s own default rather than reading out
+// of range. options_are_well_formed() already forbids both at compile time, but
+// this runs at compile time too and a constexpr out-of-range read is a hard
+// error rather than a fallback.
+[[nodiscard]] constexpr auto default_preset(
+    std::span<const OptionSpec> options) noexcept -> Preset {
+  if (options.empty()) return preset(Level::Easy);
+  const int index = options[0].default_index;
+  if (index < 0 || index >= static_cast<int>(std::size(kLevels))) {
+    return preset(Level::Easy);
+  }
+  return preset(kLevels[static_cast<std::size_t>(index)]);
+}
 
 enum class Mark : std::uint8_t { None, Flag, Question };
 

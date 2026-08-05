@@ -43,10 +43,16 @@ inline constexpr int kNeedRows = kWellRows + kChromeRows;
 // also the default size the UI test probes use. Any chrome beyond these two
 // rows and the game stops fitting the terminal most people still have.
 //
-// The Shell's floor stays 20x8, so the selector will happily launch this on a
-// terminal that cannot draw it — gitea #15 for the fourth time. The answer is
-// the same as the other three games': a game-owned "does not fit" screen, which
-// is why `fits` is a field here rather than an assert.
+// The Shell's floor stays 20x8, so the selector will still launch this on a
+// terminal that cannot draw it — gitea #15 shipped a warning, not a refusal.
+// kMeta declares this pair as its geometry and the menu says so one screen
+// earlier; the game-owned "does not fit" screen is still what catches the
+// player who goes ahead anyway, which is why `fits` is a field here rather than
+// an assert.
+//
+// ⚠ 24 rows is the tallest ask on the roster, so Tetris is the game most likely
+// to trip that warning on a real terminal. test/11selector drives it at 60x20
+// for exactly that reason.
 static_assert(kNeedCols == 35);
 static_assert(kNeedRows == 24);
 

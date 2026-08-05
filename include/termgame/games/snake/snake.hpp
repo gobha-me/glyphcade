@@ -71,6 +71,16 @@ class Snake final : public Game {
       .tag = "Arcade Classic",
       .icon = "\U0001F40D",
       .options = kSnakeOptions,
+      // 58x20, arithmetic: a 28x16 field at two columns per cell plus chrome.
+      //
+      // ⚠ And for THIS game the floor is the only geometry that may ever move,
+      // because score_key(Level, Walls) does not include the field size. A
+      // bigger terminal must never buy a bigger field or every record already
+      // in the store becomes incomparable with every new one. See the hard rule
+      // in AGENTS.md.
+      .geometry = {.cols = snake::kNeedCols,
+                   .rows = snake::kNeedRows,
+                   .floor = SizeFloor::Drawable},
   };
 
   Snake();

@@ -48,6 +48,35 @@ struct Tier {
   return {};
 }
 
+// The same cascade for text that is only known at runtime: the first candidate
+// that FITS `cols`, scanning a widest-first list.
+//
+// ⚠ WHY pick_for_width CANNOT DO THIS. A Tier holds a string_view into a
+// literal and its floor is a number written by hand, which is what makes a
+// table static_assertable. A sentence built from std::to_string has neither: it
+// owns its bytes and its width is not known until it exists. Measuring
+// `size()` here instead of trusting a declared floor is the whole difference.
+//
+// ⚠ AND IT MEASURES BYTES, WHICH IS ONLY CORRECT BECAUSE EVERY CALLER IS
+// 7-BIT. Every GameMeta text field except the icon is static_asserted ASCII and
+// the rest of any such sentence is digits and punctuation, so bytes and columns
+// agree. A caller that ever passes a multi-byte glyph needs
+// termforge::detail::display_width instead, and would be wrong here in a way
+// that only shows on a terminal narrow enough to cut.
+//
+// Returns the LAST candidate when none fits, rather than empty: the narrowest
+// form is the one the caller wrote for the narrowest terminal, and clipping it
+// is still better than saying nothing. Callers should make that last entry
+// short enough to fit Shell::kMinCols.
+[[nodiscard]] inline auto pick_that_fits(std::span<const std::string> widest_first,
+                                         int cols) -> std::string {
+  if (widest_first.empty()) return {};
+  for (const std::string& s : widest_first) {
+    if (static_cast<int>(s.size()) <= cols) return s;
+  }
+  return widest_first.back();
+}
+
 // True iff `tiers` is ordered widest-first and ends at a zero floor — i.e. iff
 // pick_for_width can never return empty. Meant for a static_assert next to the
 // table it describes.

@@ -304,6 +304,61 @@ TEST_CASE("pick_for_width never returns empty for a total table") {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// hud::pick_that_fits — the runtime sibling of the cascade above
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠ WHY IT IS A SEPARATE FUNCTION and not a Tier table. A Tier holds a
+// string_view into a literal and a floor written by hand, which is what makes a
+// table static_assertable. A sentence built from std::to_string has neither: it
+// owns its bytes, and its width is not known until it exists. Measuring size()
+// instead of trusting a declared floor is the entire difference.
+
+TEST_CASE("pick_that_fits returns the first candidate that fits") {
+  const std::string cands[]{"a very long sentence", "medium one", "short"};
+
+  CHECK(hud::pick_that_fits(cands, 100) == "a very long sentence");
+  // Exactly wide enough is wide enough — the boundary is inclusive, like
+  // pick_for_width's and like meets_floor's.
+  CHECK(hud::pick_that_fits(cands, 20) == "a very long sentence");
+  CHECK(hud::pick_that_fits(cands, 19) == "medium one");
+  CHECK(hud::pick_that_fits(cands, 10) == "medium one");
+  CHECK(hud::pick_that_fits(cands, 9) == "short");
+}
+
+TEST_CASE("pick_that_fits falls back to the narrowest rather than to nothing") {
+  // ⚠ Returning empty here would be the tidy answer and the wrong one: the
+  // last entry is the one the caller wrote FOR the narrowest terminal, and a
+  // clipped version of it still carries more than a blank row. Callers are
+  // expected to make that entry fit Shell::kMinCols; this is what happens when
+  // one does not.
+  const std::string cands[]{"wide", "narrow"};
+  CHECK(hud::pick_that_fits(cands, 1) == "narrow");
+  CHECK(hud::pick_that_fits(cands, 0) == "narrow");
+
+  // Total for an empty list too, rather than reading past the end.
+  CHECK(hud::pick_that_fits({}, 80).empty());
+}
+
+TEST_CASE("pick_that_fits never returns something wider than it was given") {
+  // The property the caller actually depends on, swept rather than argued —
+  // and the reason it exists at all: a single long string clipped by write_text
+  // ends mid-word, and gitea #15's footer ended mid-NUMBER, which reads as a
+  // complete and wrong size.
+  const std::string cands[]{
+      "Minesweeper needs 21x13; you have 20x8",
+      "Minesweeper needs 21x13",
+      "needs 21x13",
+  };
+  for (int cols = 11; cols <= 60; ++cols) {
+    INFO("cols: " << cols);
+    const std::string got = hud::pick_that_fits(cands, cols);
+    REQUIRE(static_cast<int>(got.size()) <= cols);
+    // Whatever was chosen still carries the whole size.
+    REQUIRE(got.find("21x13") != std::string::npos);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // hud::draw_status_row — the mutation that has gone green in two epics
 // ═══════════════════════════════════════════════════════════════════════════
 

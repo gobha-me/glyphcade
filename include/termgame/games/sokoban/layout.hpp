@@ -20,11 +20,15 @@
 // *playable*: below some window you cannot see enough of a room to plan a push,
 // and that is a judgement rather than a consequence.
 //
-// ⚠ That distinction is why gitea #15 (a min_cols/min_rows in GameMeta) is
-// still the wrong shape, and it is a different reason from the four times it
-// has already been deferred. A field called `min_cols` would put Minesweeper's
-// 63 — a number you can derive — next to Sokoban's 34, which is an opinion, and
-// invite the selector to treat them as the same kind of fact.
+// ⚠ That distinction is what gitea #15 was stuck on for six deferrals, and it
+// is now RESOLVED rather than still outstanding — this comment used to end
+// "#15 is still the wrong shape". A field called `min_cols` alone would have
+// put Minesweeper's 63, a number you can derive, next to Sokoban's 34, which is
+// an opinion, and invited the selector to treat them as the same kind of fact.
+// So the kind travels with the number: `GameGeometry` carries a `SizeFloor`,
+// this game is the roster's only `Playable`, and the selector prints it as
+// "recommended" where every other game says "minimum". The objection was right
+// and it is what shaped the field — see arcade/game_meta.hpp.
 
 namespace termgame::sokoban {
 

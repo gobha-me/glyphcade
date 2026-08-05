@@ -1452,3 +1452,415 @@ TEST_CASE("the options lines stay 7-bit at every pane width",
     }
   }
 }
+
+// ── The geometry block: a floor with a kind, and a ceiling (gitea #15 + #42) ──
+//
+// ⚠ WHAT IS TESTED HERE AND NOT IN test/34geometry. That suite owns the
+// NUMBERS — that every declared floor is the size its own compute_layout
+// actually flips at. This one owns what the SELECTOR does with them, which
+// needs a Shell and a Screen: the two words, the footer, the precedence
+// against a real degradation notice, and the ceiling.
+
+TEST_CASE("the detail pane names the size a game wants", "[selector][geometry]") {
+  // ⚠ TWO GAMES, ONE PER SizeFloor VALUE, and neither is optional. The kind
+  // exists because Minesweeper's 21x13 is arithmetic and Sokoban's 34x12 is a
+  // judgement (see GameGeometry in arcade/game_meta.hpp), and the only place a
+  // player ever sees that difference is this word. With one case, collapsing
+  // the two arms into whichever string that case names stays green — and the
+  // enum quietly stops meaning anything.
+  const auto pane_text = [](Probe& app, int rows) {
+    std::string all;
+    for (int y = 0; y < rows; ++y) all += row_text(app, y) + "\n";
+    return all;
+  };
+
+  const auto select = [](Probe& app, std::string_view slug) {
+    const int index = game_index(slug);
+    REQUIRE(index >= 0);
+    while (app.selector_index() < index) {
+      app.dispatch_event(key(termforge::Key::Down));
+    }
+    app.step(1, 80, 24);
+    REQUIRE(app.selector_index() == index);
+  };
+
+  SECTION("a Drawable floor is stated and left there") {
+    Probe app;
+    app.step(1, 80, 24);
+    select(app, "snake");
+    const std::string all = pane_text(app, 24);
+    INFO(all);
+    CHECK(all.find("58x20 needed") != std::string::npos);
+    // ⚠ The negative matters more than the positive here. Snake has no camera
+    // and no judgement to explain, so it must not acquire a reason it does not
+    // have — and an implementation that appended the suffix unconditionally
+    // would pass the positive check above on its own.
+    CHECK(all.find("to play well") == std::string::npos);
+  }
+
+  SECTION("a Playable floor says why its number is where it is") {
+    Probe app;
+    app.step(1, 80, 24);
+    select(app, "sokoban");
+    const std::string all = pane_text(app, 24);
+    INFO(all);
+    CHECK(all.find("34x12 needed to play well") != std::string::npos);
+  }
+
+  SECTION("neither kind promises the game will run below it") {
+    // ⚠ THE CASE THAT EXISTS BECAUSE THE FIRST DRAFT WAS WRONG. It printed
+    // "recommended" for Sokoban against "minimum" for the rest, which reads as
+    // "you may go below this one" — and Sokoban then refuses just as hard as
+    // every other game (its compute_layout returns !fits below 34x12 and its
+    // draw() falls through to draw_too_small). The menu was making a promise
+    // the game does not keep, one keystroke apart, which is the exact defect
+    // gitea #42 was filed about.
+    //
+    // No word in this pane may soften into advice. "recommended" and "prefers"
+    // are the two that were actually written down at some point.
+    for (const std::string_view slug : {"minesweeper", "2048", "snake",
+                                        "tetris", "sokoban"}) {
+      Probe app;
+      app.step(1, 80, 24);
+      select(app, slug);
+      const std::string all = pane_text(app, 24);
+      INFO(slug << ":\n" << all);
+      CHECK(all.find("needed") != std::string::npos);
+      CHECK(all.find("recommended") == std::string::npos);
+      CHECK(all.find("prefers") == std::string::npos);
+    }
+  }
+}
+
+TEST_CASE("the footer warns when the selected game will not fit",
+          "[selector][geometry]") {
+  // ⚠ THE FOOTER OWNS ONE BAND AND THE DETAIL PANE OWNS THE OTHER. The pane is
+  // dropped below kDetailPaneMinCols (48), which is very nearly the band in
+  // which games stop fitting — so on exactly the terminals where the answer
+  // matters, the pane is not there to give it. Below 48 the warning takes this
+  // row; at or above it the pane is already saying so and the row stays the
+  // degradation notice's. Neither message ever displaces the other.
+  const auto footer_of = [](Probe& app, int rows) {
+    return row_text(app, rows - 2);
+  };
+
+  const auto select = [](Probe& app, std::string_view slug, int cols, int rows) {
+    const int index = game_index(slug);
+    REQUIRE(index >= 0);
+    while (app.selector_index() < index) {
+      app.dispatch_event(key(termforge::Key::Down));
+    }
+    app.step(1, cols, rows);
+    REQUIRE(app.selector_index() == index);
+  };
+
+  SECTION("below the detail pane's width, the footer says what is needed") {
+    // 40 columns: below kDetailPaneMinCols, so there is no pane, and below
+    // Tetris's 35x24 in rows.
+    Probe app;
+    app.step(1, 40, 20);
+    select(app, "tetris", 40, 20);
+    const std::string foot = footer_of(app, 20);
+    INFO(foot);
+    CHECK(foot.find("Tetris needs 35x24") != std::string::npos);
+    // It names what the player HAS as well: "needs 35x24" alone leaves them
+    // counting rows.
+    CHECK(foot.find("40x20") != std::string::npos);
+  }
+
+  SECTION("and says nothing at a size that fits") {
+    // ⚠ THE CONTROL, and without it "the warning is absent" is
+    // indistinguishable from "nothing drew" — the same rule AGENTS.md writes
+    // down for pty greps. Same width, same probe, four more rows.
+    Probe app;
+    app.step(1, 40, 24);
+    select(app, "tetris", 40, 24);
+    const std::string foot = footer_of(app, 24);
+    INFO(foot);
+    CHECK(foot.find("needs") == std::string::npos);
+    CHECK(foot.find("Tetris") == std::string::npos);
+  }
+
+  SECTION("a Playable floor is stated with the same force as any other") {
+    // ⚠ SOKOBAN REFUSES BELOW 34x12 EXACTLY AS HARD AS THE OTHER FOUR, so this
+    // row must not soften for it. The first draft printed "Sokoban plays better
+    // at 34x12 or larger" here — advice, deliberately omitting the terminal's
+    // own size — and a player who took the advice and pressed Enter got a hard
+    // refusal screen with no board on it.
+    Probe app;
+    app.step(1, 30, 10);
+    select(app, "sokoban", 30, 10);
+    const std::string foot = footer_of(app, 10);
+    INFO(foot);
+    CHECK(foot.find("needs 34x12") != std::string::npos);
+    CHECK(foot.find("plays better") == std::string::npos);
+  }
+
+  SECTION("the message never gets cut mid-number") {
+    // ⚠ THE CASE THAT CAUGHT A REAL DEFECT, and 30 columns could not see it.
+    // The footer was one long string on the argument that only its tail would
+    // be clipped; measured on a real 22-column pty it read
+    //
+    //     Minesweeper needs 21x1
+    //
+    // a truncated number that reads as a complete and wrong one. The Shell
+    // draws the selector from kMinCols, so every width from there up is a
+    // width a player can have.
+    //
+    // The assertion is deliberately not "the full sentence is present" — the
+    // point of a cascade is that it is not. It is that whatever DOES appear
+    // contains the whole size, never a prefix of it.
+    // ⚠ EVERY GAME, NOT ONE, AND MINESWEEPER IS THE ONE THAT MATTERS. A first
+    // draft swept Sokoban alone and mutation testing walked straight through
+    // it: "Sokoban" is short enough that even the widest form clips after the
+    // size ("Sokoban needs 34x12; you have " still contains 34x12), so
+    // collapsing the cascade to its widest entry survived. "Minesweeper" is
+    // eleven characters and its widest form clips at "Minesweeper needs 21",
+    // mid-number. The title length is what makes this reachable, so the sweep
+    // has to cover the longest title on the roster rather than a convenient
+    // one.
+    //
+    // The assertion is deliberately NOT "the full sentence is present" — the
+    // point of a cascade is that it is not. It is that whatever appears
+    // contains the whole size, never a prefix of it.
+    for (const auto& entry : termgame::all_games()) {
+      const std::string wh =
+          std::to_string(entry.meta.geometry.cols) + "x" +
+          std::to_string(entry.meta.geometry.rows);
+      for (int cols = Shell::kMinCols; cols < Shell::kDetailPaneMinCols;
+           ++cols) {
+        Probe app;
+        app.step(1, cols, 8);
+        select(app, entry.meta.slug, cols, 8);
+        const std::string foot = footer_of(app, 8);
+        INFO(entry.meta.slug << " at " << cols << " cols, footer: " << foot);
+        REQUIRE(foot.find(wh) != std::string::npos);
+      }
+    }
+  }
+}
+
+TEST_CASE("the size warning and a degradation notice never displace each other",
+          "[selector][geometry]") {
+  // ⚠ THIS CASE CHOSE THE DESIGN, after both orderings of a shared row turned
+  // out to be wrong.
+  //
+  // Notice-wins first: m_notice is STICKY — it holds the most recent ErrorEvent
+  // until the next game entry clears it — and FallbackDriver reports no colour
+  // during setup, so on a bare terminal the footer is never free. The size
+  // warning was unreachable for an entire session at the bottom tier, which is
+  // the tier this repo promises always works and the one a too-small terminal
+  // is most likely to be. This suite failed on the first run with the footer
+  // reading "no colour capability: ASCII bo".
+  //
+  // Warning-wins next: that swallowed a FRESH degradation. Leaving Tetris on a
+  // terminal with no kitty protocol raises the report one frame before the
+  // selector redraws, and if Tetris also did not fit, the warning took the row.
+  // The notice is one-shot in practice — entering another game clears it — so
+  // that is a lost event, and "degradation is an event, never a silent
+  // downgrade" is a hard rule.
+  //
+  // Splitting the row by width dissolves the conflict rather than picking a
+  // loser: the warning only speaks below kDetailPaneMinCols, where the pane
+  // that would otherwise carry the size does not exist.
+
+  SECTION("above the pane's width, the notice keeps the row") {
+    Probe app;
+    app.step(1, 60, 20);
+    app.dispatch_event(termforge::Event{
+        termforge::ErrorEvent{.severity = termforge::Severity::Warning,
+                              .source = "detect",
+                              .message = "no colour capability"}});
+    app.step(1, 60, 20);
+
+    // Tetris does NOT fit at 60x20 — it wants 24 rows — so this is exactly the
+    // case that used to lose the notice.
+    const int index = game_index("tetris");
+    REQUIRE(index >= 0);
+    while (app.selector_index() < index) {
+      app.dispatch_event(key(termforge::Key::Down));
+    }
+    app.step(1, 60, 20);
+
+    const std::string foot = row_text(app, 20 - 2);
+    INFO(foot);
+    CHECK(foot.find("no colour capability") != std::string::npos);
+    CHECK(foot.find("Tetris needs") == std::string::npos);
+
+    // ⚠ And the size is still being told to the player, on the other channel.
+    // Without this the case would pass against a Shell that had simply dropped
+    // the warning, which is the failure it is meant to exclude.
+    std::string pane;
+    for (int y = 0; y < 20; ++y) pane += row_text(app, y) + "\n";
+    INFO(pane);
+    CHECK(pane.find("35x24 needed") != std::string::npos);
+  }
+
+  SECTION("below it, the warning takes the row because nothing else can") {
+    Probe app;
+    app.step(1, 40, 20);
+    app.dispatch_event(termforge::Event{
+        termforge::ErrorEvent{.severity = termforge::Severity::Warning,
+                              .source = "detect",
+                              .message = "no colour capability"}});
+    app.step(1, 40, 20);
+    const int index = game_index("tetris");
+    REQUIRE(index >= 0);
+    while (app.selector_index() < index) {
+      app.dispatch_event(key(termforge::Key::Down));
+    }
+    app.step(1, 40, 20);
+
+    const std::string foot = row_text(app, 20 - 2);
+    INFO(foot);
+    CHECK(foot.find("Tetris needs 35x24") != std::string::npos);
+
+    // ⚠ AND BACK, which is what makes it borrowing rather than clobbering.
+    // Without this a footer that simply dropped the notice on the first
+    // too-small game would pass everything above.
+    while (app.selector_index() > 0) {
+      app.dispatch_event(key(termforge::Key::Up));
+    }
+    app.step(1, 40, 20);
+    const std::string back = row_text(app, 20 - 2);
+    INFO(back);
+    CHECK(back.find("no colour capability") != std::string::npos);
+  }
+}
+
+TEST_CASE("the selector body stops widening and centres", "[selector][geometry]") {
+  // ⚠ THE DEFECT, in one sentence: every game is a fixed rectangle centred in
+  // whatever it is given, and the selector was not — so a 300-column terminal
+  // got an edge-to-edge menu and then, one keystroke later, a 58x20 box
+  // floating in the middle of it. Past kSelectorMaxCols the body stops growing
+  // and is centred, which is what a game does.
+
+  // Row 1 is the frames' top border, which spans the whole body width.
+  const auto painted_span = [](Probe& app, int y) {
+    int first = -1;
+    int last = -1;
+    for (int x = 0; x < app.screen().cols(); ++x) {
+      if (cell_text(app, x, y).empty()) continue;
+      if (first < 0) first = x;
+      last = x;
+    }
+    return std::pair{first, last};
+  };
+
+  SECTION("at twice the cap it is centred and capped") {
+    const int cols = 2 * Shell::kSelectorMaxCols;
+    Probe app;
+    app.step(1, cols, 24);
+    const auto [first, last] = painted_span(app, 1);
+    INFO("span " << first << ".." << last << " of " << cols);
+    CHECK(first == (cols - Shell::kSelectorMaxCols) / 2);
+    CHECK(last - first + 1 == Shell::kSelectorMaxCols);
+    // Centred, not merely capped: an implementation that clamped the width and
+    // left the body at x=0 passes the width check and fails this one.
+    CHECK(first == cols - 1 - last);
+    CHECK(first > 0);
+  }
+
+  SECTION("at the cap exactly, nothing has moved") {
+    // ⚠ The property that keeps every pre-#42 case honest. At and below
+    // kSelectorMaxCols this change is a no-op, which is why the constant is 120
+    // — the widest size the suite already drove.
+    Probe app;
+    app.step(1, Shell::kSelectorMaxCols, 24);
+    const auto [first, last] = painted_span(app, 1);
+    CHECK(first == 0);
+    CHECK(last == Shell::kSelectorMaxCols - 1);
+  }
+
+  SECTION("the chrome rows are offset with the panes, not left at x=0") {
+    // ⚠ THE SPAN CHECK ABOVE READS ROW 1 — the frames' top border — so it says
+    // nothing about the title, the footer or the hint row. An earlier draft
+    // left all three pinned to column 0 on the argument that they are chrome
+    // rather than a measure, which put them sixty columns from the panes they
+    // describe. Mutation testing found the gap: moving the title and the hint
+    // row back to x=0 survived the whole suite.
+    const int cols = 2 * Shell::kSelectorMaxCols;
+    const int expect = (cols - Shell::kSelectorMaxCols) / 2;
+    Probe app;
+    app.step(1, cols, 24);
+
+    const auto first_painted = [&app](int y) {
+      for (int x = 0; x < app.screen().cols(); ++x) {
+        if (!cell_text(app, x, y).empty()) return x;
+      }
+      return -1;
+    };
+
+    // The hint row is a fixed string starting at the body's left edge.
+    CHECK(first_painted(23) == expect);
+    // The title is CENTRED within the body rather than flush with it, so it
+    // cannot be compared to `expect` directly — but it must sit inside the
+    // body, and a title left at x=0 would centre on the full width and land
+    // well left of it.
+    const int title_x = first_painted(0);
+    INFO("title at " << title_x << ", body " << expect << ".."
+                     << expect + Shell::kSelectorMaxCols - 1);
+    CHECK(title_x > expect);
+    CHECK(title_x < expect + Shell::kSelectorMaxCols);
+  }
+
+  SECTION("a click still lands on the row it looks like it lands on") {
+    // ⚠ THE FAILURE MODE A COLUMN CHECK CANNOT SEE. Offsetting the panes moves
+    // where rows are PAINTED; if the widget's own rect were not moved with
+    // them, the screen would look right and every click would land a row's
+    // worth of columns away from where the player aimed — pixels and hit-test
+    // drifting apart with no compile error, which is exactly the hazard
+    // gitea #42 warns about for Sokoban's camera.
+    //
+    // Nothing here recomputes the offset by hand: it reads the marker's own
+    // column off the screen, clicks a row BELOW it in that same column, and
+    // asserts the selection followed.
+    const int cols = 2 * Shell::kSelectorMaxCols;
+    Probe app;
+    app.step(1, cols, 24);
+    REQUIRE(app.selector_index() == 0);
+
+    const auto marks = find_word(app, ">");
+    REQUIRE(marks.size() == 1);
+    INFO("marker at " << marks[0].x << "," << marks[0].y);
+    CHECK(marks[0].x > 0);  // it really is offset, or this proves nothing
+
+    app.dispatch_event(click(marks[0].x + 6, marks[0].y + 2));
+    app.step(1, cols, 24);
+    CHECK(app.selector_index() == 2);
+  }
+
+  SECTION("rows are capacity and are not capped") {
+    // ⚠ Deliberately asymmetric. More rows is more of the roster visible in a
+    // scrolling list — real information — where more columns past a measure
+    // only stretches a line nobody wanted stretched. There is no
+    // kSelectorMaxRows and this case is what says so.
+    Probe app;
+    app.step(1, 80, 40);
+    // The body band is rows 1 .. h-3, so the bottom border sits at h-3.
+    const auto [first, last] = painted_span(app, 40 - 3);
+    INFO("span " << first << ".." << last);
+    CHECK(first == 0);
+    CHECK(last == 79);
+  }
+}
+
+TEST_CASE("the size lines stay 7-bit, including on a terminal that is too small",
+          "[selector][geometry][render]") {
+  // The existing sweeps run at sizes where every game fits, so none of them can
+  // see the footer string at all. These two do — 30x10 is below four of the
+  // five floors, and 60x20 is below Tetris's alone.
+  for (const auto& [cols, rows] : {std::pair{Shell::kMinCols, 8},
+                                   std::pair{30, 10}, std::pair{47, 12},
+                                   std::pair{60, 20},
+                                   std::pair{2 * Shell::kSelectorMaxCols, 24}}) {
+    INFO("size: " << cols << "x" << rows);
+    Probe app;
+    app.step(2, cols, rows);
+    for (int i = 0; i < 5; ++i) {
+      REQUIRE(all_seven_bit(app));
+      app.dispatch_event(key(termforge::Key::Down));
+      app.step(1, cols, rows);
+    }
+  }
+}
