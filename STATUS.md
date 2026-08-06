@@ -39,6 +39,14 @@ boundaries without a `Screen`. The game is deliberately not registered yet —
 Epic 8 still owns its model and renderer. See "Solitaire's nineteen cards fit
 without hiding one" in [docs/history.md](docs/history.md).
 
+**The suite's fidelity contract is explicit.** Every roster entry now has a
+documented floor, preferred experience and degradation story in
+[`docs/fidelity.md`](docs/fidelity.md). Rendering profiles are names for output,
+not a linear terminal grade: graphics, keyboard protocol, dimensions, mouse and
+audio remain independent. In glyphcade only geometry may refuse entry; larger
+Kitty- or half-block-first games belong in standalone repositories rather than
+expanding this deliberately compact arcade.
+
 **A package config without exported targets is rejected deliberately, and both
 ways to produce one are now tested.** #12. `consumer-resolves` still proves a
 normal scratch install resolves, then points the same generated consumer at the

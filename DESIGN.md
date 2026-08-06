@@ -24,8 +24,9 @@ independent vertical slice:
   so a blocked game blocks only itself.
 
 The suite is also the honest test of TermForge's actual pitch — that a
-stdlib-only C++23 framework can do notcurses-class inline graphics. One game
-proves a code path; six games prove an API.
+stdlib-only C++23 framework can do notcurses-class inline graphics without
+abandoning a plain terminal. One game proves a code path; six games, each with a
+deliberate high-to-low fidelity story, prove an API.
 
 ---
 
@@ -275,6 +276,18 @@ Every game must be **playable at the bottom tier**. Pixel sprites are an
 enhancement over a glyph fallback that always exists — the same relationship
 `Widget::draw_pixels` has to `Widget::draw`.
 
+That is now a per-game design contract rather than a suite-wide slogan. Each
+roster entry has a geometry floor, a preferred capability set and a specific
+replacement for every preferred feature it loses. The normative
+definitions and current roster matrix live in
+[docs/fidelity.md](docs/fidelity.md).
+
+⚠ **The rendering profiles in that document are vocabulary, not terminal
+grades.** Graphics, keyboard protocol, terminal dimensions, mouse and audio are
+orthogonal. Do not add one `FidelityTier` and infer five facts from it. In this
+arcade only geometry may refuse entry; Kitty graphics, truecolour, enhanced
+keyboard input, mouse and audio may improve a game but never unlock it.
+
 **Every widget that draws chrome takes its `BorderStyle` from
 `GameContext::border_style()`, and the push happens at the moment of use** —
 per frame for the selector's four widgets, at the push site for an overlay.
@@ -311,12 +324,20 @@ TermForge as it exists today.
 | 4 | **Snake** ✓ | real-time tick | #58, #59 (both shipped) |
 | 5 | **Tetris** ✓ | tick + held-key feel | #58, #59, #60 (all shipped) |
 | 6 | **Sokoban** ✓ | tile maps, camera, layers | ~~#64~~ (glyph tier shipped v0.1.19, taken) |
-| 7 | **Solitaire** *(flagship)* | Kitty sprites, venice art, mouse drag | #63 |
+| 7 | **Solitaire** *(flagship)* | native/raster/text card tiers, venice art, mouse drag | #63 |
 
 Reference implementations for all seven exist in HTML-Games — the game *logic*
 is solved, so each port is a rendering and feel exercise rather than a design
 one. Later candidates from that roster: Breakout, Space Invaders, Pong, Typing,
 Oregon Trail.
+
+This roster is deliberately the compact, portable demonstration. A larger game
+whose premise honestly requires Kitty graphics or truecolour half-blocks belongs
+in its own repository with its own capability floor. DOS-era strategy/tactics
+inspirations such as *M.A.X.*, *Fragile Allegiance* and *Syndicate Wars* are
+good candidates for that class of TermForge application, not for an eighth
+compiled-in arcade game. See
+[docs/fidelity.md](docs/fidelity.md#the-boundary-of-this-repository).
 
 ### Solitaire's text table is bounded before the sprites exist
 

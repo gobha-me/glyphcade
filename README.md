@@ -67,7 +67,9 @@ Small games, escalating deliberately. Each one dogfoods a different part of
 TermForge — mouse routing, animation, real-time ticks, tile maps, inline pixel
 graphics — so framework gaps get found by a real consumer instead of guessed at.
 The suite doubles as the honest test of TermForge's pitch: notcurses-class inline
-graphics from a stdlib-only C++23 API.
+graphics from a stdlib-only C++23 API. It demonstrates that pitch in both
+directions: capable terminals gain fidelity, while the same rules and essential
+information survive all the way down to plain ASCII.
 
 | # | Game | Dogfoods |
 |---|------|----------|
@@ -86,6 +88,13 @@ Two rules hold across all of them:
 - **Rules extent never scales.** A bigger terminal buys a bigger *view*, never a
   bigger board. Board size *is* the game.
 
+Each game therefore has a documented **floor**, **preferred experience** and
+**degradation story**. Graphics, keyboard protocol, terminal size, mouse and
+audio are independent axes rather than one A-to-E terminal grade. See
+[Fidelity and degradation](docs/fidelity.md) for the per-game matrix and the
+boundary between this portable arcade and standalone applications that honestly
+require Kitty graphics or truecolour raster output.
+
 ## Audio
 
 Sound effects are **synthesized, not sampled** — square/triangle/noise
@@ -98,7 +107,7 @@ which is what makes the audio path testable with no sound hardware at all).
 
 ## Testing
 
-Roughly 14k lines of tests against 15k lines of source, 32 ctest targets. CI runs
+Roughly 14k lines of tests against 15k lines of source, 34 ctest targets. CI runs
 five arms on every push and pull request — gcc, clang, ASan, UBSan and TSan —
 each in a pinned `debian:trixie` container with `-Werror`.
 
@@ -115,6 +124,7 @@ right; those need hands on a keyboard.
 
 - [STATUS.md](STATUS.md) — live state, what is verified and what is not
 - [DESIGN.md](DESIGN.md) — architecture
+- [docs/fidelity.md](docs/fidelity.md) — per-game capability and degradation contract
 - [AGENTS.md](AGENTS.md) — conventions, hard rules, and how to verify a change
 - [CONTRIBUTING.md](CONTRIBUTING.md) — start here to send a patch
 
