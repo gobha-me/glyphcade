@@ -9,10 +9,11 @@ See [docs/history.md](docs/history.md) for the full development narrative.
 
 The rename was held back from a tag deliberately: a release with no artifacts in
 it is a release nobody can use, and `#15` (deb/rpm/tgz packaging) was what a
-release needed in order to carry something. **That condition is now met** — see
-Added, below — so the next tag ships the rename and the packages together.
+release needed in order to carry something. **v0.20.0 is where both land** — the
+rename and the packages ship together, which is why that entry is the largest in
+this file.
 
-## [Unreleased]
+## [v0.20.0] — 2026-08-06
 
 ### Added — there is a way to install this now
 
