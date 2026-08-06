@@ -17,6 +17,11 @@ name: CI
 on:
   push:
     branches: [main]
+    # A tag push runs EVERY job — the toolchain floor, all five build arms, the
+    # version selftest and the package job — before the release step at the end
+    # of `package` uploads anything. Attaching artifacts to a release that the
+    # test suite has not judged is the one ordering this file must not allow.
+    tags: ['v*']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -165,10 +170,147 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
+  # ── The release artifacts (#15) ─────────────────────────────────────────────
+  # Gated on the whole build matrix: a package is the one artifact nobody looks
+  # inside before it reaches a stranger, so it must never be built from a tree
+  # the tests have not judged.
+  #
+  # This is also the ONLY job in this file that builds with audio. The five
+  # build arms above are all GLYPHCADE_WITH_AUDIO=OFF — that is the
+  # configuration this repo promises always works, and runners have no sound
+  # hardware — but OFF is not what a player should download. So the two arms
+  # are split by purpose: those jobs exist to find bugs, this one exists to
+  # ship, and between them every push exercises both sides of the audio
+  # branch in cmake/check_package.cmake.
+  package:
+    # BOTH, and version-selftest is not decoration here. `package` transitively
+    # waits on `toolchain` through `build`, but version-selftest had no place in
+    # any chain — so a red git-describe parser would have sat beside a green
+    # release whose artifacts were already downloadable. The version those
+    # artifacts are named after is exactly what that job tests.
+    needs: [build, version-selftest]
+    runs-on: ubuntu-latest
+    container:
+      image: debian:trixie
+    # ⚠ Required by the release step, and easy to leave out because nothing
+    # fails until the very last second of a tag build: the default GITHUB_TOKEN
+    # is read-only on many repositories, and the symptom is a 403 after
+    # everything else has already passed.
+    permissions:
+      contents: write
+    steps:
+      # BEFORE the checkout, for the reason the build job documents: without
+      # git, actions/checkout falls back to a tarball download, there is no
+      # .git, and `git describe --tags` reports 0.0.0 — which is precisely the
+      # trap that would ship a release named glyphcade-0.0.0.
+      #
+      # Four packages beyond the build job's set, each load-bearing:
+      #   file           CPACK_DEBIAN_PACKAGE_SHLIBDEPS runs dpkg-shlibdeps, and
+      #                  CPackDeb raises a FATAL_ERROR when file(1) is missing.
+      #   rpm            provides rpmbuild; debian:trixie ships neither.
+      #   pkgconf        cmake/audio.cmake reaches rtaudio ONLY through
+      #                  pkg-config on Debian — librtaudio-dev installs no CMake
+      #                  config — so without it detection finds nothing and
+      #                  GLYPHCADE_WITH_AUDIO=ON becomes a FATAL_ERROR.
+      #   librtaudio-dev the library itself.
+      - name: Install toolchain
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            build-essential cmake git ca-certificates \
+            file rpm pkgconf librtaudio-dev
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Leave this alone — see the build job. A shallow clone finds no tags
+          # and the packages come out versioned 0.0.0.
+          fetch-depth: 0
+
+      - name: Trust the workspace
+        run: git config --global --add safe.directory "$PWD"
+
+      # Release, not Debug: the matrix above exists to find bugs, this job
+      # exists to produce the binary people download.
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_FLAGS=-Werror \
+            -DGLYPHCADE_WITH_AUDIO=ON
+
+      # The same idiom as "-Werror reached the compiler", and for the same kind
+      # of reason. GLYPHCADE_WITH_AUDIO is auto-detected, so a container that
+      # lost pkgconf would configure cleanly, build a mute arcade, and every
+      # check downstream would agree with itself — check_package would assert
+      # the ABSENCE of librtaudio and pass. One grep turns that into a red job
+      # on the right line.
+      - name: Audio reached the build
+        run: grep -q '^GLYPHCADE_WITH_AUDIO:BOOL=ON$' build/CMakeCache.txt
+
+      # --parallel with a VALUE, never bare. See the build job.
+      - name: Build
+        run: cmake --build build --parallel 4
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Package
+        run: cpack --config build/CPackConfig.cmake -G "DEB;RPM;TGZ" -B artifacts
+
+      # THE GATE. Nothing below this step runs if the artifacts are not what we
+      # meant to publish: wrong version (0.0.0 or stale against the tag), wrong
+      # contents, a missing licence notice, or a missing audio dependency.
+      #
+      # PKG_DIR points at the artifacts just built, so the bytes that get
+      # uploaded are the bytes that were judged — rather than a second set the
+      # checker builds itself and assumes identical.
+      - name: Inspect the artifacts
+        run: |
+          EXPECT=""
+          case "${GITHUB_REF}" in
+            refs/tags/v*) EXPECT="-DEXPECT_VERSION=${GITHUB_REF#refs/tags/v}" ;;
+          esac
+          cmake -DBUILD_DIR=build -DPKG_DIR=artifacts \
+                -DGENERATORS="DEB;RPM;TGZ" -DREQUIRE_AUDIO=ON \
+                ${EXPECT} -P cmake/check_package.cmake
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: |
+            artifacts/*.deb
+            artifacts/*.rpm
+            artifacts/*.tar.gz
+          # An empty upload is not a green job.
+          if-no-files-found: error
+
+      # softprops/action-gh-release rather than `gh release upload`, and the
+      # reason is this job's container: debian:trixie has no gh and cannot get
+      # one without adding GitHub's apt repository and signing key, which is a
+      # new trust root and a second network dependency to save one action. This
+      # is a JavaScript action, and container jobs already depend on GitHub
+      # mounting node (see the note in the build job). It also creates the
+      # release when the tag has none, which the first tagged build needs.
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/*.deb
+            artifacts/*.rpm
+            artifacts/*.tar.gz
+          fail_on_unmatched_files: true
+
   # No compiler and no network needed: pure CMake script that unit-tests the
   # git-describe parser. It still needs the container, because cmake is exactly
   # what a bare runner image may not have at the version we require.
   version-selftest:
+    # Same reason every other job has it: without this, a base image that no
+    # longer clears the floor produces a confusing failure here instead of the
+    # one clear failure `toolchain` exists to give.
+    needs: toolchain
     runs-on: ubuntu-latest
     container:
       image: debian:trixie

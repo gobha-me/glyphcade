@@ -2,9 +2,11 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-08-05** (term-game#55 — Tetris's next-up preview is now the
-spawn stream rather than a dead-end copy of it, the first defect here found by
-playing on hardware; before it #42 + #15 — the geometry block: every game
+**Last updated: 2026-08-06** (#15 — the arcade is *installable*: CPack `.deb`,
+`.rpm` and `.tar.gz`, built and inspected by a new CI `package` job and attached
+to the release on a tag. Before it term-game#55 — Tetris's next-up preview is now
+the spawn stream rather than a dead-end copy of it, the first defect here found
+by playing on hardware; before it #42 + #15 — the geometry block: every game
 declares the smallest terminal it wants *and what kind of ask that is*, and the
 selector gets the suite's first ceiling; before it #46 — the exported package is
 now *resolved* by a ctest rather than read as text, closing the one gap in the
@@ -16,6 +18,48 @@ border tier; plus the first maintainer feel report, see
 ---
 
 ## Where the project actually is
+
+**There is a way to install this that is not "build it yourself."** #15. `cpack`
+produces a `.deb`, an `.rpm` and a `.tar.gz`; a new CI `package` job builds them
+against the whole test suite and *inspects* them before anything is uploaded; a
+`v*` tag attaches them to the GitHub release.
+
+The shape is the part worth knowing. The install tree is 99 files and **one** of
+them is the game — the other 98 are the exported CMake package, which has no
+runtime role at all, because a static archive is consumed at link time and
+`bin/glyphcade` already contains that code. So:
+
+| artifact | carries |
+|---|---|
+| `.deb` / `.rpm` | the binary and its two licence notices. Three files. |
+| `.tar.gz` | the whole install tree, every component, unfiltered |
+
+⚠ **There is deliberately no `-dev`/`-devel` package.** Convention offers one and
+the issue proposed one, but a `-dev` package is a promise to keep those archives
+ABI-stable for third parties, and nothing here has made that promise. The tarball
+says the same thing honestly: they are available, they are not a supported
+interface. Revisit if somebody actually consumes the export.
+
+⚠ **The audio dependency is derived, never written down** — `dpkg-shlibdeps`
+from the binary's `DT_NEEDED` for the `.deb`, rpmbuild's `AUTOREQ` for the
+`.rpm`. That is not fastidiousness: the same source produces `librtaudio6` on
+Ubuntu 24.04 and **`librtaudio7`** on Debian trixie, measured, and a hardcoded
+string would have been wrong on one of them. ⚠ And expect **five** names, not
+the twenty `ldd` prints — `readelf -d` shows five `NEEDED` entries and
+dpkg-shlibdeps reads those, not the transitive closure. jack, pulse, alsa and
+dbus arrive through `librtaudio`'s own Depends. An assertion written against
+`ldd` would be red on a correct package.
+
+⚠ **`glyphcade`'s own `LICENSE.md` was never installed** until this landed, and
+neither was a runtime-side copy of TermForge's. It never showed while the only
+artifact was a build tree. TermForge is linked *statically*, so its code is
+inside the binary and MIT's condition attaches to the binary's package — which
+is why both notices are `COMPONENT runtime` and land in the `.deb`.
+
+See [CI](#ci) for the job, and `cmake/check_package.cmake` for what "inspects"
+means — the 0.0.0 refusal in there was demonstrated against a real `.git`-less
+build, which produced `glyphcade_0.0.0-1_amd64.deb` without any other step
+objecting.
 
 **Tetris's next-up preview shows the pieces that are actually coming — for the
 first time.** `term-game#55`,
@@ -508,13 +552,24 @@ early assertions look exactly like something to tidy up.
 ## CI
 
 [.github/workflows/ci.yml](.github/workflows/ci.yml) — GitHub Actions, green on
-every push and pull request. Seven jobs:
+every push and pull request. Eight jobs:
 
 - **`toolchain`** — asserts cmake >= 3.28, g++ >= 13, clang++ >= 19, and fails
   loudly on the right line if the base image ever moves under us.
 - **`build`** — five arms: gcc, clang, ASan, UBSan, TSan. All with `-Werror`
   and `-DGLYPHCADE_WITH_AUDIO=OFF`.
+- **`package`** — builds the release artifacts, gated on the whole `build`
+  matrix. The **only** job that builds `-DGLYPHCADE_WITH_AUDIO=ON`, and the
+  split is by purpose: the five arms above exist to find bugs, this one exists
+  to ship the binary people download. On a `v*` tag it attaches the artifacts to
+  the GitHub release.
 - **`version-selftest`** — no compiler needed; unit-tests the git-describe parser.
+
+⚠ Because the two sets of arms disagree about audio on purpose, **every push
+exercises both branches** of the audio assertion in `cmake/check_package.cmake`
+— the OFF arms prove the dependency is absent when it should be, the package job
+proves it is present. A negative check whose positive counterpart never runs is
+the failure mode that rule exists to avoid.
 
 **Every job runs in a pinned `debian:trixie` container**, not on the runner
 image, and that is not tidiness. The floor is clang 19+ (termforge needs C++23,
