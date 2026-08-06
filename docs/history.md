@@ -14,6 +14,43 @@ written as ordinary `#NN` links.
 
 ---
 
+## One ruleset, several presentations (#19)
+
+The arcade had a strong bottom-tier rule and several good individual examples,
+but no per-game fidelity contract. "Every game is playable at the bottom tier"
+said where each game ended; it did not require anyone to state what the richer
+paths bought, what replaced them, or which layer told the player.
+
+The tempting documentation shape was a linear A/B/C/D/E terminal grade. That
+would be false precision. TermForge reports graphics, colour and enhanced
+keyboard support independently, while terminal dimensions, requested mouse
+mode and audio availability are independent again. A small Kitty terminal and a
+large truecolour terminal with legacy keyboard input cannot be ordered without
+discarding the facts a game actually needs.
+
+So `docs/fidelity.md` names four **rendering outcomes** -- Baseline, Styled,
+Raster and Native -- but refuses to turn them into a capability enum. Each game
+instead states three things: its geometry and Baseline floor, its preferred
+experience, and the explicit replacement for every preferred feature it loses.
+Only geometry may refuse entry in glyphcade. Colour, Unicode, pixels, mouse,
+audio and enhanced keyboard input may improve a roster game but never unlock
+one or carry essential information alone.
+
+That distinction also settles the repository boundary. glyphcade remains the
+compact, portable demonstration. A game whose honest premise requires Kitty
+graphics or at least truecolour half-block raster should say so in its own
+repository, as `gloam` and `OBSCURA` already do, rather than grow an artificial
+ASCII implementation to qualify for this roster. Larger DOS-era-inspired
+strategy, tactics and simulation projects belong on that side of the line too:
+their assets, saves, release cadence and capability floor deserve an application
+of their own.
+
+#19 owns the future implementation question: make the profiles discoverable in
+the selector and mechanically complete without growing a speculative
+`GameMeta` schema or duplicating degradation notices.
+
+---
+
 ## Solitaire's nineteen cards fit without hiding one (#10)
 
 Epic 8's first layout arithmetic looked impossible at 24 rows. Pile seven starts

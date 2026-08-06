@@ -70,6 +70,13 @@ it points at history that is not public — treat it as a note, not a lead.
 - **Every game is playable at the bottom tier.** Pixel sprites are an
   enhancement over a glyph fallback that always exists — the same relationship
   `Widget::draw_pixels` has to `Widget::draw`. A game that needs Kitty is a bug.
+- **Every game has a degradation story, not a terminal grade.** Record its
+  floor, preferred experience and the replacement for every preferred feature;
+  the roster matrix lives in `docs/fidelity.md`. Graphics, keyboard protocol,
+  dimensions, mouse and audio are independent axes — never collapse them into
+  one A/B/C/D/E enum and infer capabilities the terminal did not report. In
+  glyphcade only geometry may refuse entry. A genuinely Kitty-only or
+  half-block-only application belongs in its own repository, not this roster.
 - **Rules extent never scales; presentation may, and has a ceiling as well as a
   floor.** Board size **is** the game — Minesweeper's board size is its
   difficulty, 2048 is 4x4, Tetris is 10x20 — so a bigger terminal must never buy

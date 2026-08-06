@@ -13,6 +13,20 @@ release needed in order to carry something. **v0.20.0 is where both land** — t
 rename and the packages ship together, which is why that entry is the largest in
 this file.
 
+## [Unreleased]
+
+### Documentation
+
+- Made the arcade's fidelity contract explicit: every game has a geometry
+  floor, a preferred capability set, and a visible replacement for each
+  preferred feature it loses. Rendering profiles are vocabulary rather than a
+  linear terminal grade; graphics, keyboard, dimensions, mouse and audio remain
+  independent.
+- Added the per-game degradation matrix and documented the project boundary:
+  glyphcade remains playable at the 7-bit floor, while applications that
+  honestly require Kitty graphics or truecolour half-blocks belong in their own
+  repositories.
+
 ## [v0.20.2] — 2026-08-06
 
 ### Added
