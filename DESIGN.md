@@ -318,6 +318,34 @@ is solved, so each port is a rendering and feel exercise rather than a design
 one. Later candidates from that roster: Breakout, Space Invaders, Pong, Typing,
 Oregon Trail.
 
+### Solitaire's text table is bounded before the sprites exist
+
+Klondike looked unbounded in rows: pile seven begins with six face-down cards
+and can carry a complete thirteen-rank face-up build, so the conservative worst
+case is **nineteen cards**. Drawing each with even a one-row fan needs 21 rows
+for a three-row card, before the stock, foundations or chrome.
+
+The useful bound is on *information*, not cards. A face-down identity is hidden
+by the rules, but its count is visible, so a non-empty hidden prefix draws as one
+counted card-back strip. Every face-up card keeps its own row and the final card
+keeps its full 5x3 outline. The worst pile is therefore
+
+```
+1 hidden strip + 12 face-up strips + 3 final-card rows = 16 rows
+```
+
+Seven 5-column cards plus six gaps and a frame need 43 columns. The top card
+row, one gap, the 16-row tableau, status, hint and frame need 24 rows exactly.
+That makes **43x24 a derived `Drawable` floor**, not a playability opinion and
+not an option. Extra rows become pile capacity; extra columns do not widen the
+table. `games/solitaire/layout.hpp` owns the constants and the shared
+row-to-card hit-test now, before a renderer can invent different arithmetic.
+
+A click on a visible face-up strip names that card and its run. The counted
+hidden strip has no hit while a face-up card covers it; if no face-up card
+remains, the full card back names the exposed hidden card that may be flipped.
+No playable information is capped or scrolled away.
+
 ---
 
 ## Framework dependencies
