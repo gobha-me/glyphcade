@@ -13,6 +13,17 @@ release needed in order to carry something. **v0.20.0 is where both land** — t
 rename and the packages ship together, which is why that entry is the largest in
 this file.
 
+## [v0.20.1] — 2026-08-06
+
+### Tests
+
+- `consumer-resolves` now exercises both configurations where
+  `glyphcadeConfig.cmake` legitimately has no exported targets beside it: the
+  build tree and an install made with `glyphcade_BUILD_LIB=OFF` (#12). Both must
+  be rejected with glyphcade's own useful diagnosis rather than merely fail for
+  any reason; deleting the guard now exposes CMake's generic missing-include
+  error and makes the test red.
+
 ## [v0.20.0] — 2026-08-06
 
 ### Added — there is a way to install this now

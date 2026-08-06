@@ -14,6 +14,55 @@ written as ordinary `#NN` links.
 
 ---
 
+## The targetless package configs are rejected on purpose (#12)
+
+`glyphcadeConfig.cmake` can exist without `glyphcadeTargets.cmake` in two real
+places: the build tree, because this project exports only at install time, and
+an install configured with `glyphcade_BUILD_LIB=OFF`, because there was no
+target to export. The config already rejected both with a tailored
+`glyphcade_FOUND=FALSE` diagnosis. Nothing had ever executed that branch.
+
+That matters because deleting the guard does **not** make configuration pass.
+It falls through to `include(glyphcadeTargets.cmake)` and still fails, now with
+CMake's generic "include could not find requested file". A test that asserted
+only a nonzero exit would report green with the behavior it exists to protect
+gone entirely.
+
+`consumer-resolves` is now a three-arm matrix:
+
+1. the existing full scratch install must resolve and report the expected
+   glyphcade and TermForge versions and directories;
+2. the generated config in the build directory must be rejected by the guard;
+3. a second tree configured with the library, binary and tests off is installed
+   to its own prefix, and that config must be rejected by the same guard.
+
+The third arm resolves TermForge from the first scratch install, so it performs
+no download and builds nothing. Both negative arms require the guard's own
+distinctive wording, require the intended package directory in the diagnosis,
+and reject the generic include error. CMake wraps `NOT_FOUND_MESSAGE` paragraphs
+according to its output width, so the check normalizes diagnostic whitespace
+before matching words; the first draft matched raw newlines and went red while
+printing the expected sentence in plain sight.
+
+### The mutation that makes the test meaningful
+
+The guard block was deleted, the top-level build reconfigured, and only
+`consumer-resolves` was run. The positive installed-package arm still resolved.
+The build-tree arm then reached
+`build/glyphcadeConfig.cmake`'s missing-target include and failed with:
+
+```text
+include could not find requested file:
+  /config/Projects/glyphcade/build/glyphcadeTargets.cmake
+```
+
+The test rejected it because the expected targetless-config diagnosis was
+absent. Restoring the guard returned all three arms to `CLEAN`. This is the
+distinction #12 asked to cover: not failure versus success, but the intended
+failure versus an accidental one.
+
+---
+
 ## The preview was a dead-end copy (term-game#55)
 
 Reported by the maintainer playing on real hardware: **the next-up preview does

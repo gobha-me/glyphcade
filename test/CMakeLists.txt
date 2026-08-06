@@ -106,6 +106,7 @@ if (${PROJECT_NAME}_INSTALL AND TARGET ${PROJECT_NAME}::lib)
     NAME consumer-resolves
     COMMAND ${CMAKE_COMMAND}
             -DBUILD_DIR=${PROJECT_BINARY_DIR}
+            -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
             -DPROJECT=${PROJECT_NAME}
             -DEXPECT_VERSION=${PROJECT_VERSION}
             -DTERMFORGE_DIR=${termforge_DIR}
