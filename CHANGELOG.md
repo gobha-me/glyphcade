@@ -13,6 +13,20 @@ release needed in order to carry something. **v0.20.0 is where both land** — t
 rename and the packages ship together, which is why that entry is the largest in
 this file.
 
+## [v0.20.2] — 2026-08-06
+
+### Added
+
+- Solitaire's bottom-tier layout is decided before the flagship is built (#10):
+  5x3 ASCII cards, seven piles in 43 columns, and a counted face-down prefix that
+  keeps every face-up card individually visible while bounding the nineteen-card
+  worst case at 16 tableau rows. The resulting `Drawable` floor is 43x24.
+- A model-free layout contract and exhaustive hit-test matrix pin the boundary:
+  covered hidden cards are not selectable, an exposed hidden card can be flipped,
+  every visible face-up strip maps to its card, surplus rows add capacity, and
+  surplus columns do not scale the table. The Solitaire game itself remains
+  unregistered until Epic 8 supplies its model and renderer.
+
 ## [v0.20.1] — 2026-08-06
 
 ### Tests

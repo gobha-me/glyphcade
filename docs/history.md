@@ -14,6 +14,79 @@ written as ordinary `#NN` links.
 
 ---
 
+## Solitaire's nineteen cards fit without hiding one (#10)
+
+Epic 8's first layout arithmetic looked impossible at 24 rows. Pile seven starts
+with six face-down cards and may acquire a complete K-to-A face-up build, so the
+named worst case is
+
+```cpp
+kMaxTableauCards = kMaxHiddenCards + kMaxFaceUpCards;  // 6 + 13 = 19
+```
+
+A three-row card fanned one row per card needs 21 tableau rows by itself. That
+cannot coexist with stock, foundations, status, hints and a frame in a classic
+80x24 terminal, and the four obvious responses all paid somewhere else: cap the
+pile and hide information, compress face-up cards when they matter most, add a
+scrolling mode to a card table, or refuse the terminal size the flagship ought
+to fit best.
+
+### The hidden prefix is one fact, not six visible cards
+
+The missing distinction is between cards and player-visible information. A
+face-down card's identity is unknowable; only the number of hidden cards matters.
+So a non-empty hidden prefix is one counted card-back strip. Face-up cards stay
+one row apart, and the last card keeps its complete 5x3 ASCII outline:
+
+```
+1 counted hidden strip + 12 face-up strips + 3 final-card rows = 16
+```
+
+This is information-preserving, so there is no "compact tableau" option and no
+state-dependent mode change. Seven cards at five columns, six one-column gaps
+and a frame derive **43 columns**. Frame, top cards, one gap, the 16-row tableau,
+status and hint derive **24 rows**. `kNeedCols` and `kNeedRows` are calculated
+from those parts and statically pinned to 43x24.
+
+The floor is `Drawable`, not `Playable`: it is the first size that can show the
+rules' full state space with this representation. Columns past 43 are prose
+measure and leave the table centred; rows past 24 are capacity and enlarge the
+tableau band. That is the columns-only ceiling rule from #42 reaching the game
+it was written with in mind.
+
+### The click follows the representation
+
+`tableau_card_at(row, hidden, face_up)` is beside the layout arithmetic before a
+renderer exists. A visible face-up strip maps to that card's absolute pile index,
+so selecting it means selecting the legal run beginning there. The counted
+hidden strip maps to nothing while a face-up card covers it. If the face-up run
+is empty, the full three-row card back maps to the exposed top hidden card that
+may be flipped.
+
+That one function is the future renderer/mouse seam. Re-deriving it in an event
+handler would repeat Sokoban's current `MapWidget` workaround in our own API.
+
+### What exists, and deliberately does not
+
+`include/glyphcade/games/solitaire/layout.hpp` is header-only, integer-only and
+names no TermForge type. `test/35solitaire-layout` sweeps every valid pair from
+zero through six hidden and zero through thirteen face-up cards; it checks the
+maximum, the exact floor, surplus-row capacity, the column ceiling and every
+hit row including the final card's two non-fan rows.
+
+There is no Solitaire static library and no registry entry yet. This issue was
+the pre-Epic design gate; inventing a `Game` with no model to satisfy the final
+shape early would violate the same "no empty destination checklist" rule the
+repository layout documents. Epic 8 will add the one game library when it has a
+game to compile.
+
+The browser reference was read for behaviour, not numbers. Its renderer uses a
+fixed pixel offset and computes a column height from only the last card's face,
+so it does not answer this terminal-specific question and its arithmetic was not
+ported.
+
+---
+
 ## The targetless package configs are rejected on purpose (#12)
 
 `glyphcadeConfig.cmake` can exist without `glyphcadeTargets.cmake` in two real

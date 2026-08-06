@@ -260,9 +260,9 @@ endif ()
 #
 # ⚠ This is the assertion that makes the split real, and it is written as an
 # exact set rather than a list of things that must be present. A "must contain
-# bin/glyphcade" check would stay green if all 99 files came along — which is
-# the failure being guarded against, since that is what a .deb looks like when
-# the component narrowing silently stops applying.
+# bin/glyphcade" check would stay green if the whole install tree came along —
+# which is the failure being guarded against, since that is what a .deb looks
+# like when the component narrowing silently stops applying.
 #
 # ⚠ This list is the one place a SHARED build would need an edit, and
 # cmake/install.cmake's promise that switching a target's type "needs no edit
@@ -312,8 +312,8 @@ if (_debs)
   list(SORT _want_sorted)
   if (NOT _deb_files STREQUAL _want_sorted)
     # Report the DIFFERENCE, not both sets. The failure mode being caught is a
-    # package carrying all 99 files, and printing them makes the one line that
-    # explains why unreadable. Truncate the extras for the same reason.
+    # package carrying the whole install tree, and printing it makes the one
+    # line that explains why unreadable. Truncate the extras for the same reason.
     set(_extra ${_deb_files})
     list(REMOVE_ITEM _extra ${_want_sorted})
     set(_missing ${_want_sorted})

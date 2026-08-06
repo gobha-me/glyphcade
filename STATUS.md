@@ -2,9 +2,10 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-08-06** (#12 — both targetless package-config paths now
-execute under `consumer-resolves`, and deleting their guard is a measured red;
-before it #15 — the arcade is *installable*: CPack `.deb`,
+**Last updated: 2026-08-06** (#10 — Solitaire's nineteen-card tableau now has a
+43x24 bottom-tier contract before the game exists; before it #12 — both
+targetless package-config paths execute under `consumer-resolves`, and deleting
+their guard is a measured red; before it #15 — the arcade is *installable*: CPack `.deb`,
 `.rpm` and `.tar.gz`, built and inspected by a new CI `package` job and attached
 to the release on a tag. Before it term-game#55 — Tetris's next-up preview is now
 the spawn stream rather than a dead-end copy of it, the first defect here found
@@ -20,6 +21,23 @@ border tier; plus the first maintainer feel report, see
 ---
 
 ## Where the project actually is
+
+**Solitaire's worst tableau now has a bottom-tier answer before the flagship is
+being written.** #10. A pile can hold six hidden cards and a complete
+thirteen-rank face-up build, but the six hidden identities are not information
+the player may inspect. They render as one counted card-back strip; every
+face-up card keeps its own row, and the last keeps its full 5x3 outline. The
+nineteen-card worst case is therefore 16 tableau rows, and the whole table fits
+exactly at **43x24**.
+
+This is neither a visual cap nor an adaptive option: no playable information is
+removed, and `tableau_card_at()` keeps each visible face-up strip addressable for
+the future mouse path. The covered hidden strip has no hit; once exposed, the
+full card back names the one card that may flip. `test/35solitaire-layout`
+sweeps every valid hidden/face-up count and pins the width, height and hit-test
+boundaries without a `Screen`. The game is deliberately not registered yet —
+Epic 8 still owns its model and renderer. See "Solitaire's nineteen cards fit
+without hiding one" in [docs/history.md](docs/history.md).
 
 **A package config without exported targets is rejected deliberately, and both
 ways to produce one are now tested.** #12. `consumer-resolves` still proves a
@@ -37,10 +55,11 @@ produces a `.deb`, an `.rpm` and a `.tar.gz`; a new CI `package` job builds them
 against the whole test suite and *inspects* them before anything is uploaded; a
 `v*` tag attaches them to the GitHub release.
 
-The shape is the part worth knowing. The install tree is 99 files and **one** of
-them is the game — the other 98 are the exported CMake package, which has no
-runtime role at all, because a static archive is consumed at link time and
-`bin/glyphcade` already contains that code. So:
+The shape is the part worth knowing. The install tree is currently 102 files and
+**one** of them is the game — the rest are static archives, headers, package
+metadata and licence notices, which have no runtime role at all because a static
+archive is consumed at link time and `bin/glyphcade` already contains that code.
+So:
 
 | artifact | carries |
 |---|---|
@@ -94,8 +113,8 @@ in `games/sokoban/layout.hpp` was not "not yet" but "the field is the wrong
 shape": a bare `min_cols` would sit Minesweeper's 21x13 — arithmetic — next to
 Sokoban's 34x12 — an opinion, because Sokoban has a camera and no level is ever
 undrawable — and invite the selector to treat them as the same fact. So the kind
-travels with the number, and the player sees the difference: **"minimum" against
-"recommended"**.
+travels with the number: both floors say **"needed"**, while the `Playable` one
+adds **"to play well"** to explain why its number is a judgement.
 
 **Games now ask before they start.** 
 `term-game#38` — pressing Enter on a
@@ -303,8 +322,12 @@ latency and cursor responsiveness, Tetris' DAS/ARR/soft-drop trio, Sokoban's
 push feel, and whether any effect in the bank sounds *right*. Do not infer these
 from "it feels fast" — a frame rate is not a feel decision.
 
-**Next move: Epic 8 (Solitaire)**, the flagship and the last of the roster — but
-read the upstream note below before starting it. ⚠ We are now pinned to
+**Next move: the art asset pipeline (#8), then Epic 8 (Solitaire)**, the flagship
+and the last of the roster. Its bottom-tier layout prerequisite (#10) is now
+done: 43x24 shows the nineteen-card worst case without hiding a face-up card or
+scrolling. The remaining prerequisite is the sprite input, not the table.
+
+Read the upstream note below before starting it. ⚠ We are now pinned to
 **v0.6.0** (term-game#36), so the `draw_image(Rect cells, …)` contract is available
 — but `MapWidget`'s **sprite tier still does not exist at any tag**. Its two
 gates (#83/#84) lifted and the design doc was updated to say so, but no code
@@ -355,7 +378,7 @@ exists to prevent.
 | 5 — Snake | **done** | — |
 | 6 — Tetris | **done** | ~~termforge #60~~ — shipped in **v0.1.19…v0.2.2** and taken. `KeyboardMode::Enhanced` gives real `KeyAction::Repeat`/`Release`; DAS is now expressible rather than inferred from OS auto-repeat. `term-game#32` built the seam that reaches it: declare `Enhanced` in `kMeta` and the Shell does the rest. ⚠ Still degradable: a terminal without the kitty protocol never delivers `Release` — and note the notice is **ours**, not upstream's, because `App::setup()` has already run by the time a game entry sets the mode. Tetris must fall back to discrete steps **knowingly** |
 | 7 — Sokoban | **done** | ~~termforge #64 → #63~~ — both shipped and **taken**. `MapWidget` v1 (glyph tier) is now SPENT: Sokoban is its first consumer, and the four pieces of API friction it found are listed in "What Epic 7 built" |
-| 8 — Solitaire | **ready, with a caveat** | ~~termforge #63~~ — `Image` sub-rect blit and alpha shipped at v0.1.18 and are taken. ⚠ But `MapWidget`'s **sprite tier does not exist at any tag through v0.6.0**, and the cards-as-sprites premise wants it. Not a block — `Image` plus `draw_image` is reachable from game code — but it is a design decision this epic must make first, not inherit |
+| 8 — Solitaire | **layout ready; art pipeline next** | #10 is done: the text table has a tested 43x24 contract. ~~termforge #63~~ shipped and is taken, so `Image` plus `draw_image` is reachable from game code. #8 still owns PNG decode and asset storage. ⚠ `MapWidget`'s sprite tier does not exist at any tag through v0.6.0, so free-floating cards will use the direct image path rather than wait for a tile widget they do not fit anyway |
 
 **Nothing upstream blocks any epic.** That has been true since term-game#24, and it is what
 [term-game#24](`term-game#24`) bought. termforge
