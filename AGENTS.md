@@ -247,13 +247,28 @@ runs in enforce mode and must print `CLEAN`. If it reports Class-B failures righ
 after you add files, `git add` them first: it reads `git ls-files`, so untracked
 files look like missing ones.
 
-Check `ctest -N` lists **`pty-restore`**, **`audio-export-clean`** and
-**`consumer-resolves`**. All three are conditionally registered — `pty-restore`
-on `find_program(script)`, the other two on `${PROJECT_NAME}_INSTALL` — so on a
-box or in a configuration that lacks the gate they silently are not there, and a
-green run without them has not checked what only they can show: the one thing a
-pty reveals, and whether the installed package is resolvable by anybody at all.
-**Absent means skipped, not passed**; the configure log says which.
+Check `ctest -N` lists **`pty-restore`**, **`audio-export-clean`**,
+**`consumer-resolves`** and **`package-artifacts`**. All four are conditionally
+registered — `pty-restore` on `find_program(script)`, the next two on
+`${PROJECT_NAME}_INSTALL`, and `package-artifacts` on `_INSTALL` **plus**
+`dpkg-deb` and `file` — so on a box or in a configuration that lacks the gate
+they silently are not there, and a green run without them has not checked what
+only they can show: the one thing a pty reveals, whether the installed package is
+resolvable by anybody at all, and whether the release artifacts contain what we
+meant to publish. **Absent means skipped, not passed**; the configure log says
+which.
+
+⚠ `package-artifacts` runs `cpack` itself, so it takes a few seconds, and the
+generators it checks are **derived from the tools present** — DEB and TGZ on
+this dev container, plus RPM on any box that has `rpmbuild`. It shares the
+`RESOURCE_LOCK install-tree` with the other two install-based checks, though
+*not* for the reason you might assume: cpack leaves `install_manifest.txt`
+byte-identical (measured), and it is in the lock because it drives a full
+install pass over the same build tree. See the comment at its registration.
+
+⚠ It reads `CPackConfig.cmake`, which is written at **configure** time. Editing
+`cmake/packaging.cmake` and re-running only `ctest` therefore checks the *old*
+packaging config — reconfigure first, or you will debug a stale artifact.
 
 ### Checking the terminal itself, without a human
 

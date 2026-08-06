@@ -12,6 +12,27 @@ games. [TermForge](https://github.com/gobha-me/termforge) renders it, optional
 scores that persist, pause and quit-to-menu. All of it playable on a bare 7-bit
 terminal with no colour, no mouse and no Unicode.
 
+## Install
+
+Grab a package from the [latest release](https://github.com/gobha-me/glyphcade/releases):
+
+```bash
+# Debian / Ubuntu — apt resolves the audio library from the archive
+sudo apt install ./glyphcade_<version>_amd64.deb
+
+# Fedora / RHEL
+sudo dnf install ./glyphcade-<version>.x86_64.rpm
+
+# anywhere else
+tar xzf glyphcade-<version>-Linux-x86_64.tar.gz && ./glyphcade-*/bin/glyphcade
+```
+
+Then run `glyphcade`.
+
+The `.deb` and `.rpm` contain the game and nothing else. The tarball is the whole
+install tree — it also carries the static libraries, headers and CMake package
+config described under [Use it as a library](#use-it-as-a-library).
+
 ## Build
 
 ```bash

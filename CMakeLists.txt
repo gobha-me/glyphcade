@@ -97,7 +97,57 @@ endif ()
 # because only the demo binary used them; termforge is linked PUBLIC into the
 # library itself, so it is needed in every configuration that builds anything.
 
+# ── termforge's install() rules join the `dev` component ─────────────────────
+# termforge deposits 46 files into our prefix — libtermforge.a, 40 headers, its
+# four lib/cmake/termforge/*.cmake files and its licence — because
+# cmake/deps/termforge.cmake sets termforge_INSTALL to ours, which it must (see
+# the long note there). None of its five install() calls names a COMPONENT, and
+# it is upstream's file: we cannot add one.
+#
+# They belong in `dev`, and not merely by elimination. cmake/project-config.cmake.in
+# says find_dependency(termforge 0.6.0), so a dev package WITHOUT
+# lib/cmake/termforge/ ships a glyphcadeConfig.cmake that resolves nothing —
+# and consumer-resolves would stay green while it did, because that test reads
+# the install tree rather than the packages.
+#
+# FetchContent_MakeAvailable() runs add_subdirectory() from this scope, so the
+# dependency inherits the variable; install() reads it at call time.
+#
+# ⚠ Scoped to this one include and unset immediately, ON PURPOSE. Left set
+# globally it would also swallow one of OUR install() calls that forgot its
+# COMPONENT — turning the loud configure-time failure in cmake/packaging.cmake
+# into a file silently filed in the wrong package.
+#
+# Catch2 is inside this same include. Its install rules are off today (nothing
+# of its lands in the manifest); if upstream ever flips that default, its files
+# would arrive in `dev` too. Visible in the packaging check's contents
+# assertions rather than silent, which is the reason to say so here.
+# ⚠ Save and RESTORE, rather than set-and-unset. A directory scope holds a copy
+# of its parent's variables, so unset() here would not reveal a consumer's value
+# — it would delete our copy and leave the name undefined for everything
+# configured after this line. A consumer that sets it to `core` and embeds us
+# with _INSTALL=ON would silently lose that default, and any install() rule
+# added later without an explicit COMPONENT would file into `Unspecified`
+# instead of `core`: the exact silent misfile this scoping exists to prevent,
+# reintroduced by the line meant to undo it. The undefined case has to be
+# preserved as undefined, which is why the flag is a separate variable.
+if (DEFINED CMAKE_INSTALL_DEFAULT_COMPONENT_NAME)
+  set(_saved_default_component "${CMAKE_INSTALL_DEFAULT_COMPONENT_NAME}")
+  set(_had_default_component TRUE)
+else ()
+  set(_had_default_component FALSE)
+endif ()
+
+set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME dev)
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/dependencies.cmake)
+
+if (_had_default_component)
+  set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME "${_saved_default_component}")
+else ()
+  unset(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME)
+endif ()
+unset(_saved_default_component)
+unset(_had_default_component)
 
 # GLYPHCADE_WITH_AUDIO. After project() (it needs PkgConfig) and before src/lib
 # (which reads the option to set a compile definition).
@@ -126,4 +176,18 @@ endif (${PROJECT_NAME}_TESTS)
 # now, and works against an install tree.
 if (${PROJECT_NAME}_INSTALL)
   include(${CMAKE_CURRENT_LIST_DIR}/cmake/install.cmake)
+endif ()
+
+# CPack, and it must come AFTER cmake/install.cmake: the component assertion in
+# there reads the global COMPONENTS property, which only has entries once every
+# install() rule has run.
+#
+# ⚠ The gate is deliberately stricter than the one above. ${PROJECT_NAME}_INSTALL
+# only DEFAULTS to PROJECT_IS_TOP_LEVEL — a consumer that ships us turns it back
+# on, which is precisely what cmake/deps/termforge.cmake does to termforge. In
+# that configuration include(CPack) would write CPackConfig.cmake into the
+# consumer's own binary directory, over theirs. Install rules are ours to add to
+# their prefix when they ask; their packaging is not.
+if (PROJECT_IS_TOP_LEVEL AND ${PROJECT_NAME}_INSTALL)
+  include(${CMAKE_CURRENT_LIST_DIR}/cmake/packaging.cmake)
 endif ()

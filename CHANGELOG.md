@@ -7,11 +7,39 @@ Everything up to and including **v0.19.0** was developed under the name
 `gitea #NN`, which was true when they were written; the numbers are not public.
 See [docs/history.md](docs/history.md) for the full development narrative.
 
-The rename itself is **unreleased** — deliberately. A tag now would create a
-release with no artifacts in it; `#15` (deb/rpm/tgz packaging) is what gives a
-release something to carry.
+The rename was held back from a tag deliberately: a release with no artifacts in
+it is a release nobody can use, and `#15` (deb/rpm/tgz packaging) was what a
+release needed in order to carry something. **That condition is now met** — see
+Added, below — so the next tag ships the rename and the packages together.
 
 ## [Unreleased]
+
+### Added — there is a way to install this now
+
+- **CPack packaging**: `.deb`, `.rpm` and `.tar.gz`, built by a new CI
+  `package` job and attached to the GitHub release on a `v*` tag (#15). Until
+  now the only way to install glyphcade was to build it.
+- The `.deb` and `.rpm` carry **the binary and its licence notices, and nothing
+  else**. The install tree's other 96 files are the exported CMake package —
+  static archives, headers, `lib/cmake/` — which have no runtime role at all,
+  since a static archive is consumed at link time and the binary already
+  contains that code. They ship in the **tarball**, which is the whole install
+  tree unfiltered. There is deliberately no `-dev`/`-devel` package: that would
+  be a promise to keep the archives ABI-stable for third parties, and nothing
+  here has made that promise.
+- The **audio dependency is derived, not declared** — `dpkg-shlibdeps` from the
+  binary's `DT_NEEDED` for the `.deb`, rpmbuild's `AUTOREQ` for the `.rpm` — so
+  each package names whatever the target distribution calls rtaudio. That is not
+  theoretical: the same source produces `librtaudio6` on Ubuntu 24.04 and
+  `librtaudio7` on Debian trixie.
+- **`glyphcade`'s own `LICENSE.md` is now installed**, along with a copy of
+  TermForge's. Nothing installed either before, which never showed while the
+  only artifact was a build tree. TermForge is linked *statically*, so its code
+  is inside the binary and its MIT notice belongs in the binary's package.
+- New ctest **`package-artifacts`** (`cmake/check_package.cmake`) and a new
+  `package` CI job. The check refuses a package versioned `0.0.0` — what
+  `git describe --tags` yields from a shallow or `.git`-less checkout, and the
+  kind of artifact nobody notices until it is published.
 
 ### Changed — the project is now `glyphcade`, and open source
 

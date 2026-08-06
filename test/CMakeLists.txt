@@ -121,14 +121,89 @@ if (${PROJECT_NAME}_INSTALL AND TARGET ${PROJECT_NAME}::lib)
   #
   # RESOURCE_LOCK is plain mutual exclusion by label; the string names nothing
   # real. This is the only lock in the suite, and it serialises two tests.
-  set_tests_properties(audio-export-clean consumer-resolves
+  # The #15 guard, and the third member of the family. The two above judge the
+  # INSTALL TREE — what the exported targets say, and whether a consumer can
+  # resolve them. This one judges the PACKAGES built from that tree, which is a
+  # different artifact with a different failure mode: consumer-resolves stayed
+  # green throughout the development of cmake/packaging.cmake, including while
+  # the .deb was empty and while it carried all 99 files.
+  #
+  # Gated on dpkg-deb AND file, not just on _INSTALL. CPACK_DEBIAN_PACKAGE_SHLIBDEPS
+  # runs dpkg-shlibdeps, and CPackDeb raises a FATAL_ERROR when the file utility
+  # is missing — so on a box with one and not the other, registering this test
+  # would turn a missing tool into a red suite rather than an absent check.
+  #
+  # ⚠ And on PROJECT_IS_TOP_LEVEL, which is easy to leave out because _INSTALL
+  # looks like the relevant switch. It is not the one packaging uses: the root
+  # CMakeLists includes cmake/packaging.cmake behind `PROJECT_IS_TOP_LEVEL AND
+  # _INSTALL`, so an embedded copy configured with -D<project>_INSTALL=ON and
+  # tests on — the exact shape cmake/deps/termforge.cmake imposes on termforge —
+  # writes no CPackConfig.cmake at all. Registering the test there gives a hard
+  # red from cpack ("could not find config file") instead of the honest skip the
+  # else-branch below exists to print.
+  #
+  # GENERATORS is derived from the same probes rather than hardcoded, so a box
+  # that HAS rpmbuild inspects the .rpm it can build. Hardcoding DEB;TGZ meant a
+  # maintainer who installed rpm locally to debug the RPM path still never
+  # checked it — every RPM-specific setting stayed unverified until CI ran.
+  find_program(DPKG_DEB_EXECUTABLE dpkg-deb)
+  find_program(FILE_EXECUTABLE file)
+  find_program(RPMBUILD_EXECUTABLE rpmbuild)
+  if (PROJECT_IS_TOP_LEVEL AND DPKG_DEB_EXECUTABLE AND FILE_EXECUTABLE)
+    set(_pkg_generators DEB TGZ)
+    if (RPMBUILD_EXECUTABLE)
+      list(APPEND _pkg_generators RPM)
+    endif ()
+    list(JOIN _pkg_generators "$<SEMICOLON>" _pkg_generators_arg)
+
+    message(STATUS "Configuring test setup package-artifacts (${_pkg_generators})")
+    add_test(
+      NAME package-artifacts
+      COMMAND ${CMAKE_COMMAND}
+              -DBUILD_DIR=${PROJECT_BINARY_DIR}
+              -DGENERATORS=${_pkg_generators_arg}
+              -P ${PROJECT_SOURCE_DIR}/cmake/check_package.cmake
+    )
+  else ()
+    message(STATUS
+      "package-artifacts not configured — top level: ${PROJECT_IS_TOP_LEVEL}, "
+      "dpkg-deb: ${DPKG_DEB_EXECUTABLE}, file: ${FILE_EXECUTABLE}. #15's "
+      "packaging guard is ABSENT in this configuration, not passing.")
+  endif ()
+
+  # audio-export-clean and consumer-resolves both run
+  # `cmake --install ${PROJECT_BINARY_DIR}`, which finishes by writing
+  # ${CMAKE_BINARY_DIR}/install_manifest.txt. Their scratch PREFIXES do not
+  # collide, but that one manifest is a shared write in the build tree, and two
+  # concurrent installs race on it under `ctest -j`. It would rarely fail
+  # outright — which is worse, because the failure mode is one unreproducible
+  # red per quarter rather than something you can sit down and debug.
+  #
+  # ⚠ package-artifacts joins them, but NOT for that reason, and the difference
+  # was measured rather than assumed: running `cpack` leaves
+  # build/install_manifest.txt byte-identical (checked by md5 before and after),
+  # because CPack redirects CMAKE_INSTALL_MANIFEST into its own staging tree.
+  # An earlier version of this comment claimed it was a third racer on that
+  # file. It is not.
+  #
+  # It is in the lock because it still drives a full install pass and the
+  # preinstall target over the same shared build tree, and serialising three
+  # checks that each take a few seconds costs nothing next to one intermittent
+  # red. If a fourth install-based test arrives, judge it on that basis — not on
+  # the manifest claim, which is false.
+  set(_install_tree_tests audio-export-clean consumer-resolves)
+  if (TEST package-artifacts)
+    list(APPEND _install_tree_tests package-artifacts)
+  endif ()
+  set_tests_properties(${_install_tree_tests}
     PROPERTIES RESOURCE_LOCK install-tree)
 else ()
   message(STATUS
-    "audio-export-clean and consumer-resolves not configured — "
-    "${PROJECT_NAME}_INSTALL is off, so there is no exported package to inspect "
-    "and nothing installed for a consumer to resolve. term-game#13's and term-game#46's "
-    "guards are ABSENT in this configuration, not passing.")
+    "audio-export-clean, consumer-resolves and package-artifacts not configured — "
+    "${PROJECT_NAME}_INSTALL is off, so there is no exported package to inspect, "
+    "nothing installed for a consumer to resolve and nothing to package. "
+    "term-game#13's, term-game#46's and #15's guards are ABSENT in this "
+    "configuration, not passing.")
 endif ()
 
 file(GLOB TEST_DIRS ${CMAKE_CURRENT_LIST_DIR}/*)

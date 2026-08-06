@@ -35,9 +35,36 @@
 # defaults to PROJECT_IS_TOP_LEVEL: an embedded copy of this project must not
 # inject rules into its consumer's `cmake --install`.
 #
-# Nothing here names the project literally. The package name is the project
-# name, which is derived from the directory (see the root CMakeLists), so a fork
-# copies this file verbatim.
+# Nothing here names the project literally — every rule below spells it
+# ${PROJECT_NAME} — so a fork copies this file verbatim.
+#
+# ⚠ That used to be justified as "the package name is the project name, which is
+# derived from the directory". The derivation is gone: the root CMakeLists calls
+# project(glyphcade ...) with a literal, because deriving it meant a FetchContent
+# consumer unpacking into _deps/glyphcade-src got targets called
+# glyphcade-src_lib. check_artifacts rule B6 keeps project() and test/00bootstrap
+# agreeing on the literal. The conclusion survives the change; the reason did not.
+#
+# ── Components: `runtime` and `dev` ───────────────────────────────────────────
+# Every install() below names one, and that is enforced rather than trusted —
+# cmake/packaging.cmake derives the component list from the global COMPONENTS
+# property and FATAL_ERRORs unless it is exactly `dev;runtime`, so a rule added
+# here without a COMPONENT registers as `Unspecified` and stops the configure.
+#
+# ⚠ There is deliberately no check_artifacts rule for this, and the omission is
+# considered. A Class-B text rule ("every install( in this file is followed by a
+# COMPONENT") would be strictly weaker than the assertion above: that one
+# observes what CMake actually recorded rather than what the file appears to
+# say, it covers termforge's install() calls too — which no grep of this file
+# could see — and it runs on every top-level configure rather than only under
+# ctest. Choosing the wrong component rather than none is caught downstream by
+# cmake/check_package.cmake, which asserts the runtime package's contents as an
+# exact set. Two mechanisms already cover both halves; a third would be ceremony.
+#
+#   runtime — the executable, and nothing else. What a player installs.
+#   dev     — static archives, headers, the exported Targets/Config files, and
+#             everything termforge installs into our prefix (see the scoped
+#             CMAKE_INSTALL_DEFAULT_COMPONENT_NAME in the root CMakeLists).
 
 include(CMakePackageConfigHelpers)
 
@@ -86,17 +113,39 @@ if (TARGET ${PROJECT_NAME}_lib)
   # the ARCHIVE/LIBRARY/RUNTIME destinations simply go unused — there is no
   # artifact to place — so switching a target's type in src/lib/CMakeLists.txt
   # needs no edit here.
+  # ⚠ COMPONENT is scoped to the artifact kind it follows, so each of the three
+  # needs its own — one COMPONENT at the end of the call would apply to RUNTIME
+  # alone and leave the archives Unspecified.
+  #
+  # ARCHIVE is the only kind that fires today, because every target here is
+  # STATIC. LIBRARY and its NAMELINK_COMPONENT are written anyway, and they are
+  # not decoration: under BUILD_SHARED_LIBS=ON the .so is a runtime artifact and
+  # only the .so.N symlink a linker follows is a dev one — without those two
+  # words a shared build would file libglyphcade_lib.so in the dev package,
+  # where no player would find it.
+  #
+  # ⚠ This is where the file's "switching a target's type needs no edit here"
+  # claim stops being the whole story, and it is worth being precise rather than
+  # letting the two statements sit next to each other. Nothing in THIS file
+  # needs editing. But a shared build would put the .so in the runtime package,
+  # and cmake/check_package.cmake asserts the runtime package's contents as an
+  # exact set — so that switch does need one edit, in that list, and the check
+  # says so when it fires.
   install(TARGETS ${_export_targets}
     EXPORT ${PROJECT_NAME}Targets
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
+                                                NAMELINK_COMPONENT dev
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime
   )
 
+  # COMPONENT dev covers the generated Targets-<config>.cmake files too — they
+  # are written by this one rule, not by a second install() we could forget.
   install(EXPORT ${PROJECT_NAME}Targets
     FILE      ${PROJECT_NAME}Targets.cmake
     NAMESPACE ${PROJECT_NAME}::
     DESTINATION ${_cfg_install_dir}
+    COMPONENT dev
   )
 
   # ── Why there is no export(EXPORT ...) here ─────────────────────────────────
@@ -163,8 +212,14 @@ if (TARGET ${PROJECT_NAME}_lib)
   # the consumer's include path, where it can collide with theirs. A project that
   # expects to be widely consumed should move its headers under
   # include/<project>/ and generate the version header there too.
+  #
+  # ⚠ COMPONENT goes BEFORE FILES_MATCHING. install(DIRECTORY) treats every
+  # argument after FILES_MATCHING as part of the pattern list, so a COMPONENT
+  # trailing it is not a syntax error — it is silently absorbed, and the headers
+  # land in Unspecified.
   install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    COMPONENT dev
     FILES_MATCHING PATTERN "*.hpp"
   )
 endif ()
@@ -172,9 +227,52 @@ endif ()
 # ── The application ───────────────────────────────────────────────────────────
 # Installed when it is built, but deliberately not exported: an executable is
 # something you run, not something another project links.
+#
+# The binary and the licence notices below are the whole `runtime` component,
+# and cmake/check_package.cmake asserts that literally — the runtime .deb must
+# contain those files and no other. If a man page, a .desktop entry or an icon
+# ever arrives, it belongs here with COMPONENT runtime, and that assertion is
+# what will say so.
 if (TARGET ${PROJECT_NAME} AND ${PROJECT_NAME}_BUILD_BIN)
   install(TARGETS ${PROJECT_NAME}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime
+  )
+endif ()
+
+# ── Licences, and why they are runtime rather than dev ────────────────────────
+# Nothing installed this project's own LICENSE.md until packaging needed it: an
+# install tree is something a developer already has the source for, so the
+# omission never showed. A .deb is not — it is a binary handed to somebody who
+# has nothing else — and MIT's condition is that the notice travel with it.
+#
+# ⚠ termforge's notice belongs here too, and that is the non-obvious half. It
+# installs its own copy to share/licenses/termforge/, but that rule is upstream's
+# and lands in `dev` with the rest of what it ships (see the scoped
+# CMAKE_INSTALL_DEFAULT_COMPONENT_NAME in the root CMakeLists) — while termforge
+# is linked STATICALLY, so its code is inside bin/glyphcade. The binary carries
+# the code; the binary's package must carry the notice. Publishing only the
+# runtime packages (the decision behind #15) is what turns that from a tidiness
+# point into a licence-compliance one.
+#
+# Installed to a DIFFERENT path than upstream's copy on purpose: same-path rules
+# in two components make two packages own one file, which dpkg rejects. Both
+# copies coexist in the tarball, which is the monolithic whole tree by design.
+install(FILES ${PROJECT_SOURCE_DIR}/LICENSE.md
+  DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/licenses/${PROJECT_NAME}
+  COMPONENT runtime
+)
+
+# ⚠ Only reachable on the FetchContent path — termforge_SOURCE_DIR is set by
+# FetchContent_MakeAvailable and does not exist when find_package found a system
+# copy, where the notice is already installed at that prefix and is not ours to
+# re-ship. Rather than guess, cmake/check_package.cmake asserts the file IS in
+# the runtime package: a package built against a system termforge goes red and
+# says so, instead of shipping a binary with a missing notice.
+if (DEFINED termforge_SOURCE_DIR AND EXISTS ${termforge_SOURCE_DIR}/LICENSE.md)
+  install(FILES ${termforge_SOURCE_DIR}/LICENSE.md
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/licenses/${PROJECT_NAME}
+    RENAME LICENSE.termforge.md
+    COMPONENT runtime
   )
 endif ()
 
@@ -220,4 +318,5 @@ install(FILES
     ${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
     ${PROJECT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake
   DESTINATION ${_cfg_install_dir}
+  COMPONENT dev
 )
