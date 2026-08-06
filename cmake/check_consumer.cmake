@@ -1,8 +1,11 @@
-# Asserts that the installed package can actually be RESOLVED by a consumer
-# (term-game#46).
+# Asserts both sides of the package-config contract: an installed package with
+# exported targets resolves, while a config with no Targets file beside it is
+# rejected with our own diagnosis rather than CMake's generic include failure
+# (term-game#46, GitHub #12).
 #
 # Run as a ctest:
-#   cmake -DBUILD_DIR=<build> -DPROJECT=glyphcade -DEXPECT_VERSION=<ver> \
+#   cmake -DBUILD_DIR=<build> -DSOURCE_DIR=<source> \
+#         -DPROJECT=glyphcade -DEXPECT_VERSION=<ver> \
 #         [-DTERMFORGE_DIR=<dir>] -P cmake/check_consumer.cmake
 #
 # ── Why this exists, and why check_export.cmake is not it ─────────────────────
@@ -51,20 +54,28 @@
 
 cmake_minimum_required(VERSION 3.28)
 
-if (NOT DEFINED BUILD_DIR OR NOT DEFINED PROJECT OR NOT DEFINED EXPECT_VERSION)
+if (NOT DEFINED BUILD_DIR OR NOT DEFINED SOURCE_DIR OR NOT DEFINED PROJECT OR
+    NOT DEFINED EXPECT_VERSION)
   message(FATAL_ERROR
-    "check_consumer.cmake needs -DBUILD_DIR=, -DPROJECT= and -DEXPECT_VERSION=")
+    "check_consumer.cmake needs -DBUILD_DIR=, -DSOURCE_DIR=, -DPROJECT= and "
+    "-DEXPECT_VERSION=")
 endif ()
 
-set(_prefix "${BUILD_DIR}/consumer-check-prefix")
-set(_src    "${BUILD_DIR}/consumer-check-src")
-set(_bin    "${BUILD_DIR}/consumer-check-bin")
+set(_prefix       "${BUILD_DIR}/consumer-check-prefix")
+set(_src          "${BUILD_DIR}/consumer-check-src")
+set(_bin          "${BUILD_DIR}/consumer-check-bin")
+set(_build_bin    "${BUILD_DIR}/consumer-check-build-tree-bin")
+set(_nolib_build  "${BUILD_DIR}/consumer-check-nolib-build")
+set(_nolib_prefix "${BUILD_DIR}/consumer-check-nolib-prefix")
+set(_nolib_bin    "${BUILD_DIR}/consumer-check-nolib-bin")
 
-# All THREE, and before anything else. The prefix is the obvious one, but a
-# leftover consumer-check-bin cache from a previous green run still holds
-# ${PROJECT}_DIR and termforge_DIR as resolved cache entries — which is the
-# single most likely way a red arm of this check would come out green.
-file(REMOVE_RECURSE "${_prefix}" "${_src}" "${_bin}")
+# All SEVEN, and before anything else. The prefixes are the obvious ones, but a
+# leftover consumer cache from a previous green run still holds ${PROJECT}_DIR
+# and termforge_DIR as resolved entries — which is the single most likely way a
+# red arm of this check would come out green.
+file(REMOVE_RECURSE
+  "${_prefix}" "${_src}" "${_bin}" "${_build_bin}"
+  "${_nolib_build}" "${_nolib_prefix}" "${_nolib_bin}")
 
 # ── 1. Install the already-built tree to a scratch prefix ─────────────────────
 #
@@ -207,6 +218,8 @@ string(REGEX MATCH  "CONSUMED-PROJECT-DIR=([^\n\r]*)"       _m "${_clog}")
 set(_got_dir "${CMAKE_MATCH_1}")
 string(REGEX MATCH  "CONSUMED-TERMFORGE-VERSION=([^\n\r]*)" _m "${_clog}")
 set(_got_tf_version "${CMAKE_MATCH_1}")
+string(REGEX MATCH  "CONSUMED-TERMFORGE-DIR=([^\n\r]*)"     _m "${_clog}")
+set(_got_tf_dir "${CMAKE_MATCH_1}")
 
 # ⚠ THE vacuity guard. Nothing stops somebody running `cmake --install build`
 # into /usr/local once; from then on this test would pass forever no matter what
@@ -311,11 +324,148 @@ if (NOT _floor_mm STREQUAL _got_mm)
     "cmake/project-config.cmake.in about the ABI floor needs re-reading.")
 endif ()
 
-# On success only. A failure leaves all three directories behind on purpose —
-# the generated consumer, its cache and the prefix are the evidence, and
-# check_export.cmake does the same.
-file(REMOVE_RECURSE "${_prefix}" "${_src}" "${_bin}")
+# ── 6. A config without targets is rejected on purpose ───────────────────────
+#
+# The guard at the top of project-config.cmake.in exists for two real paths.
+# Exercise BOTH: the generated config in the build tree (this project exports
+# only at install time), and a real install configured with BUILD_LIB=OFF. They
+# reach the same branch from different build shapes, and the second prevents an
+# install-rule change from making the first a convincing but incomplete proxy.
+
+function(_expect_no_targets _label _package_dir _consumer_bin)
+  file(REMOVE_RECURSE "${_consumer_bin}")
+
+  execute_process(
+    COMMAND ${CMAKE_COMMAND} -S "${_src}" -B "${_consumer_bin}"
+            "-DCHECK_PROJECT=${PROJECT}"
+            "-D${PROJECT}_DIR=${_package_dir}"
+            "-Dtermforge_DIR=${_got_tf_dir}"
+            "-DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF"
+            "-DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF"
+    RESULT_VARIABLE _nrc
+    OUTPUT_VARIABLE _nout
+    ERROR_VARIABLE  _nerr
+  )
+  set(_nlog "${_nout}${_nerr}")
+
+  if (_nrc EQUAL 0)
+    message(FATAL_ERROR
+      "${_label}: a config with no exported targets resolved successfully.\n"
+      "Consumer output follows.\n${_nlog}")
+  endif ()
+
+  # CMake paragraph-wraps a package's NOT_FOUND_MESSAGE to the output width.
+  # Match the words, not whichever newline positions this CMake version chose.
+  string(REGEX REPLACE "[ \t\r\n]+" " " _nlog_flat "${_nlog}")
+  set(_guard_text "holds a package config but no exported targets beside it")
+  string(FIND "${_nlog_flat}" "${_guard_text}" _guard_at)
+  if (_guard_at EQUAL -1)
+    message(FATAL_ERROR
+      "${_label}: the consumer failed, but not through the no-targets guard. "
+      "Expected '${_guard_text}'. An exit-code-only assertion would pass on "
+      "CMake's generic missing-include error and is deliberately insufficient.\n"
+      "Consumer output follows.\n${_nlog}")
+  endif ()
+
+  string(TOLOWER "${_nlog_flat}" _nlog_lower)
+  string(FIND "${_nlog_lower}" "include could not find requested file" _include_at)
+  if (NOT _include_at EQUAL -1)
+    message(FATAL_ERROR
+      "${_label}: the intended guard ran, but configuration also fell through "
+      "to CMake's generic missing-include failure. The guard must return.\n"
+      "Consumer output follows.\n${_nlog}")
+  endif ()
+
+  # The guard prints CMAKE_CURRENT_LIST_DIR in its own message. Requiring the
+  # intended directory in the log prevents a stray installed package from
+  # supplying the right words and turning this into a vacuous pass.
+  string(FIND "${_nlog_flat}" "${_package_dir}" _dir_at)
+  if (_dir_at EQUAL -1)
+    message(FATAL_ERROR
+      "${_label}: the expected guard text appeared, but it did not name the "
+      "package directory under test (${_package_dir}).\n${_nlog}")
+  endif ()
+
+  message(STATUS "${_label}: rejected without exported targets: CLEAN")
+endfunction()
+
+# The generated build-tree config is present by design; the exported targets
+# are absent by design. Assert both preconditions before treating its failure as
+# evidence about the guard.
+if (NOT EXISTS "${BUILD_DIR}/${PROJECT}Config.cmake")
+  message(FATAL_ERROR
+    "build-tree arm needs ${BUILD_DIR}/${PROJECT}Config.cmake, but it is absent")
+endif ()
+if (EXISTS "${BUILD_DIR}/${PROJECT}Targets.cmake")
+  message(FATAL_ERROR
+    "build-tree arm is invalid: ${BUILD_DIR}/${PROJECT}Targets.cmake exists")
+endif ()
+_expect_no_targets("build-tree config" "${BUILD_DIR}" "${_build_bin}")
+
+# Configure a second copy with no library, executable or tests. It resolves
+# termforge from the full scratch install made above (or the same explicit
+# system termforge the parent build used), so this arm has no download and no
+# dependency build. Configure + install is enough: with no glyphcade library
+# there is no glyphcade target to compile and no Targets file to install.
+set(_nolib_args
+  "-D${PROJECT}_BUILD_LIB=OFF"
+  "-D${PROJECT}_BUILD_BIN=OFF"
+  "-D${PROJECT}_TESTS=OFF"
+  "-D${PROJECT}_INSTALL=ON"
+  "-DGLYPHCADE_WITH_AUDIO=OFF"
+  "-DCMAKE_PREFIX_PATH=${_prefix}"
+  "-DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF"
+  "-DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF"
+)
+if (TERMFORGE_DIR AND NOT TERMFORGE_DIR MATCHES "NOTFOUND$")
+  list(APPEND _nolib_args "-Dtermforge_DIR=${TERMFORGE_DIR}")
+endif ()
+
+execute_process(
+  COMMAND ${CMAKE_COMMAND} -S "${SOURCE_DIR}" -B "${_nolib_build}" ${_nolib_args}
+  RESULT_VARIABLE _ncrc
+  OUTPUT_VARIABLE _ncout
+  ERROR_VARIABLE  _ncerr
+)
+if (NOT _ncrc EQUAL 0)
+  message(FATAL_ERROR
+    "no-library configure failed (${_ncrc}):\n${_ncout}\n${_ncerr}")
+endif ()
+
+execute_process(
+  COMMAND ${CMAKE_COMMAND} --install "${_nolib_build}" --prefix "${_nolib_prefix}"
+  RESULT_VARIABLE _nirc
+  OUTPUT_VARIABLE _niout
+  ERROR_VARIABLE  _nierr
+)
+if (NOT _nirc EQUAL 0)
+  message(FATAL_ERROR
+    "no-library install failed (${_nirc}):\n${_niout}\n${_nierr}")
+endif ()
+
+file(GLOB_RECURSE _nolib_configs LIST_DIRECTORIES FALSE
+  "${_nolib_prefix}/*/${PROJECT}Config.cmake")
+list(LENGTH _nolib_configs _nolib_config_count)
+if (NOT _nolib_config_count EQUAL 1)
+  message(FATAL_ERROR
+    "no-library install should contain exactly one ${PROJECT}Config.cmake, "
+    "found ${_nolib_config_count}: ${_nolib_configs}")
+endif ()
+list(GET _nolib_configs 0 _nolib_config)
+get_filename_component(_nolib_config_dir "${_nolib_config}" DIRECTORY)
+if (EXISTS "${_nolib_config_dir}/${PROJECT}Targets.cmake")
+  message(FATAL_ERROR
+    "no-library arm is invalid: ${_nolib_config_dir}/${PROJECT}Targets.cmake exists")
+endif ()
+_expect_no_targets("no-library install" "${_nolib_config_dir}" "${_nolib_bin}")
+
+# On success only. A failure leaves all seven directories behind on purpose —
+# the generated consumers, their caches and the prefixes are the evidence, and
+# check_export.cmake does the same. Keep this list paired with the initial clean.
+file(REMOVE_RECURSE
+  "${_prefix}" "${_src}" "${_bin}" "${_build_bin}"
+  "${_nolib_build}" "${_nolib_prefix}" "${_nolib_bin}")
 
 message(STATUS
-  "consumer resolves ${PROJECT} ${_got_version} with termforge "
-  "${_got_tf_version} (floor ${_floor}): CLEAN")
+  "consumer matrix resolves ${PROJECT} ${_got_version} with termforge "
+  "${_got_tf_version} (floor ${_floor}) and rejects both targetless configs: CLEAN")

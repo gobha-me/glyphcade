@@ -30,6 +30,12 @@
 #
 # The message is deliberately one quoted argument: set() with several would
 # build a ;-separated list and print as one run-on line.
+#
+# Both paths are exercised by ctest `consumer-resolves` (GitHub #12). It points
+# one generated consumer at the build tree and another at an install configured
+# with @PROJECT_NAME@_BUILD_LIB=OFF, and requires this message rather than merely
+# a nonzero configure result. Deleting this block falls through to `include`
+# below and still fails, so an exit-code-only check would be vacuous.
 if (NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
   set(@PROJECT_NAME@_FOUND FALSE)
   set(@PROJECT_NAME@_NOT_FOUND_MESSAGE

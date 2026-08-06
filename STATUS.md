@@ -2,7 +2,9 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-08-06** (#15 — the arcade is *installable*: CPack `.deb`,
+**Last updated: 2026-08-06** (#12 — both targetless package-config paths now
+execute under `consumer-resolves`, and deleting their guard is a measured red;
+before it #15 — the arcade is *installable*: CPack `.deb`,
 `.rpm` and `.tar.gz`, built and inspected by a new CI `package` job and attached
 to the release on a tag. Before it term-game#55 — Tetris's next-up preview is now
 the spawn stream rather than a dead-end copy of it, the first defect here found
@@ -18,6 +20,17 @@ border tier; plus the first maintainer feel report, see
 ---
 
 ## Where the project actually is
+
+**A package config without exported targets is rejected deliberately, and both
+ways to produce one are now tested.** #12. `consumer-resolves` still proves a
+normal scratch install resolves, then points the same generated consumer at the
+build tree and at a real install configured with `glyphcade_BUILD_LIB=OFF`.
+Both must fail with glyphcade's own "package config but no exported targets"
+diagnosis, and neither may fall through to CMake's generic missing-include
+error. Deleting the guard was red-verified: the build-tree arm reached the
+missing `glyphcadeTargets.cmake` include and the test rejected that failure for
+having the wrong reason. See "The targetless package configs are rejected on
+purpose" in [docs/history.md](docs/history.md).
 
 **There is a way to install this that is not "build it yourself."** #15. `cpack`
 produces a `.deb`, an `.rpm` and a `.tar.gz`; a new CI `package` job builds them
