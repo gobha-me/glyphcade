@@ -15,6 +15,27 @@ this file.
 
 ## [Unreleased]
 
+## [v0.22.0] — 2026-08-25
+
+### Added
+
+- Added the first complete visual-asset path (#8): committed PNGs carry a
+  provenance-and-SHA-256 manifest, CMake embeds their compressed bytes, and a
+  bounded public decoder returns `std::expected<termforge::Image,
+  termforge::ErrorEvent>`.
+- Vendored `stb_image` v2.30 at a pinned upstream commit and included its MIT
+  notice in runtime packages.
+- Added an original transparent card-back proof asset for Solitaire. Its
+  7-bit card remains the information-complete Baseline; ANSI receives an opaque
+  composition for half-block rendering and Kitty receives native transparent
+  RGBA.
+
+### Tests
+
+- Added `asset-manifest`, which rejects missing, extra or changed PNGs, and
+  `36assets-test`, which drives the same decoded proof through the Baseline,
+  ANSI truecolour and Kitty drivers without a terminal.
+
 ## [v0.21.0] — 2026-08-25
 
 ### Changed

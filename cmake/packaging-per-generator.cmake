@@ -9,10 +9,10 @@
 # build. Only CPACK_* variables exist. Anything else read here is empty.
 
 # ── The binary packages carry the runtime component only ──────────────────────
-# The install tree is 99 files and one of them is the game. The other 98 are the
-# exported CMake package — nine static archives, 79 headers, two lib/cmake/
-# trees — which have no runtime role at all: a static archive is consumed at
-# link time, and bin/glyphcade already contains that code.
+# The install tree is 116 files and one of them is the game. The others are the
+# exported CMake package and licence notices, which have no runtime role at all:
+# a static archive is consumed at link time, and bin/glyphcade already contains
+# that code.
 #
 # So a .deb or .rpm is the binary and its licence notices, full stop. The
 # exported package still gets built, still gets proven by the consumer-resolves

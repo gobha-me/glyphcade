@@ -29,9 +29,10 @@ tar xzf glyphcade-<version>-Linux-x86_64.tar.gz && ./glyphcade-*/bin/glyphcade
 
 Then run `glyphcade`.
 
-The `.deb` and `.rpm` contain the game and nothing else. The tarball is the whole
-install tree — it also carries the static libraries, headers and CMake package
-config described under [Use it as a library](#use-it-as-a-library).
+The `.deb` and `.rpm` contain the game and its required licence notices, and
+nothing else. The tarball is the whole install tree — it also carries the static
+libraries, headers and CMake package config described under
+[Use it as a library](#use-it-as-a-library).
 
 ## Build
 
@@ -98,8 +99,10 @@ require Kitty graphics or truecolour raster output.
 ## Audio
 
 Sound effects are **synthesized, not sampled** — square/triangle/noise
-oscillators with ADSR envelopes. No decoder, no asset pipeline, no binary blobs
-in git, and it is the right sound for an arcade.
+oscillators with ADSR envelopes. The audio path therefore needs no decoder or
+sample blobs, and it is the right sound for an arcade. Visual art uses a small,
+manifested PNG pipeline; every raster still has an information-complete ASCII
+fallback.
 
 The device sits behind an `AudioSink` with three implementations: `RtAudioSink`
 (hardware), `NullSink` (no card present), and `WavFileSink` (renders to disk,
@@ -107,7 +110,7 @@ which is what makes the audio path testable with no sound hardware at all).
 
 ## Testing
 
-Roughly 14k lines of tests against 15k lines of source, 34 ctest targets. CI runs
+Roughly 14k lines of tests against 15k lines of source, 36 ctest targets. CI runs
 five arms on every push and pull request — gcc, clang, ASan, UBSan and TSan —
 each in a pinned `debian:trixie` container with `-Werror`.
 

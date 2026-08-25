@@ -305,9 +305,15 @@ second is the one that keeps being relearned:
   releases twice: the detail pane's scrollbar (Epic 6) and the pause dialog's
   frame and title delimiters (term-game#44).
 
-Venice-generated PNG art is decoded via a vendored `stb_image` in glyphcade.
-TermForge's stdlib-only policy is *its* constraint and correctly keeps decode out
-of `Image`; glyphcade has no such policy and is the right place for it.
+Generated PNG art is a committed, reviewable input under `assets/`; its prompt,
+dimensions and SHA-256 live beside it in `assets/manifest.json`. CMake embeds the
+compressed PNG bytes into the target that owns them, then glyphcade's bounded
+`decode_png()` adapter turns those bytes into a TermForge `Image` once at load
+time. `stb_image` v2.30 is vendored at a pinned upstream commit for that one
+decode boundary. There is no build-time download, generator dependency or raw
+RGBA blob. TermForge's stdlib-only policy is *its* constraint and correctly
+keeps decode out of `Image`; glyphcade has no such policy and is the right place
+for it.
 
 ---
 
@@ -443,6 +449,7 @@ glyphcade/
 │   ├── games/<name>/ ✓       # a game's own headers — they stay HERE, not next
 │   │                         #   to its sources, so install(DIRECTORY include/)
 │   │                         #   still ships them
+│   ├── assets/png.hpp ✓      # bounded PNG bytes -> expected<Image, ErrorEvent>
 │   └── audio/    sink.hpp ✓ engine.hpp ✓ synth.hpp ✓ ring.hpp ✓
 │                                                      (Epic 2)
 ├── src/audio_backend/        # ✓ rtaudio, in a NEVER-exported target (#13)
@@ -451,8 +458,8 @@ glyphcade/
 │                             #   one static library per game. <name> is the
 │                             #   namespace, not necessarily the slug.
 ├── src/bin/main.cpp          # ✓ the single binary
-├── assets/                   # venice-generated art
-├── vendor/stb_image.h
+├── assets/                   # committed PNG art + provenance/hash manifest
+├── vendor/stb_image.h        # pinned v2.30 decoder + its MIT notice
 └── test/                     # ✓ Catch2, mirroring termforge's suite layout
 ```
 

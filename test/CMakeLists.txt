@@ -9,6 +9,17 @@ add_test(
   COMMAND ${CMAKE_COMMAND} -P ${PROJECT_SOURCE_DIR}/cmake/version_selftest.cmake
 )
 
+# The authored half of the asset pipeline: every committed PNG has provenance
+# and an exact digest, and every manifest entry names a real PNG. Decoder and
+# driver behavior live in test/36assets; this script catches storage drift
+# without needing a compiler.
+add_test(
+  NAME asset-manifest
+  COMMAND ${CMAKE_COMMAND}
+          -DASSET_DIR=${PROJECT_SOURCE_DIR}/assets
+          -P ${PROJECT_SOURCE_DIR}/cmake/check_assets.cmake
+)
+
 # Leftover-template-artifact check (cmake/check_artifacts.cmake), also standalone.
 # The mode is keyed on NEW_PROJECT.md, whose last checklist step is "delete this
 # file": while it exists we are the template, so the Class-A rules are inverted

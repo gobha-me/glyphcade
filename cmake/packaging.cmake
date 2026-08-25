@@ -5,14 +5,14 @@
 # inspects and attaches to a release.
 #
 # ── What ships, and what does NOT ─────────────────────────────────────────────
-# The install tree is 99 files, and only ONE of them is what a player wants.
-# The rest is the exported CMake package: nine static archives, 79 headers, two
-# lib/cmake/ trees. Those exist for `find_package(glyphcade)`, they are a real
-# and tested feature, and they have no runtime role whatsoever — a static
-# archive is consumed at link time, and bin/glyphcade already contains the code.
+# The install tree is 116 files, and only ONE of them is what a player wants.
+# The rest is the exported CMake package and licence notices. Those exist for
+# `find_package(glyphcade)` or legal compliance, they are real and tested, and
+# they have no runtime role whatsoever — a static archive is consumed at link
+# time, and bin/glyphcade already contains the code.
 #
-#   .deb / .rpm   the `runtime` component ONLY: the binary and its licence
-#                 notices. What you install to play the game.
+#   .deb / .rpm   the `runtime` component ONLY: the binary and its three
+#                 licence notices. What you install to play the game.
 #   .tar.gz       the WHOLE install tree, every component, unfiltered. Where
 #                 the exported package lives for anyone who wants to link it.
 #

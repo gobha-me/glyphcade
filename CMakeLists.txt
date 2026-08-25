@@ -40,6 +40,11 @@ project(glyphcade
 # CMAKE_INSTALL_{INCLUDE,LIB,BIN}DIR, used by src/lib and cmake/install.cmake.
 include(GNUInstallDirs)
 
+# Project-local build helper for turning committed PNGs into in-memory byte
+# spans. It has no generator or decoder dependency: CMake writes ordinary C++
+# string-literal chunks, and glyphcade's runtime PNG decoder owns the next step.
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/assets.cmake)
+
 # PROJECT_VERSION, not CMAKE_PROJECT_VERSION: the CMAKE_ prefixed variable holds
 # the *top-level* project's version, which is someone else's when we are consumed.
 message(STATUS "${PROJECT_NAME}:${PROJECT_VERSION} (tweak=${VERSION_TWEAK} dirty=${VERSION_DIRTY} top_level=${PROJECT_IS_TOP_LEVEL})")

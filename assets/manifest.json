@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "assets": [
+    {
+      "name": "proof_card_back",
+      "file": "proof/card-back.png",
+      "kind": "playing-card back proof",
+      "generator": "OpenAI built-in image_gen",
+      "generated_at": "2026-08-25",
+      "width": 1024,
+      "height": 1536,
+      "bytes": 1597673,
+      "sha256": "3058080208c396df588ebe41657ccae721da940f18f60195ea32f7449fea64f8",
+      "generation_prompt": "Use case: stylized-concept\nAsset type: game sprite proof for a terminal arcade asset pipeline\nPrimary request: create one original face-down playing card back for glyphcade, suitable as the first proof asset for a future Klondike game\nScene/backdrop: genuinely transparent background outside the card silhouette\nSubject: one centered portrait playing card seen straight-on, with a clear rounded rectangular silhouette and a symmetric geometric card-back pattern\nStyle/medium: crisp retro arcade pixel-art-inspired illustration with flat, clean shapes and a restrained high-contrast palette\nComposition/framing: 2:3 portrait card, centered, fully visible, even transparent margin on all sides, no perspective tilt\nColor palette: deep navy background with cyan and violet geometric accents, consistent with a dark terminal arcade\nConstraints: transparent pixels outside the card; opaque card interior; strong silhouette and readable pattern when reduced; no text, letters, numbers, ranks, suits, logos, trademarks, watermark, drop shadow, hands, table, scenery, or extra objects\nAvoid: photorealism, paper texture, gradients that muddy small-size rendering, decorative text, cropped edges",
+      "edit_prompts": [
+        "Use case: precise-object-edit\nAsset type: game sprite proof for a terminal arcade asset pipeline\nInput images: Image 1 is the edit target\nPrimary request: preserve the card-back design, geometry, pixel-art pattern, colors, proportions, and straight-on framing; change only the alpha treatment\nConstraints: make every pixel outside the card silhouette genuinely fully transparent (alpha 0); remove the exterior blue glow and all drop shadow; make the complete card silhouette and interior fully opaque (alpha 255), including its cyan border; keep a clean hard edge suitable for sprite compositing; retain even transparent margin; no text, logos, watermark, scenery, or extra objects\nAvoid: translucent card interior, semitransparent haze outside the card, glow, shadow, altered pattern, altered palette, cropped edges",
+        "Use case: background-extraction\nAsset type: game sprite proof for a terminal arcade asset pipeline\nInput images: Image 1 is the card-back edit target\nPrimary request: extract the single playing card as a clean cutout on a genuinely transparent background\nConstraints: preserve the card design, pattern, palette, dimensions, proportions, and straight-on framing exactly; make outside pixels actual PNG alpha transparency, not a visible checkerboard; remove the white/gray checkerboard and any background pixels completely; keep the card itself opaque with a clean hard silhouette; preserve transparent margin; no glow, no drop shadow, no text, no logos, no watermark, no new objects\nAvoid: baked checkerboard pattern, white background, gray background, RGB-only output, translucent card interior, changed artwork, cropped edges"
+      ]
+    }
+  ]
+}

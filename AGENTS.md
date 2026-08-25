@@ -70,6 +70,14 @@ it points at history that is not public — treat it as a note, not a lead.
 - **Every game is playable at the bottom tier.** Pixel sprites are an
   enhancement over a glyph fallback that always exists — the same relationship
   `Widget::draw_pixels` has to `Widget::draw`. A game that needs Kitty is a bug.
+- **Art assets are committed inputs, not build-time downloads.** Keep authored
+  PNGs under `assets/`, record their provenance and SHA-256 in
+  `assets/manifest.json`, embed the compressed bytes with
+  `glyphcade_embed_asset()`, and decode them once outside the frame loop. The
+  generator is not a build dependency and raw RGBA dumps do not belong in git.
+  Author the 7-bit cell Baseline first; native and raster paths enhance the same
+  information. Custom card packs and a general asset editor are not part of the
+  pipeline.
 - **Every game has a degradation story, not a terminal grade.** Record its
   floor, preferred experience and the replacement for every preferred feature;
   the roster matrix lives in `docs/fidelity.md`. Graphics, keyboard protocol,
