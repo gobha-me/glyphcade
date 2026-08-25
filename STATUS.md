@@ -120,9 +120,12 @@ full card back names the one card that may flip. `test/35solitaire-layout`
 sweeps every valid hidden/face-up count and pins the width, height and hit-test
 boundaries without a `Screen`; `test/37solitaire` drives the rules without
 TermForge, and `test/38solitaire-ui` covers rendering outcomes, input, timing
-and score recording. Device audio, real Kitty placement and drag feel still
-require the maintainer gate before release. See "The flagship completes the
-roster" in [docs/history.md](docs/history.md).
+and score recording. The maintainer's Kitty playtest covered native placement
+and the corrected drag path, and a subsequent hardware audition confirmed all
+five new cues play through the normal RtAudio backend. That closes the device
+delivery gate; whether every cue sounds aesthetically right remains a broader
+feel question. See "The flagship completes the roster" in
+[docs/history.md](docs/history.md).
 
 **The suite's fidelity contract is explicit.** Every roster entry now has a
 documented floor, preferred experience and degradation story in
@@ -415,14 +418,13 @@ latency and cursor responsiveness, Tetris' DAS/ARR/soft-drop trio, Sokoban's
 push feel, and whether any effect in the bank sounds *right*. Do not infer these
 from "it feels fast" — a frame rate is not a feel decision.
 
-**Next gate: review and device verification for Epic 8.** The implementation is
-complete locally and its headless evidence covers rules, exact geometry, text,
-raster and synthetic native rendering, mouse routing, fixed-tick timing, score
-persistence, asset integrity and offline audio fingerprints. Before merge and
-release, the maintainer must still play the drag path in a real terminal, check
-native Kitty placement, and listen to the five new effects on a device. After
-that release, work returns to GitHub triage; custom card packs remain outside
-the asset pipeline by design.
+**Epic 8 has cleared its hardware gate and is release-ready.** Its headless
+evidence covers rules, exact geometry, text, raster and synthetic native
+rendering, mouse routing, fixed-tick timing, score persistence, asset integrity
+and offline audio fingerprints. The maintainer also played the corrected drag
+path and native Kitty placement, then confirmed the five new effects reach a
+real device through RtAudio. After the release, work returns to GitHub triage;
+custom card packs remain outside the asset pipeline by design.
 
 Since Epic 3, two housekeeping issues have landed.
 `term-game#16` moved the pin to
@@ -461,7 +463,7 @@ delegates picking to `MapWidget::tile_at()`.
 | 5 — Snake | **done** | — |
 | 6 — Tetris | **done** | ~~termforge #60~~ — shipped in **v0.1.19…v0.2.2** and taken. `KeyboardMode::Enhanced` gives real `KeyAction::Repeat`/`Release`; DAS is now expressible rather than inferred from OS auto-repeat. `term-game#32` built the seam that reaches it: declare `Enhanced` in `kMeta` and the Shell does the rest. ⚠ Still degradable: a terminal without the kitty protocol never delivers `Release` — and note the notice is **ours**, not upstream's, because `App::setup()` has already run by the time a game entry sets the mode. Tetris must fall back to discrete steps **knowingly** |
 | 7 — Sokoban | **done** | ~~termforge #64 → #63~~ — both shipped and **taken**. `MapWidget` v1 (glyph tier) is now SPENT: Sokoban is its first consumer, and the four pieces of API friction it found are listed in "What Epic 7 built" |
-| 8 — Solitaire | **implemented; device gate pending** | No code or framework blocker. Headless validation is complete; real Kitty placement, drag feel and the new SFX need maintainer verification before merge/release |
+| 8 — Solitaire | **done** | — |
 
 **Nothing upstream blocks any epic.** That has been true since term-game#24, and it is what
 [term-game#24](`term-game#24`) bought. termforge
