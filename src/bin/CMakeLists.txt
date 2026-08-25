@@ -53,3 +53,17 @@ target_link_libraries(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}
   PRIVATE ${PROJECT_NAME}_audio_backend
 )
+
+# Manual hardware gate for Solitaire's five new effects. This is deliberately
+# neither installed nor registered with ctest: CI and the development container
+# have no audio device, while the release gate specifically requires a human
+# listener. Keeping it as a normal build target makes the audition source-built
+# and pullable without committing generated WAV files.
+add_executable(${PROJECT_NAME}-solitaire-audio-audition
+  solitaire_audio_audition.cpp
+)
+
+target_link_libraries(${PROJECT_NAME}-solitaire-audio-audition
+  PRIVATE ${PROJECT_NAME}::lib
+  PRIVATE ${PROJECT_NAME}_audio_backend
+)
