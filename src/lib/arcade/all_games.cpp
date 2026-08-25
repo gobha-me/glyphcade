@@ -25,6 +25,7 @@
 #include <glyphcade/games/minesweeper/minesweeper.hpp>
 #include <glyphcade/games/snake/snake.hpp>
 #include <glyphcade/games/sokoban/sokoban.hpp>
+#include <glyphcade/games/solitaire/solitaire.hpp>
 #include <glyphcade/games/tetris/tetris.hpp>
 #include <glyphcade/games/twenty48/twenty48.hpp>
 
@@ -44,6 +45,7 @@ constexpr GameEntry kGames[] = {
     {Snake::kMeta, &make_game<Snake>},
     {Tetris::kMeta, &make_game<Tetris>},
     {Sokoban::kMeta, &make_game<Sokoban>},
+    {Solitaire::kMeta, &make_game<Solitaire>},
 };
 
 // ── The table checks itself ──────────────────────────────────────────────────

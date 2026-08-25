@@ -11,8 +11,8 @@
 // it is also what makes pause and quit-to-menu work here for free — the Shell
 // is already in the state where it handles both.
 //
-// ⚠ It is NOT a Game-interface change. arcade/game.hpp is untouched. This is a
-// member a game holds and consults from its own draw() and on_event(), in
+// ⚠ It does NOT add an options-specific Game interface. This is a member a game
+// holds and consults from its own draw() and on_event(), in
 // exactly the arm where every game already branches on m_layout.fits to draw
 // draw_too_small(). A game that wants a settings screen composes one; a game
 // that does not never learns this header exists, and 2048 does not.

@@ -12,7 +12,7 @@
 // - the seam this file reserved, filled in exactly as promised, additively and
 // without disturbing a single existing game.
 //
-// scores() (term-game#14) is the fourth and last service DESIGN.md named, and it
+// scores() (term-game#14) was the fourth service DESIGN.md named, and it
 // filled the same way: one accessor, one setter in the plumbing block below, one
 // new member, and not a line changed in either game's existing code.
 //
@@ -24,8 +24,11 @@
 // with a direction, and had Minesweeper been the only scoring game this would
 // have shipped as one integer and been wrong.
 //
-// There are now no reserved seams left here. A fifth service is a new design
-// question, not a promise already made.
+// Solitaire added report(): the game owns the decision to degrade its card art,
+// while the Shell owns the sticky ErrorEvent notice. The callback is null in a
+// bare test context, preserving the same null-object discipline as audio and
+// scores. There are no reserved seams left here; another service is a new
+// design question, not a promise already made.
 
 #include <termforge/core/types.hpp>
 #include <termforge/widgets/glyphs.hpp>
@@ -100,6 +103,13 @@ class GameContext {
     return m_scores;
   }
 
+  // Surface a game-owned degradation through the Shell's ordinary ErrorEvent
+  // path. A bare context is a null reporter, so headless model/view tests stay
+  // unable to touch a terminal or external sink by accident.
+  auto report(const termforge::ErrorEvent& error) const -> void {
+    if (m_report != nullptr) m_report(m_report_owner, error);
+  }
+
   // Ask the Shell to return to the selector.
   //
   // ⚠ DEFERRED, never immediate, and that deferral is the whole point.
@@ -130,6 +140,11 @@ class GameContext {
   auto set_scores(scores::Store* store) noexcept -> void {
     m_scores = scores::Recorder{store};
   }
+  using ReportFn = void (*)(void*, const termforge::ErrorEvent&);
+  auto set_reporter(void* owner, ReportFn report) noexcept -> void {
+    m_report_owner = owner;
+    m_report = report;
+  }
 
  private:
   termforge::Capabilities m_caps{};
@@ -142,6 +157,8 @@ class GameContext {
   // dereferencing a store nobody gave it — and, just as importantly, a test that
   // forgets to inject one cannot write to a real file by accident.
   scores::Recorder m_scores{};
+  void* m_report_owner{nullptr};
+  ReportFn m_report{nullptr};
 };
 
 }  // namespace glyphcade

@@ -96,6 +96,14 @@ TEST_CASE("snake is registered", "[registry]") {
   REQUIRE(found);
 }
 
+TEST_CASE("solitaire is registered", "[registry]") {
+  bool found = false;
+  for (const auto& entry : glyphcade::all_games()) {
+    if (entry.meta.slug == "solitaire") found = true;
+  }
+  REQUIRE(found);
+}
+
 TEST_CASE("the roster holds every game the build was told to link",
           "[registry]") {
   // ⚠ What a by-name case CANNOT catch once there is more than one game: a

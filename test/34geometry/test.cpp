@@ -40,6 +40,7 @@
 #include <glyphcade/games/minesweeper/layout.hpp>
 #include <glyphcade/games/snake/layout.hpp>
 #include <glyphcade/games/sokoban/layout.hpp>
+#include <glyphcade/games/solitaire/layout.hpp>
 #include <glyphcade/games/tetris/layout.hpp>
 #include <glyphcade/games/twenty48/layout.hpp>
 
@@ -159,6 +160,8 @@ constexpr GameFits kFits[]{
     // the answer, and that independence IS the reason its floor is Playable.
     {"sokoban",
      [](int c, int r) { return glyphcade::sokoban::compute_layout(c, r, 8, 5).fits; }},
+    {"solitaire",
+     [](int c, int r) { return glyphcade::solitaire::compute_layout(c, r).fits; }},
 };
 
 [[nodiscard]] auto fits_for(std::string_view slug) -> bool (*)(int, int) {

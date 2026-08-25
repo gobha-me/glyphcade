@@ -2,9 +2,8 @@
 
 // glyphcade — Solitaire: the bottom-tier table geometry. Integers only.
 //
-// This is the layout decision that precedes Epic 8, not an incomplete Game.
-// It names no termforge type and owns no rules state. The eventual renderer and
-// mouse path will consume the same Layout and tableau_card_at() answer so their
+// It names no termforge type and owns no rules state. The renderer and mouse
+// path consume the same Layout and tableau_card_at() answer so their
 // coordinates cannot drift apart.
 //
 // ── Why a nineteen-card pile still fits twenty-four rows ────────────────────
@@ -25,6 +24,7 @@
 // face-up card keeps its own row. It needs no scrolling mode, adaptive option
 // or hidden playable information.
 
+#include <algorithm>
 #include <optional>
 
 namespace glyphcade::solitaire {
@@ -42,12 +42,20 @@ inline constexpr int kMaxTableauCards = kMaxHiddenCards + kMaxFaceUpCards;
 static_assert(kMaxHiddenCards == 6);
 static_assert(kMaxTableauCards == 19);
 
-// Bottom-tier card. The three interior columns hold the widest label, "10H";
-// higher tiers may replace the suit letter or the whole card with art without
-// changing the rules extent.
+// Bottom-tier card. The three interior columns hold the widest label, "10H".
+// Presentation may grow on a larger screen, but width and height grow together
+// at the atlas' 2:3 aspect after accounting for cells that are nominally twice
+// as tall as they are wide. A short-but-wide terminal therefore keeps compact
+// cards instead of crushing portrait art into a three-row landscape slot.
+// Width has a deliberate ceiling: seven 11-column cards with two-column gaps
+// need 91 columns including the frame. Past that prose measure the table
+// centres instead of stretching.
 inline constexpr int kCardCols = 5;
 inline constexpr int kCardRows = 3;
 inline constexpr int kPileGapCols = 1;
+inline constexpr int kMaxCardCols = 11;
+inline constexpr int kMaxCardRows = 8;
+inline constexpr int kMaxPileGapCols = 2;
 inline constexpr int kFaceUpFanRows = 1;
 inline constexpr int kHiddenSummaryRows = 1;
 
@@ -76,8 +84,9 @@ inline constexpr int kTopCols =
     kStockWasteCols + kTopGroupGapCols + kFoundationCols;
 
 // Frame border, the top card row, one separating row, the tableau, then status
-// and hint. Surplus ROWS enlarge tableau_rows; surplus COLUMNS do not enlarge
-// cards or the table, matching the suite-wide ceiling rule.
+// and hint. At the floor, surplus rows enlarge tableau capacity. Once enough
+// rows exist to preserve the card-art aspect they also enlarge the exposed
+// card, with the same larger height accounted for in the worst tableau.
 inline constexpr int kFrameCols = 2;
 inline constexpr int kFrameRows = 2;
 inline constexpr int kSectionGapRows = 1;
@@ -101,6 +110,9 @@ inline constexpr int kMaxTableauRows =
     pile_rows(kMaxHiddenCards, kMaxFaceUpCards);
 inline constexpr int kNeedCols = kTableauCols + kFrameCols;
 inline constexpr int kNeedRows = kFixedRows + kMaxTableauRows;
+inline constexpr int kMaxNeedCols = (kTableauPiles * kMaxCardCols) +
+                                    ((kTableauPiles - 1) * kMaxPileGapCols) +
+                                    kFrameCols;
 
 static_assert(kTopPiles == 6);
 static_assert(kTopGroupGapCols == 7);
@@ -110,6 +122,7 @@ static_assert((kMaxTableauCards - 1) + kCardRows == 21,
               "an uncompressed nineteen-card fan does not fit");
 static_assert(kNeedCols == 43);
 static_assert(kNeedRows == 24);
+static_assert(kMaxNeedCols == 91);
 
 struct Layout {
   bool fits{false};
@@ -117,6 +130,10 @@ struct Layout {
   int frame_y{0};
   int frame_w{0};
   int frame_h{0};
+  int card_cols{kCardCols};
+  int card_rows{kCardRows};
+  int pile_gap_cols{kPileGapCols};
+  int tableau_cols{kTableauCols};
   int top_x{0};
   int top_y{0};
   int tableau_x{0};
@@ -126,21 +143,26 @@ struct Layout {
   int hint_y{0};
 
   [[nodiscard]] constexpr auto tableau_pile_x(int pile) const noexcept -> int {
-    return tableau_x + (pile * (kCardCols + kPileGapCols));
+    return tableau_x + (pile * (card_cols + pile_gap_cols));
   }
 
   [[nodiscard]] constexpr auto top_pile_x(int pile) const noexcept -> int {
     if (pile < kStockWastePiles) {
-      return top_x + (pile * (kCardCols + kPileGapCols));
+      return top_x + (pile * (card_cols + pile_gap_cols));
     }
-    return top_x + kStockWasteCols + kTopGroupGapCols +
-           ((pile - kStockWastePiles) * (kCardCols + kPileGapCols));
+    const int stock_waste_cols = (kStockWastePiles * card_cols) + pile_gap_cols;
+    const int foundation_cols = (kFoundationPiles * card_cols) +
+                                ((kFoundationPiles - 1) * pile_gap_cols);
+    const int group_gap_cols =
+        tableau_cols - stock_waste_cols - foundation_cols;
+    return top_x + stock_waste_cols + group_gap_cols +
+           ((pile - kStockWastePiles) * (card_cols + pile_gap_cols));
   }
 };
 
-// A running game owns the whole Screen. The table has a prose measure in
-// columns and stays centred at kNeedCols, while extra rows are real capacity
-// and extend the tableau viewport.
+// A running game owns the whole Screen. Cards and gaps grow with available
+// geometry up to kMaxNeedCols, then the table centres. Neither dimension
+// changes the seven-pile rules extent.
 [[nodiscard]] constexpr auto compute_layout(int screen_cols,
                                             int screen_rows) noexcept
     -> Layout {
@@ -151,17 +173,36 @@ struct Layout {
   out.fits = screen_cols >= kNeedCols && screen_rows >= kNeedRows;
   if (!out.fits) return out;
 
-  out.frame_x = (screen_cols - kNeedCols) / 2;
+  const int available_cols = std::min(screen_cols, kMaxNeedCols) - kFrameCols;
+  const int width_card_cols = std::clamp(
+      (available_cols - ((kTableauPiles - 1) * kPileGapCols)) / kTableauPiles,
+      kCardCols, kMaxCardCols);
+  // The worst tableau and top row each contain one full-height card. Solving
+  //   frame/chrome + top + (hidden + 12 fans + final card) <= screen rows
+  // leaves this much height for each of those two cards.
+  const int height_card_rows =
+      std::clamp((screen_rows - 18) / 2, kCardRows, kMaxCardRows);
+  const int aspect_card_cols =
+      std::max(kCardCols, (height_card_rows * 4 + 1) / 3);
+  out.card_cols = std::min(width_card_cols, aspect_card_cols);
+  out.card_rows = std::clamp((out.card_cols * 3 + 2) / 4, kCardRows,
+                             height_card_rows);
+  out.pile_gap_cols = std::clamp(
+      (available_cols - (kTableauPiles * out.card_cols)) / (kTableauPiles - 1),
+      kPileGapCols, kMaxPileGapCols);
+  out.tableau_cols = (kTableauPiles * out.card_cols) +
+                     ((kTableauPiles - 1) * out.pile_gap_cols);
+  out.frame_w = out.tableau_cols + kFrameCols;
+  out.frame_x = (screen_cols - out.frame_w) / 2;
   out.frame_y = 0;
-  out.frame_w = kNeedCols;
   out.frame_h = screen_rows;
 
   const int inner_x = out.frame_x + 1;
   out.top_x = inner_x;
   out.top_y = out.frame_y + 1;
   out.tableau_x = inner_x;
-  out.tableau_y = out.top_y + kCardRows + kSectionGapRows;
-  out.tableau_rows = screen_rows - kFixedRows;
+  out.tableau_y = out.top_y + out.card_rows + kSectionGapRows;
+  out.tableau_rows = out.status_y - out.tableau_y;
   return out;
 }
 
@@ -171,12 +212,13 @@ struct Layout {
 // full card back is the exposed top hidden card and clicking any of its three
 // rows identifies the one card that may be flipped.
 [[nodiscard]] constexpr auto tableau_card_at(int row, int hidden_count,
-                                             int face_up_count) noexcept
+                                             int face_up_count,
+                                             int card_rows = kCardRows) noexcept
     -> std::optional<int> {
   if (row < 0 || hidden_count < 0 || face_up_count < 0) return std::nullopt;
 
   if (face_up_count == 0) {
-    if (hidden_count == 0 || row >= kCardRows) return std::nullopt;
+    if (hidden_count == 0 || row >= card_rows) return std::nullopt;
     return hidden_count - 1;
   }
 
@@ -184,7 +226,7 @@ struct Layout {
   if (row < hidden_rows) return std::nullopt;
 
   const int face_row = row - hidden_rows;
-  const int face_rows = ((face_up_count - 1) * kFaceUpFanRows) + kCardRows;
+  const int face_rows = ((face_up_count - 1) * kFaceUpFanRows) + card_rows;
   if (face_row >= face_rows) return std::nullopt;
 
   const int fanned_index = face_row / kFaceUpFanRows;

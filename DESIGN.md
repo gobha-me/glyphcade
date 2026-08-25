@@ -39,7 +39,7 @@ event loop, the audio engine, and the selector UI. Games are *not* `App`
 subclasses; only one thing can own a terminal.
 
 ```cpp
-class Game {
+class Game : public termforge::Widget {
  public:
   virtual ~Game() = default;
 
@@ -56,9 +56,6 @@ class Game {
   // (so every game gets pause/quit-to-menu for free).
   virtual auto on_event(const termforge::Event&) -> bool = 0;
 
-  // Draw. Immediate mode, same contract as termforge Widgets.
-  virtual auto draw(termforge::Screen&) -> void = 0;
-
   // True when the game wants to hand control back to the selector.
   [[nodiscard]] virtual auto done() const -> bool { return false; }
 };
@@ -68,7 +65,8 @@ class Game {
 the `App`, the `Terminal`, or each other.
 
 What it carries: the probed `capabilities()`, the `border_style()` the Shell
-chose from them, `quit_to_menu()`, `audio()` and `scores()`. The last two were
+chose from them, `quit_to_menu()`, `audio()`, `scores()` and a null-safe
+`report()` path for game-owned degradation events. Audio and scores were
 **seams, not omissions** — declared here before they existed and filled later,
 each additively, without a line changing in any existing game.
 
@@ -81,8 +79,16 @@ wanted a best *time per difficulty*, so a record is a keyed value with a
 **direction**. Had it shipped with the first scoring game it would have been one
 integer, and wrong.
 
-There are now no reserved seams left. A sixth service is a new design question,
-not a promise already made.
+There are no reserved seams left. `report()` was added for Solitaire because the
+choice to fall from native card art to raster or text belongs to the game while
+the sticky notice and error routing belong to the Shell. Any further service is
+a new design question, not a promise already made.
+
+`Game` is a `termforge::Widget`, but still not an `App`. This lets a game expose
+the same optional `pixel_regions()` / `draw_pixels()` enhancement contract as
+any other widget. After the game's semantic cell draw, the Shell renders those
+regions at the placement the driver supports; a bottom-tier implementation
+remains complete.
 
 `quit_to_menu()` sets a flag; it never calls back. Returning to the menu
 destroys the `Game`, so a synchronous callback would destroy a game that called
@@ -330,7 +336,7 @@ TermForge as it exists today.
 | 4 | **Snake** ✓ | real-time tick | #58, #59 (both shipped) |
 | 5 | **Tetris** ✓ | tick + held-key feel | #58, #59, #60 (all shipped) |
 | 6 | **Sokoban** ✓ | tile maps, camera, layers | ~~#64~~ (glyph tier shipped v0.1.19, taken) |
-| 7 | **Solitaire** *(flagship)* | native/raster/text card tiers, venice art, mouse drag | #63 |
+| 7 | **Solitaire** ✓ *(flagship)* | native/raster/text card tiers, generated deck art, mouse drag | ~~#63~~ (shipped) |
 
 Reference implementations for all seven exist in HTML-Games — the game *logic*
 is solved, so each port is a rendering and feel exercise rather than a design
@@ -345,7 +351,7 @@ good candidates for that class of TermForge application, not for an eighth
 compiled-in arcade game. See
 [docs/fidelity.md](docs/fidelity.md#the-boundary-of-this-repository).
 
-### Solitaire's text table is bounded before the sprites exist
+### Solitaire's text table is bounded independently of its sprites
 
 Klondike looked unbounded in rows: pile seven begins with six face-down cards
 and can carry a complete thirteen-rank face-up build, so the conservative worst
@@ -364,9 +370,12 @@ keeps its full 5x3 outline. The worst pile is therefore
 Seven 5-column cards plus six gaps and a frame need 43 columns. The top card
 row, one gap, the 16-row tableau, status, hint and frame need 24 rows exactly.
 That makes **43x24 a derived `Drawable` floor**, not a playability opinion and
-not an option. Extra rows become pile capacity; extra columns do not widen the
-table. `games/solitaire/layout.hpp` owns the constants and the shared
-row-to-card hit-test now, before a renderer can invent different arithmetic.
+not an option. Past the floor, rows and columns grow cards together at the
+atlas' portrait aspect; a short-but-wide terminal keeps compact cards instead
+of stretching them flat. The table stops at 11x8 cards and a 91-column prose
+ceiling, then centres; remaining rows are pile capacity. The seven rules piles
+never change. `games/solitaire/layout.hpp` owns the constants and the shared
+row-to-card hit-test, so renderer and input use one arithmetic.
 
 A click on a visible face-up strip names that card and its run. The counted
 hidden strip has no hit while a face-up card covers it; if no face-up card
@@ -445,7 +454,7 @@ glyphcade/
 │   ├── arcade/   exception_boundary.hpp ✓                      (Epic 0)
 │   │              game.hpp ✓  game_meta.hpp ✓  context.hpp ✓
 │   │              registry.hpp ✓  shell.hpp ✓         (Epic 1)
-│   │              scores.hpp                   (deferred — see GameContext)
+│   │              scores.hpp ✓
 │   ├── games/<name>/ ✓       # a game's own headers — they stay HERE, not next
 │   │                         #   to its sources, so install(DIRECTORY include/)
 │   │                         #   still ships them

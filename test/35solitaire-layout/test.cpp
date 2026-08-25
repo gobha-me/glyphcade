@@ -1,6 +1,6 @@
-// Solitaire's pre-Epic layout contract: the nineteen-card worst case, the
-// 43x24 bottom-tier floor and the one coordinate mapping the future renderer
-// and mouse path will share. No Screen and no TTY.
+// Solitaire's layout contract: the nineteen-card worst case, the 43x24
+// bottom-tier floor and the one coordinate mapping the renderer and mouse path
+// share. No Screen and no TTY.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -55,7 +55,7 @@ TEST_CASE("a counted hidden prefix bounds the worst pile at sixteen rows",
   CHECK(observed_max == kMaxTableauRows);
 }
 
-TEST_CASE("43x24 is the exact floor and extra rows become capacity",
+TEST_CASE("43x24 is the exact floor and presentation has a width ceiling",
           "[solitaire][layout]") {
   const Layout exact = compute_layout(kNeedCols, kNeedRows);
   REQUIRE(exact.fits);
@@ -63,6 +63,9 @@ TEST_CASE("43x24 is the exact floor and extra rows become capacity",
   CHECK(exact.frame_y == 0);
   CHECK(exact.frame_w == 43);
   CHECK(exact.frame_h == 24);
+  CHECK(exact.card_cols == 5);
+  CHECK(exact.card_rows == 3);
+  CHECK(exact.pile_gap_cols == 1);
   CHECK(exact.tableau_rows == kMaxTableauRows);
   CHECK(exact.tableau_y + exact.tableau_rows == exact.status_y);
   CHECK(exact.status_y + 1 == exact.hint_y);
@@ -71,13 +74,39 @@ TEST_CASE("43x24 is the exact floor and extra rows become capacity",
   CHECK_FALSE(compute_layout(kNeedCols - 1, kNeedRows).fits);
   CHECK_FALSE(compute_layout(kNeedCols, kNeedRows - 1).fits);
 
+  // Width alone does not crush portrait cards into three terminal rows.
+  const Layout short_wide = compute_layout(120, 24);
+  REQUIRE(short_wide.fits);
+  CHECK(short_wide.card_cols == kCardCols);
+  CHECK(short_wide.card_rows == kCardRows);
+
   const Layout roomy = compute_layout(80, 30);
   REQUIRE(roomy.fits);
-  CHECK(roomy.frame_x == (80 - kNeedCols) / 2);
-  CHECK(roomy.frame_w == kNeedCols);  // columns are measure, not capacity
-  CHECK(roomy.frame_h == 30);         // rows are capacity
-  CHECK(roomy.tableau_rows == 22);
+  CHECK(roomy.card_cols == 8);
+  CHECK(roomy.card_rows == 6);
+  CHECK(std::abs((3 * roomy.card_cols) - (4 * roomy.card_rows)) <= 1);
+  CHECK(roomy.pile_gap_cols == 2);
+  CHECK(roomy.frame_x == 5);
+  CHECK(roomy.frame_w == 70);
+  CHECK(roomy.frame_h == 30);
+  CHECK(roomy.tableau_rows == 19);
   CHECK(roomy.tableau_rows > exact.tableau_rows);
+
+  const Layout wide = compute_layout(120, 32);
+  REQUIRE(wide.fits);
+  CHECK(wide.card_cols == 9);
+  CHECK(wide.card_rows == 7);
+  CHECK(std::abs((3 * wide.card_cols) - (4 * wide.card_rows)) <= 1);
+  CHECK(wide.pile_gap_cols == kMaxPileGapCols);
+  CHECK(wide.frame_w == 77);
+  CHECK(wide.frame_x == (120 - wide.frame_w) / 2);
+
+  const Layout wider = compute_layout(200, 40);
+  CHECK(wider.card_cols == kMaxCardCols);
+  CHECK(wider.card_rows == kMaxCardRows);
+  CHECK(std::abs((3 * wider.card_cols) - (4 * wider.card_rows)) <= 1);
+  CHECK(wider.frame_w == kMaxNeedCols);
+  CHECK(wider.frame_x == (200 - kMaxNeedCols) / 2);
 }
 
 TEST_CASE("pile origins share the same gap arithmetic", "[solitaire][layout]") {
@@ -85,12 +114,14 @@ TEST_CASE("pile origins share the same gap arithmetic", "[solitaire][layout]") {
   REQUIRE(l.fits);
 
   CHECK(l.tableau_pile_x(0) == l.tableau_x);
-  CHECK(l.tableau_pile_x(6) + kCardCols == l.tableau_x + kTableauCols);
+  CHECK(l.tableau_pile_x(6) + l.card_cols == l.tableau_x + l.tableau_cols);
   CHECK(l.top_pile_x(0) == l.top_x);
-  CHECK(l.top_pile_x(1) + kCardCols == l.top_x + kStockWasteCols);
-  CHECK(l.top_pile_x(2) ==
-        l.top_x + kStockWasteCols + kTopGroupGapCols);
-  CHECK(l.top_pile_x(5) + kCardCols == l.top_x + kTopCols);
+  const int stock_waste_cols = (2 * l.card_cols) + l.pile_gap_cols;
+  const int foundation_cols = (4 * l.card_cols) + (3 * l.pile_gap_cols);
+  const int group_gap = l.tableau_cols - stock_waste_cols - foundation_cols;
+  CHECK(l.top_pile_x(1) + l.card_cols == l.top_x + stock_waste_cols);
+  CHECK(l.top_pile_x(2) == l.top_x + stock_waste_cols + group_gap);
+  CHECK(l.top_pile_x(5) + l.card_cols == l.top_x + l.tableau_cols);
   CHECK(l.top_x == l.tableau_x);
 }
 

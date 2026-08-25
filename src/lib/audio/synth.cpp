@@ -20,7 +20,7 @@ namespace {
 // tuned bank — expect the maintainer to move them after listening, and treat
 // the fingerprints in test/18audio-synth as recording what IS, not what should
 // be.
-constexpr std::array<SfxSpec, 15> kBank{{
+constexpr std::array<SfxSpec, 20> kBank{{
     // Click — the generic acknowledgement. Short, dry, unobtrusive.
     {.wave = Wave::Square,
      .freq_start_hz = 660,
@@ -217,6 +217,45 @@ constexpr std::array<SfxSpec, 15> kBank{{
      .env = {.attack_ms = 2, .decay_ms = 14, .sustain_q8 = 165,
              .release_ms = 28},
      .gain_q8 = 21,
+     .duty_q8 = 128},
+    {.wave = Wave::Noise,
+     .freq_start_hz = 1300,
+     .freq_end_hz = 500,
+     .duration_ms = 65,
+     .env =
+         {.attack_ms = 2, .decay_ms = 18, .sustain_q8 = 90, .release_ms = 35},
+     .gain_q8 = 14,
+     .duty_q8 = 128},
+    {.wave = Wave::Square,
+     .freq_start_hz = 740,
+     .freq_end_hz = 980,
+     .duration_ms = 42,
+     .env =
+         {.attack_ms = 1, .decay_ms = 10, .sustain_q8 = 120, .release_ms = 24},
+     .gain_q8 = 17,
+     .duty_q8 = 72},
+    {.wave = Wave::Triangle,
+     .freq_start_hz = 330,
+     .freq_end_hz = 294,
+     .duration_ms = 38,
+     .env =
+         {.attack_ms = 1, .decay_ms = 8, .sustain_q8 = 120, .release_ms = 22},
+     .gain_q8 = 16,
+     .duty_q8 = 128},
+    {.wave = Wave::Square,
+     .freq_start_hz = 180,
+     .freq_end_hz = 120,
+     .duration_ms = 34,
+     .env = {.attack_ms = 1, .decay_ms = 8, .sustain_q8 = 90, .release_ms = 20},
+     .gain_q8 = 12,
+     .duty_q8 = 48},
+    {.wave = Wave::Triangle,
+     .freq_start_hz = 659,
+     .freq_end_hz = 988,
+     .duration_ms = 72,
+     .env =
+         {.attack_ms = 2, .decay_ms = 16, .sustain_q8 = 170, .release_ms = 40},
+     .gain_q8 = 22,
      .duty_q8 = 128},
 }};
 
