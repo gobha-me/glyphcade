@@ -276,6 +276,16 @@ if (DEFINED termforge_SOURCE_DIR AND EXISTS ${termforge_SOURCE_DIR}/LICENSE.md)
   )
 endif ()
 
+# stb_image is compiled into glyphcade_core rather than exposed as a dependency,
+# and future game binaries pull that object in the moment they call decode_png.
+# Ship its chosen MIT notice now with the decoder instead of leaving Solitaire
+# a licence-compliance trap one issue later. The notice is harmless in the
+# current runtime package even though only the proof test calls the decoder.
+install(FILES ${PROJECT_SOURCE_DIR}/vendor/LICENSE.stb.md
+  DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/licenses/${PROJECT_NAME}
+  COMPONENT runtime
+)
+
 # ── Package config ────────────────────────────────────────────────────────────
 # <project>Config.cmake is what find_package(<project> CONFIG) loads; it exists
 # to pull in the Targets file (and, in a real project, to re-find the public

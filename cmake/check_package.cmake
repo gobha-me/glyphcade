@@ -274,7 +274,8 @@ endif ()
 set(_expect_runtime
   "usr/bin/glyphcade"
   "usr/share/licenses/glyphcade/LICENSE.md"
-  "usr/share/licenses/glyphcade/LICENSE.termforge.md")
+  "usr/share/licenses/glyphcade/LICENSE.termforge.md"
+  "usr/share/licenses/glyphcade/LICENSE.stb.md")
 
 if (_debs)
   execute_process(COMMAND "${DPKG_DEB_EXECUTABLE}" -c "${_deb}"
@@ -330,10 +331,9 @@ if (_debs)
       "Extra files mean the runtime narrowing in "
       "cmake/packaging-per-generator.cmake stopped applying, or an install() "
       "rule was given COMPONENT runtime when it meant dev. A missing licence "
-      "notice usually means termforge came from find_package rather than "
-      "FetchContent, so the conditional rule in cmake/install.cmake that copies "
-      "its notice never ran — see the ⚠ there. That notice is not optional: "
-      "termforge is linked statically, so its code is inside this binary.")
+      "notice means a statically linked dependency's install rule did not run; "
+      "see the licence section in cmake/install.cmake. Those notices are not "
+      "optional because their code is inside this binary.")
   endif ()
 
   # And the .deb's payload really is a subset of the tarball's, which is what

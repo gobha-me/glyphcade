@@ -2,7 +2,9 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-08-25** (TermForge repinned from v0.6.0 to v0.57.14; the
+**Last updated: 2026-08-25** (#8 adds the first complete art-asset path: a
+manifested PNG, build-time embedding, bounded decode and all three rendering
+tiers. Before it TermForge was repinned from v0.6.0 to v0.57.14; the
 compact `Cell` API is adopted, the ASCII selector mark is now `*`, capability
 replies are parsed as complete records, and Sokoban's #128 hit-test workaround
 is retired. Before it #10 — Solitaire's
@@ -60,6 +62,16 @@ and floored-viewport arithmetic. `set_map_size()` preservation followed in
 v0.6.2 (#127), and the atlas-backed sprite tier shipped in v0.14.0 (#64). There
 are again **no TermForge workarounds in this repository**.
 
+**The art asset pipeline is complete.** #8. Authored PNGs are committed with a
+provenance-and-hash manifest, embedded as compressed bytes by CMake, and decoded
+through a bounded `std::expected<Image, ErrorEvent>` adapter backed by pinned
+`stb_image` v2.30. The proof card back keeps transparent RGBA for Kitty, is
+composited over its authored navy surround for ANSI half-blocks, and has an
+information-complete 7-bit card at Baseline. `test/36assets` drives all three
+real TermForge drivers headlessly; `asset-manifest` rejects missing, extra or
+changed PNGs. Visual quality on a real terminal remains a human judgement, not
+something the byte-level test claims.
+
 **Solitaire's worst tableau now has a bottom-tier answer before the flagship is
 being written.** #10. A pile can hold six hidden cards and a complete
 thirteen-rank face-up build, but the six hidden identities are not information
@@ -101,7 +113,7 @@ produces a `.deb`, an `.rpm` and a `.tar.gz`; a new CI `package` job builds them
 against the whole test suite and *inspects* them before anything is uploaded; a
 `v*` tag attaches them to the GitHub release.
 
-The shape is the part worth knowing. The install tree is currently 113 files and
+The shape is the part worth knowing. The install tree is currently 116 files and
 **one** of them is the game — the rest are static archives, headers, package
 metadata and licence notices, which have no runtime role at all because a static
 archive is consumed at link time and `bin/glyphcade` already contains that code.
@@ -109,7 +121,7 @@ So:
 
 | artifact | carries |
 |---|---|
-| `.deb` / `.rpm` | the binary and its two licence notices. Three files. |
+| `.deb` / `.rpm` | the binary and its three licence notices. Four files. |
 | `.tar.gz` | the whole install tree, every component, unfiltered |
 
 ⚠ **There is deliberately no `-dev`/`-devel` package.** Convention offers one and
@@ -368,10 +380,9 @@ latency and cursor responsiveness, Tetris' DAS/ARR/soft-drop trio, Sokoban's
 push feel, and whether any effect in the bank sounds *right*. Do not infer these
 from "it feels fast" — a frame rate is not a feel decision.
 
-**Next move: the art asset pipeline (#8), then Epic 8 (Solitaire)**, the flagship
-and the last of the roster. Its bottom-tier layout prerequisite (#10) is now
-done: 43x24 shows the nineteen-card worst case without hiding a face-up card or
-scrolling. The remaining prerequisite is the sprite input, not the table.
+**Next move: Epic 8 (Solitaire)**, the flagship and the last of the roster. Both
+prerequisites are now done: #10 gives the bottom-tier table a 43x24 contract,
+and #8 supplies committed sprite input, PNG decode and tested tier routing.
 
 We are now pinned to **v0.57.14**, so both `draw_image(Rect cells, …)` and
 `MapWidget`'s atlas-backed sprite tier are available. Free-floating cards still
@@ -417,7 +428,7 @@ delegates picking to `MapWidget::tile_at()`.
 | 5 — Snake | **done** | — |
 | 6 — Tetris | **done** | ~~termforge #60~~ — shipped in **v0.1.19…v0.2.2** and taken. `KeyboardMode::Enhanced` gives real `KeyAction::Repeat`/`Release`; DAS is now expressible rather than inferred from OS auto-repeat. `term-game#32` built the seam that reaches it: declare `Enhanced` in `kMeta` and the Shell does the rest. ⚠ Still degradable: a terminal without the kitty protocol never delivers `Release` — and note the notice is **ours**, not upstream's, because `App::setup()` has already run by the time a game entry sets the mode. Tetris must fall back to discrete steps **knowingly** |
 | 7 — Sokoban | **done** | ~~termforge #64 → #63~~ — both shipped and **taken**. `MapWidget` v1 (glyph tier) is now SPENT: Sokoban is its first consumer, and the four pieces of API friction it found are listed in "What Epic 7 built" |
-| 8 — Solitaire | **layout ready; art pipeline next** | #10 is done: the text table has a tested 43x24 contract. ~~termforge #63~~ shipped and is taken, so `Image` plus `draw_image` is reachable from game code. #8 still owns PNG decode and asset storage. `MapWidget`'s sprite tier also shipped in v0.14.0, but free-floating cards still fit the direct image path better than a tile widget |
+| 8 — Solitaire | **ready to build** | #10 gives the text table a tested 43x24 contract; #8 supplies manifested PNG storage, embedding and decode. ~~termforge #63~~ shipped and is taken, so `Image` plus `draw_image` is reachable from game code. `MapWidget`'s sprite tier also shipped in v0.14.0, but free-floating cards still fit the direct image path better than a tile widget |
 
 **Nothing upstream blocks any epic.** That has been true since term-game#24, and it is what
 [term-game#24](`term-game#24`) bought. termforge
@@ -703,8 +714,8 @@ Settled and recorded in [DESIGN.md](DESIGN.md) with reasoning:
 - **Roster ordered by increasing framework risk** — Minesweeper needs nothing,
   Snake forced #58, Solitaire is the flagship.
 - **Explicit game registration**, never self-registering statics.
-- **SFX synthesized, not sampled** — no decoder, no asset pipeline, no blobs in
-  git. Venice is for sprite/title art instead.
+- **SFX synthesized, not sampled** — audio needs no decoder or sample blobs.
+  Visual PNGs use the small committed-and-manifested pipeline from #8.
 - **Audio behind an `AudioSink`** with `WavFileSink` for offline testing.
 - **Port logic from HTML-Games** rather than reinventing game rules.
 

@@ -106,6 +106,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
   # Screen and Rgb but no Shell type, so the chain is unchanged.
   add_library(${PROJECT_NAME}_core STATIC
     build_info.cpp
+    assets/png.cpp
     arcade/hud.cpp
     arcade/options_screen.cpp
     arcade/scores.cpp
@@ -143,6 +144,10 @@ if (${PROJECT_NAME}_BUILD_LIB)
     PUBLIC
       $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
       $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+  )
+
+  target_include_directories(${PROJECT_NAME}_core SYSTEM PRIVATE
+    ${PROJECT_SOURCE_DIR}/vendor
   )
 
   # The C++ standard is a property of this library's public headers, not of the
