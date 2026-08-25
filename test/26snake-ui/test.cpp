@@ -45,13 +45,17 @@ class Probe final : public Shell {
  public:
   using Shell::screen;
 
-  Probe() { set_frame_ms(0); }
+  Probe() {
+    set_frame_ms(0);
+    set_clock(&m_clock);
+  }
 
   auto step(int frames = 1, int cols = 80, int rows = 24) -> void {
     test_run_frames(frames, cols, rows, &m_sink);
   }
 
  private:
+  termforge::SyntheticClock m_clock;
   std::string m_sink;
 };
 
@@ -610,7 +614,11 @@ TEST_CASE("the record survives a restart and does not follow the score down",
   REQUIRE(g != nullptr);
 
   g->board().load(snake_at(10, 5), Coord{11, 5}, /*eaten=*/9);
-  g->tick(std::chrono::duration<double>{0.15});
+  // Exactly one step. At nine foods the interval is 73 ms, so the old 150 ms
+  // fixture bought a second move; when spawn_food() put the next meal directly
+  // ahead, the legitimate score of 110 made this persistence assertion flaky.
+  g->tick(g->board().interval());
+  REQUIRE(g->board().score() == 100);
   REQUIRE(app.scores().get("snake", "best_score_normal_solid") == 100);
 
   app.dispatch_event(ch(U'n'));
@@ -655,10 +663,9 @@ TEST_CASE("the board does not move while the options screen is up",
   // rest of this suite stays green.
   //
   // ⚠ Snake::tick is called DIRECTLY rather than driven through app.step().
-  // Probe sets frame_ms(0), so 240 frames pass almost no real time and the
-  // Shell's accumulator yields a handful of ticks -- nowhere near Snake's step
-  // interval, so a step()-driven version of this case would pass against the
-  // mutant for the wrong reason. It measured 4 ticks when it wanted 100.
+  // Probe's SyntheticClock stays frozen unless a case explicitly advances it,
+  // so a step()-driven version would deliver zero ticks and pass against the
+  // mutant for the wrong reason.
   Probe app;
   app.step(1, 80, 24);
   const int index = snake_index();
@@ -673,16 +680,9 @@ TEST_CASE("the board does not move while the options screen is up",
   REQUIRE(g != nullptr);
   const auto head_before = g->board().head();
 
-  // ⚠ A BASELINE, NOT ZERO, and this used to be an absolute `ticks() == 120`.
-  // ticks() counts EVERY tick the game receives, and the two app.step() calls
-  // above deliver some: test_run_frames deliberately does not reset the tick
-  // clock, so real wall time spent drawing selector frames becomes ticks the
-  // Shell's accumulator hands over. On a quiet machine that is zero and the
-  // absolute form passed for six releases. It is not a property of the code
-  // under test — term-game#42 added a few string builds to draw_selector and this
-  // case went red five runs in six on the loaded TSan build, pointing at Snake
-  // for something Snake had no part in. What the case means is that the 120
-  // ticks below ARRIVED, so that is what it now measures.
+  // Keep a baseline rather than coupling this case to Probe's frozen clock.
+  // What the case means is that the 120 direct ticks below ARRIVED, so that is
+  // what it measures.
   const int ticks_before = g->ticks();
 
   // ⚠ Far ENOUGH. Snake's step interval is hundreds of milliseconds, so a small

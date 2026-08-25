@@ -34,6 +34,10 @@ this file.
 - Made the Minesweeper HUD clock test drive TermForge's `SyntheticClock`
   instead of assuming 200 uncapped Release frames consume one fixed-tick
   period.
+- Made the Snake UI fixtures use TermForge's `SyntheticClock`, and made the
+  score-persistence case advance exactly one board interval. Rendering fixtures
+  can no longer move with machine time, and a valid second food spawn cannot
+  turn the expected 100-point record into 110 at random.
 
 ### Documentation
 

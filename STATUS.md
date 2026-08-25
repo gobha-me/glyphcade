@@ -45,6 +45,15 @@ period had elapsed. An optimized CI run completed them sooner and correctly
 delivered zero fixed ticks. Its `Probe` now owns a `SyntheticClock`; the case
 advances 100 ms explicitly and still drives the production accumulator.
 
+The first v0.21.0 tag run then exposed the same category one layer down in
+`test/26snake-ui`: its nine-food score fixture advanced 150 ms even though the
+board interval at that speed is 73 ms. That bought two moves, and a next food
+randomly spawned directly ahead made the valid record 110 instead of the case's
+expected 100. Repeating that case under UBSan also exposed rendering fixtures
+that could move when enough real time elapsed between their load and draw. The
+suite's `Probe` now owns a frozen `SyntheticClock`, and the score fixture
+advances exactly one reported board interval.
+
 The bump also closes the feedback loop from Epic 7. `MapWidget::tile_at()`
 shipped in v0.6.1 (#128), so Sokoban no longer duplicates the widget's camera
 and floored-viewport arithmetic. `set_map_size()` preservation followed in
