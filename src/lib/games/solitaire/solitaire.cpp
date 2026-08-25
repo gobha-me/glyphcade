@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdlib>
+#include <random>
 #include <string>
 #include <utility>
 #include <variant>
@@ -56,20 +57,27 @@ constexpr termforge::Pixel kValidPixel{0x16, 0xA5, 0x5A, 255};
   return out;
 }
 
-struct Daily {
-  std::uint64_t seed{0};
-  std::string label;
-};
+[[nodiscard]] auto random_seed() -> std::uint64_t {
+  std::random_device device;
+  const auto wall = static_cast<std::uint64_t>(
+      std::chrono::system_clock::now().time_since_epoch().count());
+  const auto monotonic = static_cast<std::uint64_t>(
+      std::chrono::steady_clock::now().time_since_epoch().count());
+  const auto entropy = (static_cast<std::uint64_t>(device()) << 32U) ^
+                       static_cast<std::uint64_t>(device());
+  Rng mix{wall ^ monotonic ^ entropy};
+  return mix.next();
+}
 
-[[nodiscard]] auto daily() -> Daily {
-  using namespace std::chrono;
-  const year_month_day date{floor<days>(system_clock::now())};
-  const int year = static_cast<int>(date.year());
-  const auto month = static_cast<unsigned int>(date.month());
-  const auto day = static_cast<unsigned int>(date.day());
-  return {.seed = static_cast<std::uint64_t>(year) * 10000ULL +
-                  static_cast<std::uint64_t>(month) * 100ULL + day,
-          .label = number(year) + pad2(month) + pad2(day)};
+[[nodiscard]] auto hex8(std::uint64_t value) -> std::string {
+  constexpr std::string_view digits{"0123456789ABCDEF"};
+  std::string out(8, '0');
+  for (int index = 7; index >= 0; --index) {
+    out[static_cast<std::size_t>(index)] =
+        digits[static_cast<std::size_t>(value & 0x0FULL)];
+    value >>= 4U;
+  }
+  return out;
 }
 
 [[nodiscard]] auto rank_text(solitaire::Rank rank) -> std::string_view {
@@ -182,7 +190,11 @@ struct Daily {
 
 } // namespace
 
-Solitaire::Solitaire() : m_board(0) {
+Solitaire::Solitaire() : Solitaire(random_seed()) {
+}
+
+Solitaire::Solitaire(std::uint64_t deal_seed)
+    : m_board(0), m_deal_rng(deal_seed) {
 }
 
 auto Solitaire::start(GameContext& ctx) -> void {
@@ -198,12 +210,13 @@ auto Solitaire::apply_options() -> void {
   const auto scoring = m_options.selected(1) == 0
                            ? solitaire::ScoringMode::Standard
                            : solitaire::ScoringMode::Vegas;
-  const Daily deal = daily();
-  m_date_key =
-      deal.label + (draw == solitaire::DrawMode::One ? ":draw1:" : ":draw3:") +
-      (scoring == solitaire::ScoringMode::Standard ? "standard" : "vegas");
-  m_board.reset(deal.seed, draw, scoring);
-  m_frame.set_title("Solitaire " + deal.label);
+  const std::uint64_t deal_seed = m_deal_rng.next();
+  m_score_key =
+      (draw == solitaire::DrawMode::One ? "draw1:" : "draw3:") +
+      std::string(scoring == solitaire::ScoringMode::Standard ? "standard"
+                                                               : "vegas");
+  m_board.reset(deal_seed, draw, scoring);
+  m_frame.set_title("Solitaire Deal " + hex8(deal_seed));
   m_elapsed = std::chrono::duration<double>{0.0};
   m_cursor = Cursor{};
   m_selected.reset();
@@ -216,7 +229,7 @@ auto Solitaire::apply_options() -> void {
   if (m_ctx != nullptr) m_ctx->audio().play(audio::SfxId::CardDeal);
 }
 
-auto Solitaire::reset_daily() -> void {
+auto Solitaire::new_deal() -> void {
   apply_options();
 }
 
@@ -389,7 +402,7 @@ auto Solitaire::normalize_cursor() -> void {
 
 auto Solitaire::record_win() -> void {
   if (m_ctx == nullptr || m_win_recorded || !m_board.won()) return;
-  const std::string prefix = m_date_key + ":";
+  const std::string prefix = m_score_key + ":";
   m_ctx->scores().record(kMeta.slug, prefix + "score", m_board.score(),
                          scores::Better::Higher);
   m_ctx->scores().record(kMeta.slug, prefix + "moves", m_board.moves(),
@@ -403,7 +416,7 @@ auto Solitaire::record_win() -> void {
 
 auto Solitaire::best_score() const -> std::string {
   if (m_ctx == nullptr) return "---";
-  const auto value = m_ctx->scores().get(kMeta.slug, m_date_key + ":score");
+  const auto value = m_ctx->scores().get(kMeta.slug, m_score_key + ":score");
   return value ? number(static_cast<int>(*value)) : "---";
 }
 
@@ -554,7 +567,7 @@ auto Solitaire::handle_key(const termforge::KeyEvent& key) -> bool {
       m_selected.reset();
       return true;
     case U'n':
-    case U'N': reset_daily(); return true;
+    case U'N': new_deal(); return true;
     case U'a':
     case U'A':
       announce(m_board.auto_complete());
@@ -707,13 +720,16 @@ auto Solitaire::handle_mouse(const termforge::MouseEvent& mouse) -> bool {
   }
   if (mouse.action() == termforge::MouseAction::Release && m_dragging) {
     m_dragging = false;
-    if (!m_drag_moved) return true;
     if (const auto target = mouse_target(mouse.x, mouse.y);
         target && m_selected) {
+      if (!m_drag_moved && target->kind == m_selected->kind &&
+          target->pile == m_selected->pile) {
+        return true;
+      }
       const auto result = m_board.move(*m_selected, *target);
       announce(result);
       if (result.changed) m_selected.reset();
-    } else {
+    } else if (m_drag_moved) {
       announce({});
     }
     return true;
@@ -1089,9 +1105,13 @@ auto Solitaire::pixel_placement(termforge::Rect) const noexcept
 
 auto Solitaire::draw_status(termforge::Screen& screen) -> void {
   std::string state = m_board.won() ? "YOU WIN" : "PLAYING";
-  const std::array<std::string, 4> fields{
-      "score " + number(m_board.score()), "best " + best_score(),
-      "moves " + number(m_board.moves()), "time " + elapsed_text(m_elapsed)};
+  const auto& position = m_board.position();
+  const std::array<std::string, 5> fields{
+      "score " + number(m_board.score()),
+      "deck " + number(static_cast<int>(position.stock.size())) + "+" +
+          number(static_cast<int>(position.waste.size())),
+      "moves " + number(m_board.moves()), "time " + elapsed_text(m_elapsed),
+      "best " + best_score()};
   hud::draw_status_row(
       screen, m_layout.status_y, fields, state, termforge::theme::kFg,
       m_board.won() ? termforge::Rgb{0xF5, 0x9E, 0x0B} : termforge::theme::kDim,

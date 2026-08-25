@@ -3,7 +3,7 @@
 Live state. Update this when something lands; do not let it drift.
 
 **Last updated: 2026-08-25** (Epic 8 implements the final roster game:
-daily Klondike Solitaire with Draw 1/3, Standard/Vegas scoring, bounded undo,
+fresh Klondike Solitaire deals with Draw 1/3, Standard/Vegas scoring, bounded undo,
 safe auto-complete, keyboard and mouse play, five new SFX, and committed Neon
 and Classic card atlases across native, raster and text tiers. Before it #8
 added the first complete art-asset path: manifested PNGs, build-time embedding,
@@ -77,7 +77,8 @@ changed PNGs. Visual quality on a real terminal remains a human judgement, not
 something the byte-level test claims.
 
 **Epic 8 is implemented. There are six games, and the flagship exercises every
-rendering tier.** Solitaire deals one deterministic UTC-daily Klondike board,
+rendering tier.** Solitaire deals a fresh random Klondike board on entry and on
+`N`, while an injected session seed keeps the sequence exact in tests. It
 offers Draw 1/3, Standard/Vegas scoring and Neon/Classic decks, and supports the
 complete game through keyboard selection or mouse drag-and-drop. Its model owns
 the rules, scoring, a 50-position undo history and a dry-run auto-complete that
@@ -96,6 +97,15 @@ flatten portrait art merely because columns are available. Kitty and ANSI are
 given proportionally scaled images at the driver's exact preferred pixel
 extent, making TermForge's `Stretch` placement an identity operation. Remaining
 rows are tableau capacity; the seven piles and the rules state never scale.
+
+The first device gameplay pass found three acceptance defects before merge. A
+drag now commits from its press and release coordinates even when a terminal
+omits intermediate motion reports, so legal face-up runs move as a unit. A
+full-deal regression proves stock recycling preserves all cards and exact stock
+order, and the status row exposes `deck stock+waste` while Kitty restores a
+visible stock-back region. The same pass replaced the surprising UTC-daily
+opening board with fresh entropy-backed deals; scores remain comparable within
+each draw/scoring mode.
 
 A pile can hold six hidden cards and a complete thirteen-rank face-up build, but
 the six hidden identities are not information the player may inspect. They

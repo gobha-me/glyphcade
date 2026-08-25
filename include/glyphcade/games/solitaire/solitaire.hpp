@@ -37,7 +37,7 @@ class Solitaire final : public Game {
       .slug = "solitaire",
       .title = "Solitaire",
       .description =
-          "Play a daily Klondike deal with draw-one or draw-three rules, "
+          "Play a fresh Klondike deal with draw-one or draw-three rules, "
           "Standard or Vegas scoring, undo, mouse dragging and a complete "
           "keyboard path.",
       .tag = "Card Classic",
@@ -49,6 +49,7 @@ class Solitaire final : public Game {
   };
 
   Solitaire();
+  explicit Solitaire(std::uint64_t deal_seed);
 
   [[nodiscard]] auto meta() const -> const GameMeta& override { return kMeta; }
   auto start(GameContext& ctx) -> void override;
@@ -79,8 +80,8 @@ class Solitaire final : public Game {
       -> std::optional<solitaire::PileRef> {
     return m_selected;
   }
-  [[nodiscard]] auto daily_key() const noexcept -> std::string_view {
-    return m_date_key;
+  [[nodiscard]] auto score_key() const noexcept -> std::string_view {
+    return m_score_key;
   }
 
  private:
@@ -112,7 +113,7 @@ class Solitaire final : public Game {
   auto load_art(int deck) -> void;
   auto prepare_display_art(termforge::Extent full, int fan_height) -> void;
   auto report_fidelity() -> void;
-  auto reset_daily() -> void;
+  auto new_deal() -> void;
   auto handle_key(const termforge::KeyEvent& key) -> bool;
   auto handle_mouse(const termforge::MouseEvent& mouse) -> bool;
   auto activate_cursor() -> void;
@@ -151,6 +152,7 @@ class Solitaire final : public Game {
   GameContext* m_ctx{nullptr};
   OptionsScreen m_options{};
   solitaire::Board m_board;
+  Rng m_deal_rng;
   solitaire::Layout m_layout{};
   Cursor m_cursor{};
   std::optional<solitaire::PileRef> m_selected{};
@@ -164,7 +166,7 @@ class Solitaire final : public Game {
   bool m_use_native{false};
   bool m_fidelity_reported{false};
   int m_loaded_deck{-1};
-  std::string m_date_key;
+  std::string m_score_key;
   std::chrono::duration<double> m_elapsed{0.0};
 
   std::array<termforge::Image, 52> m_front_native{};

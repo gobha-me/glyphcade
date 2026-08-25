@@ -63,6 +63,13 @@ auto start(Solitaire& game, GameContext& context) -> void {
   return true;
 }
 
+[[nodiscard]] auto row_text(const termforge::Screen& screen, int y)
+    -> std::string {
+  std::string out;
+  for (int x = 0; x < screen.cols(); ++x) out += screen.text_at(x, y);
+  return out;
+}
+
 struct Reports {
   std::vector<termforge::ErrorEvent> events;
 
@@ -73,7 +80,7 @@ struct Reports {
 
 } // namespace
 
-TEST_CASE("the options defaults start draw-three Standard daily play",
+TEST_CASE("the options defaults start fresh draw-three Standard play",
           "[solitaire][ui][options]") {
   GameContext context;
   Solitaire game;
@@ -225,6 +232,82 @@ TEST_CASE("mouse dragging highlights and commits through the model",
   CHECK_FALSE(game.selected_source().has_value());
 }
 
+TEST_CASE("a legal tableau run moves as one group without motion reports",
+          "[solitaire][ui][mouse][regression]") {
+  GameContext context;
+  Solitaire game{1234};
+  start(game, context);
+  Position p;
+  p.tableau[0] = {card(Suit::Hearts, Rank::Seven),
+                  card(Suit::Clubs, Rank::Six),
+                  card(Suit::Diamonds, Rank::Five)};
+  p.tableau[1] = {card(Suit::Spades, Rank::Eight)};
+  game.board().load(p);
+
+  termforge::Screen screen{80, 24};
+  game.draw(screen);
+  const auto& layout = game.layout();
+  const int source_x = layout.tableau_pile_x(0) + 2;
+  const int target_x = layout.tableau_pile_x(1) + 2;
+  const int y = layout.tableau_y;
+
+  REQUIRE(game.on_event(mouse(source_x, y, true)));
+  REQUIRE(game.on_event(mouse(target_x, y, false)));
+  CHECK(game.board().position().tableau[0].empty());
+  REQUIRE(game.board().position().tableau[1].size() == 4);
+  CHECK(game.board().position().tableau[1][1].rank == Rank::Seven);
+  CHECK(game.board().position().tableau[1][2].rank == Rank::Six);
+  CHECK(game.board().position().tableau[1][3].rank == Rank::Five);
+}
+
+TEST_CASE("recycling the stock restores its cards and visible count",
+          "[solitaire][ui][stock][regression]") {
+  GameContext context;
+  termforge::Capabilities caps;
+  caps.kitty_graphics = true;
+  caps.truecolor = true;
+  context.set_capabilities(caps);
+  Solitaire game{1234};
+  start(game, context);
+  Position p;
+  p.waste = {card(Suit::Clubs, Rank::Ace),
+             card(Suit::Diamonds, Rank::Two),
+             card(Suit::Hearts, Rank::Three)};
+  game.board().load(p, DrawMode::Three);
+
+  termforge::Screen screen{80, 24};
+  game.draw(screen);
+  const auto& layout = game.layout();
+  REQUIRE(game.on_event(mouse(layout.top_pile_x(0) + 1, layout.top_y + 1,
+                              true)));
+  CHECK(game.board().position().stock.size() == 3);
+  CHECK(game.board().position().waste.empty());
+  game.draw(screen);
+  CHECK(row_text(screen, layout.status_y).find("deck 3+0") !=
+        std::string::npos);
+  const termforge::Rect stock{layout.top_pile_x(0), layout.top_y,
+                              layout.card_cols, layout.card_rows};
+  const auto regions = game.pixel_regions();
+  CHECK(std::ranges::find(regions, stock) != regions.end());
+}
+
+TEST_CASE("new deals advance a deterministic seeded sequence",
+          "[solitaire][ui][deal][regression]") {
+  GameContext first_context;
+  GameContext second_context;
+  Solitaire first{987654321};
+  Solitaire second{987654321};
+  start(first, first_context);
+  start(second, second_context);
+  const Position first_deal = first.board().position();
+  CHECK(first_deal == second.board().position());
+
+  REQUIRE(first.on_event(ch(U'n')));
+  REQUIRE(second.on_event(ch(U'n')));
+  CHECK(first.board().position() == second.board().position());
+  CHECK_FALSE(first.board().position() == first_deal);
+}
+
 TEST_CASE("fixed ticks advance the timer only while the deal is active",
           "[solitaire][ui][tick]") {
   GameContext context;
@@ -245,7 +328,7 @@ TEST_CASE("fixed ticks advance the timer only while the deal is active",
   CHECK(game.elapsed() == std::chrono::duration<double>{0.25});
 }
 
-TEST_CASE("a daily win records score moves and elapsed time",
+TEST_CASE("a win records score moves and elapsed time by rules mode",
           "[solitaire][ui][scores]") {
   glyphcade::scores::Store scores;
   GameContext context;
@@ -265,7 +348,7 @@ TEST_CASE("a daily win records score moves and elapsed time",
   REQUIRE(game.on_event(ch(U'a')));
   REQUIRE(game.board().won());
 
-  const std::string prefix{game.daily_key()};
+  const std::string prefix{game.score_key()};
   CHECK(scores.get("solitaire", prefix + ":score") == 40);
   CHECK(scores.get("solitaire", prefix + ":moves") == 4);
   CHECK(scores.get("solitaire", prefix + ":time_ms") == 1250);

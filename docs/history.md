@@ -18,8 +18,9 @@ written as ordinary `#NN` links.
 
 Solitaire lands as a rules model and several presentations of the same state,
 not as a renderer with rules hidden inside event handlers. `board.hpp` names no
-TermForge type. It owns a deterministic UTC-daily deal, Draw 1 and Draw 3 stock
-order, unlimited recycling, legal tableau and foundation moves, automatic
+TermForge type. It owns deterministic deals from an explicit seed, while the
+game supplies fresh entropy on entry and for `N`. It also owns Draw 1 and Draw 3
+stock order, unlimited recycling, legal tableau and foundation moves, automatic
 flips, Standard and Vegas scoring, a fifty-position undo history and win state.
 Auto-complete first plans against a copy, including stock/recycle accessibility,
 and changes the live board only if that plan reaches all 52 foundations.
@@ -35,6 +36,12 @@ action,
 while mouse press/motion/release selects, previews and commits through the same
 model calls. The dragged card remains semantically present in the cell layer,
 but its one pixel source moves to the pointer, avoiding duplicate image regions.
+The first device pass exposed that some press/release sequences carry no
+intermediate motion report. Release coordinates now commit the selected run
+directly, and a three-card regression pins that input path. The same pass added
+a full Draw-3 recycle invariant plus a visible `deck stock+waste` count and
+Kitty stock-region assertion, making an exhausted-stock reset both lossless and
+observable.
 The first wide-window review caught that the renderer still treated the
 43-column floor as its final measure. A second visual review caught the opposite
 failure: widening an always-three-row card made Kitty stretch portrait art as

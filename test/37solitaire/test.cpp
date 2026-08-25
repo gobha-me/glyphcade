@@ -23,7 +23,7 @@ auto foundation_through(Suit suit, Rank rank) -> Pile {
 
 } // namespace
 
-TEST_CASE("a daily seed produces one complete deterministic Klondike deal",
+TEST_CASE("a seed produces one complete deterministic Klondike deal",
           "[solitaire][deal]") {
   Board first{20260825};
   Board again{20260825};
@@ -71,6 +71,28 @@ TEST_CASE("draw-one and draw-three preserve stock order across recycling",
   draw_one.load(p, DrawMode::One);
   CHECK(draw_one.act_stock().cards == 1);
   CHECK(draw_one.position().waste.back().rank == Rank::Four);
+}
+
+TEST_CASE("a complete draw-three cycle never loses a card",
+          "[solitaire][stock][regression]") {
+  Board board{20260825, DrawMode::Three};
+  const Position initial = board.position();
+
+  while (!board.position().stock.empty()) REQUIRE(board.act_stock().changed);
+  REQUIRE(board.position().waste.size() == 24);
+  REQUIRE(board.act_stock().kind == ActionKind::Recycle);
+  CHECK(board.position().stock == initial.stock);
+  CHECK(board.position().waste.empty());
+
+  std::set<int> ids;
+  const auto collect = [&](const Pile& pile) {
+    for (const Card value : pile) ids.insert(card_id(value));
+  };
+  collect(board.position().stock);
+  collect(board.position().waste);
+  for (const auto& pile : board.position().foundations) collect(pile);
+  for (const auto& pile : board.position().tableau) collect(pile);
+  CHECK(ids.size() == 52);
 }
 
 TEST_CASE("tableau moves require an alternating descending run",
