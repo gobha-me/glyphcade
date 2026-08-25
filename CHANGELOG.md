@@ -15,6 +15,15 @@ this file.
 
 ## [Unreleased]
 
+## [v0.23.1] — 2026-08-25
+
+### Tests
+
+- Replaced cpp-template's standalone `divide()` example with a failure matrix
+  over glyphcade's Sokoban parser (#2). Every parse error, both size ceilings,
+  their exact accepted boundaries and an ordinary successful parse now exercise
+  the production `std::expected` API.
+
 ## [v0.23.0] — 2026-08-25
 
 ### Added

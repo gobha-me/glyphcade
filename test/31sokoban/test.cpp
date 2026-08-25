@@ -35,14 +35,6 @@ using namespace glyphcade::sokoban;
   return Board(std::move(*lv));
 }
 
-[[nodiscard]] auto err(std::initializer_list<std::string_view> rows)
-    -> ParseError {
-  const std::vector<std::string_view> v(rows);
-  auto lv = parse(v, "test", 0);
-  REQUIRE_FALSE(lv.has_value());
-  return lv.error();
-}
-
 }  // namespace
 
 // ── The parser ───────────────────────────────────────────────────────────────
@@ -83,30 +75,6 @@ TEST_CASE("the seven standard characters all parse", "[sokoban][parse]") {
   REQUIRE(b->player == Pos{1, 1});
   REQUIRE(b->is_goal(1, 1));
   REQUIRE(b->boxes.size() == 2);
-}
-
-TEST_CASE("two players is a parse error, not a silent choice",
-          "[sokoban][parse]") {
-  // ⚠ The reference scans for the player and keeps the LAST match
-  // (game.js:97-104), so a level with two silently starts you on one of them.
-  REQUIRE(err({"#####", "#@ @#", "#####"}) == ParseError::ManyPlayers);
-  REQUIRE(err({"#####", "#  .#", "#####"}) == ParseError::NoPlayer);
-}
-
-TEST_CASE("boxes and goals must be equal in number", "[sokoban][parse]") {
-  // ⚠ The reference's win check scans only for a remaining `$`
-  // (game.js:251-256). With more goals than boxes that reports a win with empty
-  // goals still on screen; with more boxes than goals it can never be satisfied.
-  REQUIRE(err({"#######", "#@$ ..#", "#######"}) == ParseError::CountMismatch);
-  REQUIRE(err({"#######", "#@$$ .#", "#######"}) == ParseError::CountMismatch);
-  REQUIRE(err({"#####", "#@$ #", "#####"}) == ParseError::NoGoals);
-}
-
-TEST_CASE("an unknown character is refused rather than treated as floor",
-          "[sokoban][parse]") {
-  REQUIRE(err({"#####", "#@X.#", "#####"}) == ParseError::BadChar);
-  REQUIRE(err({}) == ParseError::Empty);
-  REQUIRE(err({"", ""}) == ParseError::Empty);
 }
 
 TEST_CASE("ragged rows are padded, and the short row's edge is not a hole",

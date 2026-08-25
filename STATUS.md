@@ -2,7 +2,9 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-08-25** (Epic 8 implements the final roster game:
+**Last updated: 2026-08-25** (#2 replaces cpp-template's standalone `divide()`
+canary with a failure-complete matrix over Sokoban's production
+`std::expected` parser. Before it Epic 8 implements the final roster game:
 fresh Klondike Solitaire deals with Draw 1/3, Standard/Vegas scoring, bounded undo,
 safe auto-complete, keyboard and mouse play, five new SFX, and committed Neon
 and Classic card atlases across native, raster and text tiers. Before it #8
@@ -59,6 +61,12 @@ expected 100. Repeating that case under UBSan also exposed rendering fixtures
 that could move when enough real time elapsed between their load and draw. The
 suite's `Probe` now owns a frozen `SyntheticClock`, and the score fixture
 advances exactly one reported board interval.
+
+**The inherited failure-test demo is gone.** #2. `test/20failure-testing` now
+drives every `sokoban::ParseError`, both dimension ceilings and their exact
+accepted boundaries through the production `std::expected` API. The parser's
+behavioral coverage remains in `test/31sokoban`; rejection coverage has one
+owner instead of being duplicated across the two suites.
 
 The bump also closes the feedback loop from Epic 7. `MapWidget::tile_at()`
 shipped in v0.6.1 (#128), so Sokoban no longer duplicates the widget's camera
