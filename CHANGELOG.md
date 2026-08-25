@@ -29,6 +29,12 @@ this file.
 - Took TermForge's exact capability-reply parsing: malformed or colliding Kitty
   APC and DA1 substrings can no longer select a stronger rendering driver.
 
+### Tests
+
+- Made the Minesweeper HUD clock test drive TermForge's `SyntheticClock`
+  instead of assuming 200 uncapped Release frames consume one fixed-tick
+  period.
+
 ### Documentation
 
 - Made the arcade's fidelity contract explicit: every game has a geometry

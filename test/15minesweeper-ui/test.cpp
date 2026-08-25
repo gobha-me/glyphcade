@@ -49,13 +49,21 @@ class Probe final : public Shell {
  public:
   using Shell::screen;
 
-  Probe() { set_frame_ms(0); }
+  Probe() {
+    set_frame_ms(0);
+    set_clock(&m_clock);
+  }
 
   auto step(int frames = 1, int cols = 80, int rows = 24) -> void {
     test_run_frames(frames, cols, rows, &m_sink);
   }
 
+  auto advance(std::chrono::duration<double> elapsed) -> void {
+    m_clock.advance(elapsed);
+  }
+
  private:
+  termforge::SyntheticClock m_clock;
   std::string m_sink;
 };
 
@@ -510,8 +518,12 @@ TEST_CASE("the HUD zero-pads and only counts time after a reveal",
   REQUIRE(screen_contains(app, "EASY"));
   REQUIRE(screen_contains(app, "PLAYING"));
 
-  // Ticks with nothing opened must not move the clock.
-  for (int i = 0; i < 200; ++i) app.step();
+  // Ticks with nothing opened must not move the clock. Drive the App's real
+  // fixed-step path with synthetic time: 200 uncapped wall-clock frames can
+  // complete inside one 60 Hz period in an optimized build, making a test that
+  // merely spins frames a machine-speed assertion rather than a clock test.
+  app.advance(std::chrono::milliseconds{100});
+  app.step();
   REQUIRE(screen_contains(app, "TIME 000"));
   // ...but they DO reach the game. The two accumulators are not the same thing.
   REQUIRE(g->ticks() > 0);

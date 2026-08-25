@@ -39,6 +39,12 @@ API or emitted probe bytes: Kitty graphics APCs and DA1 replies are parsed as
 complete records, so malformed or colliding substrings cannot select a stronger
 driver tier. The documented bare and truecolour pty flows exercise that path.
 
+The Release package arm exposed one test that still measured machine speed:
+`test/15minesweeper-ui` spun 200 uncapped frames and assumed at least one 60 Hz
+period had elapsed. An optimized CI run completed them sooner and correctly
+delivered zero fixed ticks. Its `Probe` now owns a `SyntheticClock`; the case
+advances 100 ms explicitly and still drives the production accumulator.
+
 The bump also closes the feedback loop from Epic 7. `MapWidget::tile_at()`
 shipped in v0.6.1 (#128), so Sokoban no longer duplicates the widget's camera
 and floored-viewport arithmetic. `set_map_size()` preservation followed in
