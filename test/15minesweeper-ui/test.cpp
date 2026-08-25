@@ -118,7 +118,7 @@ auto enter_game(Probe& app, int cols = 80, int rows = 24) -> Minesweeper* {
 [[nodiscard]] auto row_text(Probe& app, int y) -> std::string {
   auto& s = app.screen();
   std::string out;
-  for (int x = 0; x < s.cols(); ++x) out += s.at(x, y).text;
+  for (int x = 0; x < s.cols(); ++x) out += s.text_at(x, y);
   return out;
 }
 
@@ -130,11 +130,12 @@ auto enter_game(Probe& app, int cols = 80, int rows = 24) -> Minesweeper* {
 }
 
 [[nodiscard]] auto glyph_at(Probe& app, const Layout& l, Coord p) -> std::string {
-  return app.screen().at(l.glyph_x(p.col), l.row_y(p.row)).text;
+  return std::string(
+      app.screen().text_at(l.glyph_x(p.col), l.row_y(p.row)));
 }
 
 [[nodiscard]] auto cell_text(Probe& app, int x, int y) -> std::string {
-  return app.screen().at(x, y).text;
+  return std::string(app.screen().text_at(x, y));
 }
 
 // Every byte of every cell on the screen must be 7-bit.
@@ -142,7 +143,7 @@ auto enter_game(Probe& app, int cols = 80, int rows = 24) -> Minesweeper* {
   auto& s = app.screen();
   for (int y = 0; y < s.rows(); ++y) {
     for (int x = 0; x < s.cols(); ++x) {
-      for (const char c : s.at(x, y).text) {
+      for (const char c : s.text_at(x, y)) {
         if (static_cast<unsigned char>(c) >= 0x80) return false;
       }
     }

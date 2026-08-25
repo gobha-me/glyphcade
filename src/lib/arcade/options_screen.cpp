@@ -257,11 +257,9 @@ auto OptionsScreen::draw(termforge::Screen& screen) -> void {
   const bool ascii =
       m_ctx == nullptr || termforge::is_ascii(m_ctx->border_style());
 
-  // ⚠ An EMPTY text, not " ". Cell::blank() keys off text.empty(), and a screen
-  // full of spaces is not blank — it is a screen the diffing renderer must
-  // repaint every frame.
-  screen.clear(
-      termforge::Cell{.text = "", .fg = termforge::theme::kFg, .bg = bg});
+  // ⚠ A styled blank, not " ". A screen full of spaces is not blank — it is a
+  // screen the diffing renderer must repaint every frame.
+  screen.clear(termforge::theme::kFg, bg);
 
   screen.write_text(0, 0, termforge::detail::truncate_to_width(m_title, cols),
                     termforge::theme::kFg, bg);

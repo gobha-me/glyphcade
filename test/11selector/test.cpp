@@ -17,7 +17,7 @@
 //   3. Everything here renders at the ASCII tier. test_run_frames installs a
 //      FallbackDriver, which reports no colour, so the Shell probes
 //      BorderStyle::Ascii and every glyph family resolves to its 7-bit form —
-//      the selection marker is '>' here and '▸' on a capable terminal. That is
+//      the selection marker is '*' here and '▸' on a capable terminal. That is
 //      the tier worth testing (it is the one the repo promises always works),
 //      but do not write a case that only holds there and call it universal.
 //      ⚠ There is no way to reach the OTHER tier from here, and it is not for
@@ -191,11 +191,11 @@ class Probe final : public Shell {
 }
 
 [[nodiscard]] auto cell_text(Probe& app, int x, int y) -> std::string {
-  return app.screen().at(x, y).text;
+  return std::string(app.screen().text_at(x, y));
 }
 
 // The whole row, as the screen holds it. Blank cells contribute nothing —
-// Screen::fill_rect leaves Cell::text empty rather than writing a space.
+// Screen::fill_rect leaves text_at() empty rather than writing a space.
 [[nodiscard]] auto row_text(Probe& app, int y) -> std::string {
   std::string out;
   for (int x = 0; x < app.screen().cols(); ++x) out += cell_text(app, x, y);
@@ -225,7 +225,8 @@ struct Hit {
     for (int x = 0; x + n <= s.cols(); ++x) {
       bool all = true;
       for (int i = 0; i < n && all; ++i) {
-        all = s.at(x + i, y).text == std::string(1, word[static_cast<std::size_t>(i)]);
+        all = s.text_at(x + i, y) ==
+              std::string(1, word[static_cast<std::size_t>(i)]);
       }
       if (all) hits.push_back(Hit{x, y});
     }
@@ -250,7 +251,7 @@ struct Hit {
   auto& s = app.screen();
   for (int y = 0; y < s.rows(); ++y) {
     for (int x = 0; x < s.cols(); ++x) {
-      for (const char c : s.at(x, y).text) {
+      for (const char c : s.text_at(x, y)) {
         if (static_cast<unsigned char>(c) >= 0x80) return false;
       }
     }
@@ -364,19 +365,19 @@ TEST_CASE("the selected row is marked in TEXT and not colour",
   REQUIRE(row_text(app, kRow0).find(glyphcade::all_games().front().meta.title) !=
           std::string::npos);
 
-  // '>' and not '▸' because the fallback tier is the ASCII tier — mark_glyphs()
+  // '*' and not '▸' because the fallback tier is the ASCII tier — mark_glyphs()
   // keys off BorderStyle, and Shell::draw_selector passes the one it probed.
-  REQUIRE(cell_text(app, kMarkX, kRow0) == ">");
+  REQUIRE(cell_text(app, kMarkX, kRow0) == "*");
 
   if (glyphcade::all_games().size() > 1) {
-    // ⚠ .empty(), not " ". fill_rect leaves Cell::text empty; it does not write
+    // ⚠ .empty(), not " ". fill_rect leaves text_at() empty; it does not write
     // a space. Asserting " " here fails against a correct implementation.
     REQUIRE(cell_text(app, kMarkX, kRow0 + 1).empty());
 
     app.dispatch_event(key(termforge::Key::Down));
     app.step();
     REQUIRE(cell_text(app, kMarkX, kRow0).empty());
-    REQUIRE(cell_text(app, kMarkX, kRow0 + 1) == ">");
+    REQUIRE(cell_text(app, kMarkX, kRow0 + 1) == "*");
   }
 }
 
@@ -1821,7 +1822,7 @@ TEST_CASE("the selector body stops widening and centres", "[selector][geometry]"
     app.step(1, cols, 24);
     REQUIRE(app.selector_index() == 0);
 
-    const auto marks = find_word(app, ">");
+    const auto marks = find_word(app, "*");
     REQUIRE(marks.size() == 1);
     INFO("marker at " << marks[0].x << "," << marks[0].y);
     CHECK(marks[0].x > 0);  // it really is offset, or this proves nothing

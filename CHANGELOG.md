@@ -15,6 +15,20 @@ this file.
 
 ## [Unreleased]
 
+## [v0.21.0] — 2026-08-25
+
+### Changed
+
+- Updated TermForge from v0.6.0 to v0.57.14. Glyphcade now uses the compact
+  `Cell` API, the ASCII selector mark is the distinct `*`, and Sokoban delegates
+  mouse picking to `MapWidget::tile_at()` instead of reproducing the widget's
+  camera arithmetic.
+- Raised the exported CMake package's TermForge dependency floor to the same
+  exact patch version, keeping installed consumers aligned with the library's
+  build-time ABI.
+- Took TermForge's exact capability-reply parsing: malformed or colliding Kitty
+  APC and DA1 substrings can no longer select a stronger rendering driver.
+
 ### Documentation
 
 - Made the arcade's fidelity contract explicit: every game has a geometry
@@ -217,7 +231,8 @@ fixed timestep.
 
 **Epic 0: project bootstrap.**
 
-[Unreleased]: https://github.com/gobha-me/glyphcade/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/gobha-me/glyphcade/compare/v0.21.0...HEAD
+[v0.21.0]: https://github.com/gobha-me/glyphcade/compare/v0.20.2...v0.21.0
 [v0.19.0]: https://github.com/gobha-me/glyphcade/releases/tag/v0.19.0
 [v0.18.0]: https://github.com/gobha-me/glyphcade/releases/tag/v0.18.0
 [v0.17.0]: https://github.com/gobha-me/glyphcade/releases/tag/v0.17.0

@@ -113,7 +113,7 @@ auto enter_tetris(Probe& app, int cols = 80, int rows = 24) -> void {
   std::string out;
   const auto& s = app.screen();
   for (int x = 0; x < s.cols(); ++x) {
-    const auto& t = s.at(x, y).text;
+    const auto t = s.text_at(x, y);
     out += t.empty() ? " " : t;
   }
   return out;
@@ -129,7 +129,7 @@ auto enter_tetris(Probe& app, int cols = 80, int rows = 24) -> void {
   auto& s = app.screen();
   for (int y = 0; y < s.rows(); ++y) {
     for (int x = 0; x < s.cols(); ++x) {
-      for (const char c : s.at(x, y).text) {
+      for (const char c : s.text_at(x, y)) {
         if (static_cast<unsigned char>(c) >= 0x80) return false;
       }
     }
@@ -142,7 +142,8 @@ auto enter_tetris(Probe& app, int cols = 80, int rows = 24) -> void {
     -> std::string {
   std::string out;
   for (int i = 0; i < kCellCols; ++i) {
-    const auto& t = app.screen().at(lay.cell_x(col) + i, lay.cell_y(row)).text;
+    const auto t =
+        app.screen().text_at(lay.cell_x(col) + i, lay.cell_y(row));
     out += t.empty() ? " " : t;
   }
   return out;

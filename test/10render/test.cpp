@@ -39,7 +39,7 @@ class Probe final : public glyphcade::Shell {
 // so this is the only way to look for a string on screen.
 [[nodiscard]] auto row_text(termforge::Screen& s, int y) -> std::string {
   std::string out;
-  for (int x = 0; x < s.cols(); ++x) out += s.at(x, y).text;
+  for (int x = 0; x < s.cols(); ++x) out += s.text_at(x, y);
   return out;
 }
 
