@@ -368,7 +368,7 @@ namespace {
 auto row_text(const termforge::Screen& screen, int y) -> std::string {
   std::string out;
   for (int x = 0; x < screen.cols(); ++x) {
-    const std::string& t = screen.at(x, y).text;
+    const auto t = screen.text_at(x, y);
     out += t.empty() ? " " : t;
   }
   while (!out.empty() && out.back() == ' ') out.pop_back();
@@ -534,8 +534,8 @@ auto opened_at(std::span<const OptionSpec> opts, GameContext& ctx,
 // three bytes, so byte offsets into the row stop being column numbers at the
 // first multi-byte glyph. Every tier assertion below indexes CELLS.
 auto cell_text(const termforge::Screen& screen, int x, int y) -> std::string {
-  const std::string& t = screen.at(x, y).text;
-  return t.empty() ? " " : t;
+  const auto t = screen.text_at(x, y);
+  return t.empty() ? " " : std::string(t);
 }
 
 // Is every cell a WHOLE UTF-8 sequence? A cell holding a lone continuation byte
@@ -544,7 +544,7 @@ auto cell_text(const termforge::Screen& screen, int x, int y) -> std::string {
 auto cells_are_whole_utf8(const termforge::Screen& screen) -> bool {
   for (int y = 0; y < screen.rows(); ++y) {
     for (int x = 0; x < screen.cols(); ++x) {
-      const std::string& t = screen.at(x, y).text;
+      const auto t = screen.text_at(x, y);
       if (t.empty()) continue;
       const auto lead = static_cast<unsigned char>(t[0]);
       std::size_t need = 0;
@@ -581,7 +581,7 @@ auto screen_text(const termforge::Screen& screen) -> std::string {
 auto all_seven_bit(const termforge::Screen& screen) -> bool {
   for (int y = 0; y < screen.rows(); ++y) {
     for (int x = 0; x < screen.cols(); ++x) {
-      for (const unsigned char b : screen.at(x, y).text) {
+      for (const unsigned char b : screen.text_at(x, y)) {
         if (b >= 0x80) return false;
       }
     }
@@ -937,11 +937,9 @@ TEST_CASE("the cycler arrows come from the tier: Unicode") {
 }
 
 TEST_CASE("the cycler arrows come from the tier: ASCII") {
-  // ⚠ BY COLUMN, NEVER BY row.find('>'). kAsciiMarks gives ">" for BOTH
-  // selector and arrow_right — upstream says so out loud at glyphs.hpp and
-  // notes that termforge #22's own tests assert the marker by column for this
-  // reason. At this tier the row genuinely contains two '>' for two different
-  // reasons, and a search finds the SELECTOR at column 0 first.
+  // ⚠ BY COLUMN, NEVER BY row.find('>'). kAsciiMarks keeps the right arrow as
+  // ">" but now gives the selector a distinct "*". Assert both positions so a
+  // future collision or layout drift cannot pass as the intended tier change.
   GameContext ctx;
   auto s = opened_at(kTwoOptions, ctx, termforge::BorderStyle::Ascii);
   termforge::Screen screen(80, 8);
@@ -949,9 +947,7 @@ TEST_CASE("the cycler arrows come from the tier: ASCII") {
   INFO(screen_text(screen));
   CHECK(cell_text(screen, kArrowLeftX, kLevelY) == "<");
   CHECK(cell_text(screen, kLevelRightX, kLevelY) == ">");
-  // The collision itself, asserted rather than left as a comment: both of these
-  // are '>' and they are not the same glyph.
-  CHECK(cell_text(screen, 0, kLevelY) == ">");
+  CHECK(cell_text(screen, 0, kLevelY) == "*");
   CHECK(cell_text(screen, kValueX, kLevelY) == "N");
 }
 

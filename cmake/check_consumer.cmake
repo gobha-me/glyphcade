@@ -12,7 +12,7 @@
 #
 # cmake/project-config.cmake.in carries the consumer-side termforge floor:
 #
-#   find_dependency(termforge 0.6.0)
+#   find_dependency(termforge 0.57.14)
 #
 # Until this file existed, nothing in ctest EXECUTED that line. Its sibling
 # cmake/check_export.cmake installs to a scratch prefix and greps the generated
@@ -28,7 +28,7 @@
 # a package that resolves on the developer's machine and nowhere else".
 #
 # ⚠ The gap was demonstrated, not merely reasoned about. With the floor set to a
-# stale 0.2.2 while the install carries termforge 0.6.0:
+# stale 0.6.0 while the install carries termforge 0.57.14:
 #
 #   a real consumer  →  Could not find a configuration file for package
 #                       "termforge" ... , exit 1
@@ -39,7 +39,8 @@
 # other: check_export judges the CONTENT of the exported targets, this one
 # judges whether the package RESOLVES.
 #
-# The floor has moved four times (0.1 → 0.1.10 → 0.1.15 → 0.2.2 → 0.6.0), and
+# The floor has moved five times
+# (0.1 → 0.1.10 → 0.1.15 → 0.2.2 → 0.6.0 → 0.57.14), and
 # every one of those times correctness rested on somebody remembering to edit a
 # second file. That is the thing being automated here.
 #
@@ -158,7 +159,7 @@ set(_consumer_args
 )
 
 # ⚠ Forward termforge's location when — and only when — it is real. On a machine
-# where `find_package(termforge 0.6.0 QUIET CONFIG)` in cmake/deps/termforge.cmake
+# where `find_package(termforge 0.57.14 QUIET CONFIG)` in cmake/deps/termforge.cmake
 # SUCCEEDS, the FetchContent branch never runs, so termforge_INSTALL is never
 # set and the scratch prefix contains no lib/cmake/termforge/ to find. Without
 # this the consumer would go red for a reason that has nothing to do with the

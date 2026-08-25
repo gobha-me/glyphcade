@@ -95,7 +95,7 @@ auto enter_sokoban(Probe& app, int cols = 80, int rows = 24) -> void {
   std::string out;
   const auto& s = app.screen();
   for (int x = 0; x < s.cols(); ++x) {
-    const auto& t = s.at(x, y).text;
+    const auto t = s.text_at(x, y);
     out += t.empty() ? " " : t;
   }
   return out;
@@ -111,7 +111,7 @@ auto enter_sokoban(Probe& app, int cols = 80, int rows = 24) -> void {
   auto& s = app.screen();
   for (int y = 0; y < s.rows(); ++y) {
     for (int x = 0; x < s.cols(); ++x) {
-      for (const char c : s.at(x, y).text) {
+      for (const char c : s.text_at(x, y)) {
         if (static_cast<unsigned char>(c) >= 0x80) return false;
       }
     }
@@ -120,8 +120,8 @@ auto enter_sokoban(Probe& app, int cols = 80, int rows = 24) -> void {
 }
 
 // The two columns of one map tile, as the screen holds them. The tile's screen
-// position is the widget's rect plus (tile - camera) * tile size — the same
-// arithmetic the game has to do for a click, and for the same reason.
+// position is the widget's rect plus (tile - camera) * tile size. This helper
+// reads painted tiles; runtime click mapping belongs to MapWidget::tile_at().
 [[nodiscard]] auto tile_text(Probe& app, const Sokoban& game, int tx, int ty)
     -> std::string {
   const auto& lay = game.layout();
@@ -130,7 +130,7 @@ auto enter_sokoban(Probe& app, int cols = 80, int rows = 24) -> void {
   const int y0 = lay.view_y + ((ty - cam_y) * kTileRows);
   std::string out;
   for (int i = 0; i < kTileCols; ++i) {
-    const auto& t = app.screen().at(x0 + i, y0).text;
+    const auto t = app.screen().text_at(x0 + i, y0);
     out += t.empty() ? " " : t;
   }
   return out;

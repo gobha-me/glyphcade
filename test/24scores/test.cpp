@@ -112,7 +112,9 @@ class Probe final : public Shell {
 
 [[nodiscard]] auto row_text(Probe& app, int y) -> std::string {
   std::string out;
-  for (int x = 0; x < app.screen().cols(); ++x) out += app.screen().at(x, y).text;
+  for (int x = 0; x < app.screen().cols(); ++x) {
+    out += app.screen().text_at(x, y);
+  }
   return out;
 }
 
@@ -122,7 +124,7 @@ class Probe final : public Shell {
   auto& s = app.screen();
   for (int y = 0; y < s.rows(); ++y) {
     for (int x = 0; x < s.cols(); ++x) {
-      for (const char c : s.at(x, y).text) {
+      for (const char c : s.text_at(x, y)) {
         if (static_cast<unsigned char>(c) >= 0x80) return false;
       }
     }

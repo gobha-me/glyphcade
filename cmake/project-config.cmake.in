@@ -75,15 +75,15 @@ endif ()
 # an external link to any of them adds a line here — and if it is rtaudio,
 # cmake/check_export.cmake goes red first.
 #
-# ⚠ 0.6.0, at patch granularity, and it must track the floor in
+# ⚠ 0.57.14, at patch granularity, and it must track the floor in
 # cmake/deps/termforge.cmake exactly. This line used to say 0.1 while that file
 # said 0.1.10 — with a comment claiming the two matched, which they did not.
 #
 # The reason to align them is stronger than symmetry, because termforge's
-# version file is SameMinorVersion and "0.6" therefore accepts any 0.6.x. The
+# version file is SameMinorVersion and "0.57" therefore accepts any 0.57.x. The
 # Shell holds a termforge::ListWidget BY VALUE, in a header we install; v0.1.11
 # added members to that class, and v0.2.1 did it AGAIN (the scrollbar's track
-# and thumb colours, #21). So a consumer resolving an older 0.6.x compiles our
+# and thumb colours, #21). So a consumer resolving an older 0.57.x compiles our
 # public header against one object layout while glyphcade_lib was built against
 # another. Nothing fails to find, nothing fails to link — the sizes just
 # disagree. Anything we hold by value in an installed header makes the build
@@ -100,8 +100,8 @@ endif ()
 # vtable layout both count, and neither is visible from our side.
 #
 # ⚠ Crossing a minor is a one-way door for consumers: SameMinorVersion means
-# 0.6.0 no longer accepts any 0.2.x (intended — the ABI differs, above), and
-# equally that a stale 0.2.2 request stops matching a 0.6.x install. That is
+# 0.57.14 no longer accepts any 0.6.x (intended — the ABI differs, above), and
+# equally that a stale 0.6.0 request stops matching a 0.57.x install. That is
 # why this line and cmake/deps/termforge.cmake move in the same commit; a
 # half-done bump produces a package that resolves in our tree and nowhere else.
 #
@@ -125,7 +125,7 @@ endif ()
 # on the line being deleted or stripped of its version, which resolution can
 # never notice because it then always succeeds.
 include(CMakeFindDependencyMacro)
-find_dependency(termforge 0.6.0)
+find_dependency(termforge 0.57.14)
 
 include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
 

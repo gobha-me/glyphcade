@@ -98,14 +98,14 @@ endif ()
 # library itself, so it is needed in every configuration that builds anything.
 
 # ── termforge's install() rules join the `dev` component ─────────────────────
-# termforge deposits 46 files into our prefix — libtermforge.a, 40 headers, its
+# termforge deposits 58 files into our prefix — libtermforge.a, 52 headers, its
 # four lib/cmake/termforge/*.cmake files and its licence — because
 # cmake/deps/termforge.cmake sets termforge_INSTALL to ours, which it must (see
 # the long note there). None of its five install() calls names a COMPONENT, and
 # it is upstream's file: we cannot add one.
 #
 # They belong in `dev`, and not merely by elimination. cmake/project-config.cmake.in
-# says find_dependency(termforge 0.6.0), so a dev package WITHOUT
+# says find_dependency(termforge 0.57.14), so a dev package WITHOUT
 # lib/cmake/termforge/ ships a glyphcadeConfig.cmake that resolves nothing —
 # and consumer-resolves would stay green while it did, because that test reads
 # the install tree rather than the packages.

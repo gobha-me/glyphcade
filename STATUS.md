@@ -2,7 +2,11 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-08-06** (#10 — Solitaire's nineteen-card tableau now has a
+**Last updated: 2026-08-25** (TermForge repinned from v0.6.0 to v0.57.14; the
+compact `Cell` API is adopted, the ASCII selector mark is now `*`, capability
+replies are parsed as complete records, and Sokoban's #128 hit-test workaround
+is retired. Before it #10 — Solitaire's
+nineteen-card tableau has a
 43x24 bottom-tier contract before the game exists; before it #12 — both
 targetless package-config paths execute under `consumer-resolves`, and deleting
 their guard is a measured red; before it #15 — the arcade is *installable*: CPack `.deb`,
@@ -21,6 +25,31 @@ border tier; plus the first maintainer feel report, see
 ---
 
 ## Where the project actually is
+
+**The TermForge pin is v0.57.14, the latest published tag as of 2026-08-25.**
+That is 110 tags and 288 commits past v0.6.0. The source-visible break is
+v0.50.0's compact `Cell`: styled blanking now uses `Screen::clear(fg, bg)`, and
+tests resolve graphemes through `Screen::text_at()` because text may live in
+screen-owned spill storage. v0.11.1 deliberately changed the ASCII selector
+mark from `>` to `*`, distinct from a right arrow; the selector and options
+tests pin the new glyph at its exact column.
+
+v0.57.14 also hardens the real terminal setup path without changing its public
+API or emitted probe bytes: Kitty graphics APCs and DA1 replies are parsed as
+complete records, so malformed or colliding substrings cannot select a stronger
+driver tier. The documented bare and truecolour pty flows exercise that path.
+
+The Release package arm exposed one test that still measured machine speed:
+`test/15minesweeper-ui` spun 200 uncapped frames and assumed at least one 60 Hz
+period had elapsed. An optimized CI run completed them sooner and correctly
+delivered zero fixed ticks. Its `Probe` now owns a `SyntheticClock`; the case
+advances 100 ms explicitly and still drives the production accumulator.
+
+The bump also closes the feedback loop from Epic 7. `MapWidget::tile_at()`
+shipped in v0.6.1 (#128), so Sokoban no longer duplicates the widget's camera
+and floored-viewport arithmetic. `set_map_size()` preservation followed in
+v0.6.2 (#127), and the atlas-backed sprite tier shipped in v0.14.0 (#64). There
+are again **no TermForge workarounds in this repository**.
 
 **Solitaire's worst tableau now has a bottom-tier answer before the flagship is
 being written.** #10. A pile can hold six hidden cards and a complete
@@ -63,7 +92,7 @@ produces a `.deb`, an `.rpm` and a `.tar.gz`; a new CI `package` job builds them
 against the whole test suite and *inspects* them before anything is uploaded; a
 `v*` tag attaches them to the GitHub release.
 
-The shape is the part worth knowing. The install tree is currently 102 files and
+The shape is the part worth knowing. The install tree is currently 113 files and
 **one** of them is the game — the rest are static archives, headers, package
 metadata and licence notices, which have no runtime role at all because a static
 archive is consumed at link time and `bin/glyphcade` already contains that code.
@@ -200,7 +229,7 @@ record across quit-to-menu and across restarts — 2048 a best score, Minesweepe
 a best time per difficulty — in a versioned text file under `$XDG_DATA_HOME`.
 See "What the score store is" below.
 
-**The termforge pin is now v0.6.0** (
+**Before the current v0.57.14 pin, the termforge pin was v0.6.0** (
 `term-game#36`) — six tags, not the
 four the issue was written against, and the first bump that **fixed a bug we
 were shipping** rather than merely staying current. See "What the v0.6.0 bump
@@ -335,15 +364,12 @@ and the last of the roster. Its bottom-tier layout prerequisite (#10) is now
 done: 43x24 shows the nineteen-card worst case without hiding a face-up card or
 scrolling. The remaining prerequisite is the sprite input, not the table.
 
-Read the upstream note below before starting it. ⚠ We are now pinned to
-**v0.6.0** (term-game#36), so the `draw_image(Rect cells, …)` contract is available
-— but `MapWidget`'s **sprite tier still does not exist at any tag**. Its two
-gates (#83/#84) lifted and the design doc was updated to say so, but no code
-followed. Epic 8's premise — cards as pixel sprites — needs that tier or an
-`Image`-and-`draw_image` path written by hand. What the bump changed is that the
-hand-written path is now viable: at v0.2.2 `draw_image` took an image's *pixel*
-dims as a *cell* count, so it could not have worked. See "What the v0.6.0 bump
-brought" below.
+We are now pinned to **v0.57.14**, so both `draw_image(Rect cells, …)` and
+`MapWidget`'s atlas-backed sprite tier are available. Free-floating cards still
+fit the direct `Image`/`draw_image` path better than a tile map; at v0.2.2 that
+hand-written path was not viable because `draw_image` took an image's pixel
+dimensions as a cell count. See "What the v0.6.0 bump brought" below for that
+resolved history.
 
 Since Epic 3, two housekeeping issues have landed.
 `term-game#16` moved the pin to
@@ -362,15 +388,11 @@ upstream, and all three of our stopgaps went, each on the deletion condition it
 was written with. That loop closing is the thesis of running the two projects
 together, so it is worth stating once rather than leaving implied.
 
-⚠ **Epic 7 adds one back, and it is counted rather than quietly absorbed.**
-`Sokoban::handle_mouse` re-derives `MapWidget`'s camera, tile size and floored
-viewport extent in app code, because the widget has no `tile_at(cell_x, cell_y)`
-and its `viewport_tiles()` is private. There is no way to hit-test a tile map
-without it. **Deletion condition: termforge
-[#128](https://github.com/gobha-me/termforge/issues/128)** ships a tile-picking
-accessor. Commented at the site, and item 2 of the feedback below. Saying "we
-have no workarounds" while carrying one would be the kind of claim this file
-exists to prevent.
+Epic 7 added one back for a time: `Sokoban::handle_mouse` re-derived
+`MapWidget`'s camera, tile size and floored viewport while waiting for
+[#128](https://github.com/gobha-me/termforge/issues/128). v0.6.1 satisfied its
+written deletion condition; the duplicated arithmetic is gone and the game now
+delegates picking to `MapWidget::tile_at()`.
 
 ---
 
@@ -386,7 +408,7 @@ exists to prevent.
 | 5 — Snake | **done** | — |
 | 6 — Tetris | **done** | ~~termforge #60~~ — shipped in **v0.1.19…v0.2.2** and taken. `KeyboardMode::Enhanced` gives real `KeyAction::Repeat`/`Release`; DAS is now expressible rather than inferred from OS auto-repeat. `term-game#32` built the seam that reaches it: declare `Enhanced` in `kMeta` and the Shell does the rest. ⚠ Still degradable: a terminal without the kitty protocol never delivers `Release` — and note the notice is **ours**, not upstream's, because `App::setup()` has already run by the time a game entry sets the mode. Tetris must fall back to discrete steps **knowingly** |
 | 7 — Sokoban | **done** | ~~termforge #64 → #63~~ — both shipped and **taken**. `MapWidget` v1 (glyph tier) is now SPENT: Sokoban is its first consumer, and the four pieces of API friction it found are listed in "What Epic 7 built" |
-| 8 — Solitaire | **layout ready; art pipeline next** | #10 is done: the text table has a tested 43x24 contract. ~~termforge #63~~ shipped and is taken, so `Image` plus `draw_image` is reachable from game code. #8 still owns PNG decode and asset storage. ⚠ `MapWidget`'s sprite tier does not exist at any tag through v0.6.0, so free-floating cards will use the direct image path rather than wait for a tile widget they do not fit anyway |
+| 8 — Solitaire | **layout ready; art pipeline next** | #10 is done: the text table has a tested 43x24 contract. ~~termforge #63~~ shipped and is taken, so `Image` plus `draw_image` is reachable from game code. #8 still owns PNG decode and asset storage. `MapWidget`'s sprite tier also shipped in v0.14.0, but free-floating cards still fit the direct image path better than a tile widget |
 
 **Nothing upstream blocks any epic.** That has been true since term-game#24, and it is what
 [term-game#24](`term-game#24`) bought. termforge
@@ -394,7 +416,7 @@ exists to prevent.
 [#58](https://github.com/gobha-me/termforge/issues/58) (frame pacing),
 [#59](https://github.com/gobha-me/termforge/issues/59) (`on_tick`) and
 [#61](https://github.com/gobha-me/termforge/issues/61) (F5–F12) are all closed,
-and we pin **v0.6.0** to get them, plus
+and we pin **v0.57.14** to get them, plus
 [#71](https://github.com/gobha-me/termforge/issues/71) (terminal restore on the
 exception path), [#72](https://github.com/gobha-me/termforge/issues/72)
 (`ListWidget` marks its own selection) and
@@ -416,9 +438,9 @@ was nothing for us to delete. See
 | [#61](https://github.com/gobha-me/termforge/issues/61) | `Key` enum stops at F4 | **closed — shipped in v0.1.9** |
 | [#62](https://github.com/gobha-me/termforge/issues/62) | `Cell` has no text attributes | **closed — shipped as `Attr` in v0.1.16, and we are pinned to it — but nothing uses it.** Still costs Minesweeper a column per cell (63 vs 33 for Hard). Spending it is its own issue; see "the payoff we did not spend" above, including the correction that `FallbackDriver` **does** emit `Reverse` |
 | [#63](https://github.com/gobha-me/termforge/issues/63) | `Image` has no blit/alpha compositing | **closed — shipped in v0.1.18, and we are pinned to it.** Unblocks Epic 8 |
-| [#127](https://github.com/gobha-me/termforge/issues/127) | `MapWidget::set_map_size()` wipes every layer while claiming to preserve the corner | **open** — filed from Epic 7. Not a blocker: size first, populate second |
-| [#128](https://github.com/gobha-me/termforge/issues/128) | `MapWidget` has no `tile_at()`, so hit-testing re-derives the widget's private viewport arithmetic | **open** — filed from Epic 7, and the **deletion condition for this repo's one workaround** |
-| [#64](https://github.com/gobha-me/termforge/issues/64) | MapWidget (Epic 3.6) | **shipped as `MapWidget` v1 (glyph tier) in v0.1.19, and SPENT by Epic 7** — Sokoban is its first consumer and produced four pieces of API feedback (see "What MapWidget's first consumer found"), reported upstream as a comment on #64 plus #127 and #128. ⚠ Still open upstream against the sprite tier, which **does not exist at any tag through v0.6.0** even though both its gates landed. We did not need it; **Epic 8 might** |
+| [#127](https://github.com/gobha-me/termforge/issues/127) | `MapWidget::set_map_size()` wipes every layer while claiming to preserve the corner | **closed — fixed in v0.6.2.** The widget now preserves the overlapping corner; glyphcade's size-first/populate-second load order remains valid |
+| [#128](https://github.com/gobha-me/termforge/issues/128) | `MapWidget` has no `tile_at()`, so hit-testing re-derives the widget's private viewport arithmetic | **closed — shipped in v0.6.1 and taken at v0.57.14.** `Sokoban::handle_mouse` delegates to `tile_at()` and the workaround is deleted |
+| [#64](https://github.com/gobha-me/termforge/issues/64) | MapWidget (Epic 3.6) | **closed — glyph tier shipped in v0.1.19 and was spent by Epic 7; the persistent atlas-backed sprite tier shipped in v0.14.0.** Sokoban remains a glyph-only consumer until it has art |
 | [#75](https://github.com/gobha-me/termforge/issues/75) | Mouse tracking mode hardcoded to `?1002h`; no `?1003h`, no way to disable | **closed — shipped as `Terminal::set_mouse_mode` in v0.1.15, and the pin has been past it since — but nothing calls it.** The default, `MouseMode::Drag`, is byte-for-byte what we already emitted, so taking the tag changed nothing. `MouseMode::Motion` is what Minesweeper wants for buttonless hover; deferred to [#4](https://github.com/gobha-me/glyphcade/issues/4) because it is a *feel* change and the dev container cannot verify feel |
 | [#71](https://github.com/gobha-me/termforge/issues/71) | `App::run()` skips `teardown()` on a throw | **closed — shipped in v0.1.10, and we are on it** (`term-game#16`). The terminal-restore workaround is gone; our boundary survives as a diagnostic. `test/21exception` asserts the upstream guarantee via `test_winch_hooked()`, `pty-restore` asserts the escape bytes. |
 | [#72](https://github.com/gobha-me/termforge/issues/72) | `ListWidget` selection invisible at the fallback tier | **closed — shipped in v0.1.11, and we are on it** (`term-game#17`). Our gutter marker is gone and the two columns went back to the list. The marker is `ListWidget`'s now, on by default and **inside `rect()`**, so a click on it selects — which the workaround could not do. `test/11selector` asserts the glyph in cell text at the ASCII tier, coverage the workaround never had. |
@@ -426,11 +448,11 @@ was nothing for us to delete. See
 
 Check state with `gh` rather than trusting this table if it looks stale.
 
-### The pin is v0.6.0, and the version request is patch-level
+### The pin is v0.57.14, and the version request is patch-level
 
-`cmake/deps/termforge.cmake` asks `find_package(termforge 0.6.0 …)`, not `0.6`.
-termforge's package version file is `SameMinorVersion`, so `0.6` accepts *any*
-installed 0.6.x. The worked examples below are all 0.1.x because that is where
+`cmake/deps/termforge.cmake` asks `find_package(termforge 0.57.14 …)`, not
+`0.57`. termforge's package version file is `SameMinorVersion`, so `0.57`
+accepts *any* installed 0.57.x. The worked examples below are all 0.1.x because that is where
 the lesson was learned; every one of them survives the move, because the
 dependency still ships load-bearing API in patch releases — v0.2.1, v0.2.2 and
 v0.5.2 all did. Three ways minor granularity bit:
@@ -553,8 +575,8 @@ capture showed mid-branch, before the call was added.
 at all — `test/11selector` had 13 cases and none of them looked at the marker:
 
 - the selected row differs from an unselected one in **cell text**, not colour,
-  read back through `Screen::at()` under the fallback driver, and the mark moves
-  with the arrow keys.
+  read back through `Screen::text_at()` under the fallback driver, and the mark
+  moves with the arrow keys.
 - the whole selector screen is 7-bit at the ASCII tier — the only assertion that
   catches a dropped `set_style`.
 - a click in the marker gutter enters that row's game.

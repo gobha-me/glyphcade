@@ -49,13 +49,21 @@ class Probe final : public Shell {
  public:
   using Shell::screen;
 
-  Probe() { set_frame_ms(0); }
+  Probe() {
+    set_frame_ms(0);
+    set_clock(&m_clock);
+  }
 
   auto step(int frames = 1, int cols = 80, int rows = 24) -> void {
     test_run_frames(frames, cols, rows, &m_sink);
   }
 
+  auto advance(std::chrono::duration<double> elapsed) -> void {
+    m_clock.advance(elapsed);
+  }
+
  private:
+  termforge::SyntheticClock m_clock;
   std::string m_sink;
 };
 
@@ -118,7 +126,7 @@ auto enter_game(Probe& app, int cols = 80, int rows = 24) -> Minesweeper* {
 [[nodiscard]] auto row_text(Probe& app, int y) -> std::string {
   auto& s = app.screen();
   std::string out;
-  for (int x = 0; x < s.cols(); ++x) out += s.at(x, y).text;
+  for (int x = 0; x < s.cols(); ++x) out += s.text_at(x, y);
   return out;
 }
 
@@ -130,11 +138,12 @@ auto enter_game(Probe& app, int cols = 80, int rows = 24) -> Minesweeper* {
 }
 
 [[nodiscard]] auto glyph_at(Probe& app, const Layout& l, Coord p) -> std::string {
-  return app.screen().at(l.glyph_x(p.col), l.row_y(p.row)).text;
+  return std::string(
+      app.screen().text_at(l.glyph_x(p.col), l.row_y(p.row)));
 }
 
 [[nodiscard]] auto cell_text(Probe& app, int x, int y) -> std::string {
-  return app.screen().at(x, y).text;
+  return std::string(app.screen().text_at(x, y));
 }
 
 // Every byte of every cell on the screen must be 7-bit.
@@ -142,7 +151,7 @@ auto enter_game(Probe& app, int cols = 80, int rows = 24) -> Minesweeper* {
   auto& s = app.screen();
   for (int y = 0; y < s.rows(); ++y) {
     for (int x = 0; x < s.cols(); ++x) {
-      for (const char c : s.at(x, y).text) {
+      for (const char c : s.text_at(x, y)) {
         if (static_cast<unsigned char>(c) >= 0x80) return false;
       }
     }
@@ -509,8 +518,12 @@ TEST_CASE("the HUD zero-pads and only counts time after a reveal",
   REQUIRE(screen_contains(app, "EASY"));
   REQUIRE(screen_contains(app, "PLAYING"));
 
-  // Ticks with nothing opened must not move the clock.
-  for (int i = 0; i < 200; ++i) app.step();
+  // Ticks with nothing opened must not move the clock. Drive the App's real
+  // fixed-step path with synthetic time: 200 uncapped wall-clock frames can
+  // complete inside one 60 Hz period in an optimized build, making a test that
+  // merely spins frames a machine-speed assertion rather than a clock test.
+  app.advance(std::chrono::milliseconds{100});
+  app.step();
   REQUIRE(screen_contains(app, "TIME 000"));
   // ...but they DO reach the game. The two accumulators are not the same thing.
   REQUIRE(g->ticks() > 0);

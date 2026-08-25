@@ -91,7 +91,7 @@ auto enter_2048(Probe& app, int cols = 80, int rows = 24) -> void {
   std::string out;
   const auto& s = app.screen();
   for (int x = 0; x < s.cols(); ++x) {
-    const auto& t = s.at(x, y).text;
+    const auto t = s.text_at(x, y);
     out += t.empty() ? " " : t;
   }
   return out;
@@ -101,7 +101,7 @@ auto enter_2048(Probe& app, int cols = 80, int rows = 24) -> void {
   const auto& s = app.screen();
   for (int y = 0; y < s.rows(); ++y) {
     for (int x = 0; x < s.cols(); ++x) {
-      for (const char c : s.at(x, y).text) {
+      for (const char c : s.text_at(x, y)) {
         if (static_cast<unsigned char>(c) >= 0x80) {
           return false;
         }
@@ -255,12 +255,12 @@ TEST_CASE("the lattice makes the grid visible with no colour at all",
   const auto& l = g->layout();
   // A vertical rule sits in the gap column, on a tile's middle row.
   const int gx = l.tile_x(0) + kTileCols;
-  REQUIRE(app.screen().at(gx, l.tile_y(0) + kTileRows / 2).text ==
+  REQUIRE(app.screen().text_at(gx, l.tile_y(0) + kTileRows / 2) ==
           kAsciiLattice.vertical);
   // A horizontal rule sits in the gap row, and a cross where the two meet.
   const int gy = l.tile_y(0) + kTileRows;
-  REQUIRE(app.screen().at(l.tile_x(0), gy).text == kAsciiLattice.horizontal);
-  REQUIRE(app.screen().at(gx, gy).text == kAsciiLattice.cross);
+  REQUIRE(app.screen().text_at(l.tile_x(0), gy) == kAsciiLattice.horizontal);
+  REQUIRE(app.screen().text_at(gx, gy) == kAsciiLattice.cross);
 }
 
 TEST_CASE("the outcome is stated in words, not in colour",

@@ -25,7 +25,7 @@
 # runners, and an SSH URL here would fail in exactly the environments that most
 # need the fallback to work.
 
-# 0.6.0, not 0.6 — and the patch level here is load-bearing, not pedantry.
+# 0.57.14, not 0.57 — and the patch level here is load-bearing, not pedantry.
 #
 # termforge's package version file is SameMinorVersion: it accepts a candidate
 # whose major.minor match AND whose version is >= the one requested. Asking for
@@ -85,14 +85,13 @@
 #
 # ⚠ Crossing a minor makes SameMinorVersion cut the other way, and it is worth
 # saying out loud because it is the reason all three files move in ONE commit:
-# asking for 0.6.0 no longer accepts any 0.2.x at all (which is what we want —
+# asking for 0.57.14 no longer accepts any 0.6.x at all (which is what we want —
 # the ABI differs, see above), but by the same rule anything still asking for
-# 0.2.2 silently stops matching a 0.6.x install. The three places are
+# 0.6.0 silently stops matching a 0.57.x install. The three places are
 # cmake/deps/termforge.cmake (here), cmake/project-config.cmake.in, and
 # STATUS.md. Two of them are consumer-visible; a half-done bump is a package
-# that resolves on the developer's machine and nowhere else. This bump crosses
-# four minors at once (0.2 → 0.6), so the rule applies four times over.
-find_package(termforge 0.6.0 QUIET CONFIG)
+# that resolves on the developer's machine and nowhere else.
+find_package(termforge 0.57.14 QUIET CONFIG)
 
 if (termforge_FOUND)
   message(STATUS "termforge: ${termforge_VERSION} via find_package")
@@ -261,6 +260,40 @@ else ()
   #            correct at the ASCII tier and wrong above it. Its own issue, not
   #            this bump's cargo, on the v0.1.16 precedent above.
   #
+  #  ── The current bump moves v0.6.0 → v0.57.14: 110 tags and 288 commits. ──
+  #
+  #   v0.6.1 — MapWidget::tile_at() (#128). This retires glyphcade's one
+  #            framework workaround: Sokoban no longer reproduces the widget's
+  #            camera and floored-viewport arithmetic in handle_mouse().
+  #   v0.6.2 — set_map_size() preserves the overlapping corner (#127), matching
+  #            its old documentation. Glyphcade already sizes before populating,
+  #            so this is corrective but does not change its level-load order.
+  #  v0.11.1 — the ASCII selector mark changed from ">" to "*" (#132), keeping
+  #            it distinct from arrow_right. This intentionally changes the
+  #            selector and options-screen fallback output; their tests now pin
+  #            the new mark while retaining the 7-bit and hit-test controls.
+  #  v0.14.0 — MapWidget's persistent atlas-backed sprite tier (#64). Sokoban
+  #            has no atlas yet, so its required glyph baseline is unchanged;
+  #            the framework gap recorded after Epic 7 is closed.
+  #  v0.50.0 — Cell became a compact, trivially-copyable 24-byte value (#92).
+  #            This is the source break found by the bump: Cell is no longer an
+  #            aggregate and its grapheme may live in Screen-owned spill
+  #            storage. Production uses Screen::clear(fg,bg); rendering tests
+  #            resolve graphemes through Screen::text_at().
+  # v0.57.13 — press-only structured input treats every Press as a complete
+  #            discrete action (#339). Glyphcade uses App's normal event route,
+  #            so no source adaptation is needed; the input suites exercise it
+  #            through dispatch and the headless loop.
+  # v0.57.14 — capability replies are parsed as complete records (#309), so
+  #            malformed APC/DA1 substrings cannot select a stronger driver.
+  #            Probe bytes and the public API are unchanged; the pty checks
+  #            exercise the real setup path at both rendering tiers.
+  #
+  # The intervening tags add App loop seams, image transports and placement,
+  # widgets, drivers, text facilities, and diagnostics. None removes another
+  # API glyphcade names: the complete -Werror build and test matrix below is the
+  # consumer audit, including installed-package resolution and both audio arms.
+  #
   # Pin a tag, not a SHA: the find_package path above is version-gated, so both
   # acquisition paths should describe the same thing in the same vocabulary.
   #
@@ -270,7 +303,7 @@ else ()
   #   cmake -B build-oldpin  -DTERMFORGE_TAG=v0.4.0 -DCMAKE_CXX_FLAGS=-Werror
   #   cmake -B build-prevpin -DTERMFORGE_TAG=v0.2.2 -DCMAKE_CXX_FLAGS=-Werror
   #
-  # find_package(0.6.0) misses any 0.2.x or 0.4.x, so FetchContent takes the
+  # find_package(0.57.14) misses any 0.2.x or 0.4.x, so FetchContent takes the
   # override in both. TERMFORGE_URI above accepts a LOCAL PATH, so neither arm
   # needs the network — point it at an existing _deps/termforge-src clone.
   #
@@ -291,7 +324,7 @@ else ()
   # on purpose. Anyone re-deriving this later: run both arms before believing a
   # per-tag table, including this one.
   if (NOT TERMFORGE_TAG)
-    set(TERMFORGE_TAG v0.6.0)
+    set(TERMFORGE_TAG v0.57.14)
   endif ()
 
   # termforge's own options already default to PROJECT_IS_TOP_LEVEL, so as a

@@ -76,10 +76,9 @@ struct Layout {
   int status_y{0};
   int hint_y{0};
 
-  // The window in TILES, floored — the same arithmetic MapWidget does
-  // privately in viewport_tiles(). ⚠ We have to redo it because the widget does
-  // not expose it, and a click cannot be turned into a tile without it. That
-  // asymmetry is reported upstream; see the note in sokoban.cpp.
+  // The window in TILES, floored — the same geometry exposed by
+  // MapWidget::viewport_tiles(). Layout tests keep this arithmetic independent
+  // of a Screen; runtime mouse picking delegates to MapWidget::tile_at().
   [[nodiscard]] constexpr auto view_tiles_w() const noexcept -> int {
     return view_w / kTileCols;
   }
