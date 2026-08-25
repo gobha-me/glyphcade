@@ -15,6 +15,37 @@ this file.
 
 ## [Unreleased]
 
+## [v0.23.0] — 2026-08-25
+
+### Added
+
+- Added Klondike Solitaire (#1), completing the six-game roster with Draw 1/3,
+  Standard/Vegas scoring, fresh seeded deals, bounded undo, safe auto-complete,
+  keyboard play, mouse drag-and-drop and score persistence per rules mode.
+- Added responsive Neon and Classic card atlases. Kitty receives transparent
+  native art, truecolour terminals receive raster cards composited over felt,
+  and the 43x24 Baseline remains a complete 7-bit text game.
+- Added five synthesized card effects for dealing, flipping, placing, invalid
+  moves and foundation moves.
+
+### Changed
+
+- Made `Game` a `termforge::Widget`, allowing any game to expose optional pixel
+  regions while preserving its semantic cell rendering.
+- Added `GameContext::report()` so games can route presentation degradation
+  through the Shell's existing sticky `ErrorEvent` notice.
+- Made Solitaire scale card presentation, but never rules extent, from 5x3 to
+  11x8 cards up to a 91-column ceiling.
+
+### Tests
+
+- Added exhaustive Solitaire model, layout and UI coverage for rules, stock
+  recycling, undo, scoring, geometry, input, rendering tiers and persistence.
+- Maintainer hardware QA covered native Kitty placement and press/release-only
+  dragging, and confirmed all five new cues play through the normal RtAudio
+  device backend. Offline fingerprints continue to pin their numeric output;
+  whether every cue sounds aesthetically right remains a human judgement.
+
 ## [v0.22.0] — 2026-08-25
 
 ### Added

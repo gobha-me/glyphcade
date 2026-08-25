@@ -71,8 +71,11 @@ native art falls to raster or text.
 Five card effects were appended to the synth bank, preserving every earlier enum
 index. Offline fingerprints pin their frames, peak, RMS and zero crossings. The
 model, UI, exact geometry, registry, asset manifest and score records all have
-headless coverage. Those facts do not prove drag feel, real Kitty placement or
-sound quality: the merge/release gate remains a maintainer play on hardware.
+headless coverage. The maintainer hardware gate then covered the corrected drag
+path and native Kitty placement and confirmed all five new cues play through
+the normal RtAudio device backend. That proves device delivery, not that every
+effect in the bank sounds aesthetically right; the latter remains a human feel
+question.
 
 ---
 
