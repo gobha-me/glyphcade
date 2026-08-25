@@ -7,7 +7,8 @@ namespace glyphcade::hud {
 auto draw_status_row(termforge::Screen& screen, int y,
                      std::span<const std::string> fields, std::string_view word,
                      termforge::Rgb field_fg, termforge::Rgb word_fg,
-                     termforge::Rgb bg, std::string_view sep) -> void {
+                     termforge::Rgb bg, std::string_view sep, int x, int cols)
+    -> void {
   // ⚠ No y-range guard here, deliberately. Screen::write_text already clips,
   // and the callers disagree about which rows are legal: four games put the
   // status row at 0 and the hints at rows-1, Sokoban puts them at rows-3 and
@@ -35,15 +36,16 @@ auto draw_status_row(termforge::Screen& screen, int y,
   // minor versions of the dependency is the strongest evidence available that
   // this is de-facto stable and de-jure unpromised, which is precisely the
   // regime a local guard is for.
+  const int width = cols < 0 ? screen.cols() : cols;
   const int word_x =
-      std::max(0, screen.cols() - static_cast<int>(word.size()));
+      x + std::max(0, width - static_cast<int>(word.size()));
   screen.write_text(word_x, y, word, word_fg, bg);
 
   // One blank column between the two halves. `budget` goes negative on a screen
   // narrower than the word itself, which is correct: nothing fits, so nothing
   // is appended, and the word — the only thing that matters at the bottom tier
   // — keeps the row to itself.
-  const int budget = word_x - 2;
+  const int budget = word_x - x - 2;
 
   std::string left;
   for (const std::string& field : fields) {
@@ -54,7 +56,7 @@ auto draw_status_row(termforge::Screen& screen, int y,
     left += gap;
     left += field;
   }
-  screen.write_text(0, y, left, field_fg, bg);
+  screen.write_text(x, y, left, field_fg, bg);
 }
 
 }  // namespace glyphcade::hud

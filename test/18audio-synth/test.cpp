@@ -73,7 +73,7 @@ struct Fingerprint {
 
 // Generated from the implementation and committed as text. Regenerate by
 // rendering each spec at kRate and recomputing the four quantities below.
-constexpr std::array<Fingerprint, 15> kFingerprints{{
+constexpr std::array<Fingerprint, 20> kFingerprints{{
     {.name = "Click", .frames = 1152, .peak = 0.078125F, .rms = 0.038033F,
      .zero_crossings = 31},
     {.name = "Reveal", .frames = 1536, .peak = 0.067755F, .rms = 0.017765F,
@@ -131,6 +131,31 @@ constexpr std::array<Fingerprint, 15> kFingerprints{{
     // right response is to change the SPEC, not the tolerance.
     {.name = "Seat", .frames = 2640, .peak = 0.079105F, .rms = 0.027651F,
      .zero_crossings = 70},
+    {.name = "CardDeal",
+     .frames = 3120,
+     .peak = 0.052460F,
+     .rms = 0.013806F,
+     .zero_crossings = 1362},
+    {.name = "CardFlip",
+     .frames = 2016,
+     .peak = 0.066406F,
+     .rms = 0.031177F,
+     .zero_crossings = 71},
+    {.name = "CardPlace",
+     .frames = 1824,
+     .peak = 0.060147F,
+     .rms = 0.016480F,
+     .zero_crossings = 23},
+    {.name = "InvalidMove",
+     .frames = 1632,
+     .peak = 0.046875F,
+     .rms = 0.019208F,
+     .zero_crossings = 9},
+    {.name = "CardFoundation",
+     .frames = 3456,
+     .peak = 0.083506F,
+     .rms = 0.028607F,
+     .zero_crossings = 117},
 }};
 
 static_assert(kFingerprints.size() == kSfxIds.size(),

@@ -16,6 +16,68 @@
         "Use case: precise-object-edit\nAsset type: game sprite proof for a terminal arcade asset pipeline\nInput images: Image 1 is the edit target\nPrimary request: preserve the card-back design, geometry, pixel-art pattern, colors, proportions, and straight-on framing; change only the alpha treatment\nConstraints: make every pixel outside the card silhouette genuinely fully transparent (alpha 0); remove the exterior blue glow and all drop shadow; make the complete card silhouette and interior fully opaque (alpha 255), including its cyan border; keep a clean hard edge suitable for sprite compositing; retain even transparent margin; no text, logos, watermark, scenery, or extra objects\nAvoid: translucent card interior, semitransparent haze outside the card, glow, shadow, altered pattern, altered palette, cropped edges",
         "Use case: background-extraction\nAsset type: game sprite proof for a terminal arcade asset pipeline\nInput images: Image 1 is the card-back edit target\nPrimary request: extract the single playing card as a clean cutout on a genuinely transparent background\nConstraints: preserve the card design, pattern, palette, dimensions, proportions, and straight-on framing exactly; make outside pixels actual PNG alpha transparency, not a visible checkerboard; remove the white/gray checkerboard and any background pixels completely; keep the card itself opaque with a clean hard silhouette; preserve transparent margin; no glow, no drop shadow, no text, no logos, no watermark, no new objects\nAvoid: baked checkerboard pattern, white background, gray background, RGB-only output, translucent card interior, changed artwork, cropped edges"
       ]
+    },
+    {
+      "name": "solitaire_neon_face_source",
+      "file": "solitaire/source/neon-face.png",
+      "kind": "blank playing-card face source",
+      "generator": "OpenAI built-in image_gen",
+      "generated_at": "2026-08-25",
+      "width": 1024,
+      "height": 1536,
+      "bytes": 1226771,
+      "sha256": "55405c67a4eeb630eb0ca79738d6cbc68cb5263bd32cea46840822dfa36518c7",
+      "generation_prompt": "Use case: stylized-concept. Asset type: blank face-frame source plate for the built-in glyphcade Neon Klondike deck. Create one completely blank face-up playing card frame to receive deterministic rank, suit, and pip overlays later. Genuinely transparent outside the centered, straight-on 2:3 card silhouette. Crisp flat retro-futurist arcade illustration with clean hard edges; pale cool gray interior, deep navy edge, restrained cyan and violet accents. Keep the interior empty and low contrast. No text, letters, numbers, ranks, suits, pips, symbols, logos, trademark, watermark, glow, shadow, hands, table, scenery, checkerboard background, busy ornament, muddy gradients, perspective, or cropped edges."
+    },
+    {
+      "name": "solitaire_classic_face_source",
+      "file": "solitaire/source/classic-face.png",
+      "kind": "blank playing-card face source",
+      "generator": "OpenAI built-in image_gen",
+      "generated_at": "2026-08-25",
+      "width": 1024,
+      "height": 1536,
+      "bytes": 1243741,
+      "sha256": "32930ac4c0ddf37835244d8eb23e7956300bf734f394520ad3d50ad538dcb0ee",
+      "generation_prompt": "Use case: stylized-concept. Asset type: blank face-frame source plate for the built-in glyphcade Classic Klondike deck. Create one completely blank face-up playing card frame to receive deterministic rank, suit, and pip overlays later. Genuinely transparent outside the centered, straight-on 2:3 card silhouette. Crisp flat classic arcade illustration with clean hard edges; warm ivory interior, deep burgundy edge, muted gold accents. Keep the interior empty and low contrast. No text, letters, numbers, ranks, suits, pips, symbols, logos, trademark, watermark, glow, shadow, hands, table, scenery, checkerboard background, busy ornament, paper texture, muddy gradients, perspective, or cropped edges."
+    },
+    {
+      "name": "solitaire_classic_back_source",
+      "file": "solitaire/source/classic-back.png",
+      "kind": "playing-card back source",
+      "generator": "OpenAI built-in image_gen",
+      "generated_at": "2026-08-25",
+      "width": 1024,
+      "height": 1536,
+      "bytes": 2152267,
+      "sha256": "c133baad819fd74695301783145d8d67ed6adf0af8fdd384367f8bfd238af7bc",
+      "generation_prompt": "Use case: stylized-concept. Asset type: source art for a built-in Klondike card deck in a dark terminal arcade. Create one original face-down playing-card back for the glyphcade Classic deck. Genuinely transparent outside the centered, straight-on 2:3 card silhouette. Use a restrained symmetrical engraved diamond-and-vine pattern, crisp retro arcade shapes, a warm cream edge, deep burgundy field, and muted gold linework. No text, letters, numbers, ranks, suits, logos, trademark, watermark, glow, shadow, hands, table, scenery, checkerboard background, photorealism, paper texture, muddy gradients, perspective, or cropped edges."
+    },
+    {
+      "name": "solitaire_neon_atlas",
+      "file": "solitaire/neon-atlas.png",
+      "kind": "53-sprite playing-card atlas",
+      "generator": "tools/build_solitaire_atlas.py with ImageMagick 6",
+      "generated_at": "2026-08-25",
+      "width": 1664,
+      "height": 960,
+      "bytes": 271099,
+      "sha256": "d35012ce0856f03014d13337c966fad06d62ec61f4e0d970d180f682af9644bc",
+      "generation_prompt": "Run the committed authoring tool over the Neon face source and proof card back. Add exact corner ranks and ASCII suit identifiers, deterministic vector suit pips, and face-card marks; pack Clubs, Diamonds, Hearts, Spades by row and A through K by column, with the back in row five. Preserve alpha and emit 128x192 sprites in one 1664x960 PNG.",
+      "source_assets": ["proof_card_back", "solitaire_neon_face_source"]
+    },
+    {
+      "name": "solitaire_classic_atlas",
+      "file": "solitaire/classic-atlas.png",
+      "kind": "53-sprite playing-card atlas",
+      "generator": "tools/build_solitaire_atlas.py with ImageMagick 6",
+      "generated_at": "2026-08-25",
+      "width": 1664,
+      "height": 960,
+      "bytes": 279755,
+      "sha256": "4deb3d634d958847be3931c6be2d64bf302d8c6ec60eb1c8540438063898e32e",
+      "generation_prompt": "Run the committed authoring tool over the Classic face and back sources. Add exact corner ranks and ASCII suit identifiers, deterministic vector suit pips, and face-card marks; pack Clubs, Diamonds, Hearts, Spades by row and A through K by column, with the back in row five. Preserve alpha and emit 128x192 sprites in one 1664x960 PNG.",
+      "source_assets": ["solitaire_classic_face_source", "solitaire_classic_back_source"]
     }
   ]
 }

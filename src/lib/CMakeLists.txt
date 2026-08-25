@@ -97,7 +97,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
   # ── core: the shared services, and the bottom of the link chain ─────────────
   # ⚠ arcade/scores.cpp is in CORE, not in ${PROJECT_NAME}_lib, and the arcade/
   # prefix is not what decides that — the rule above at "The rule for a new file"
-  # is. Both games call ctx.scores().record(), so scores has to sit below the
+  # is. Multiple games call ctx.scores().record(), so scores has to sit below the
   # games exactly as audio does. Its two siblings in arcade/ land in two other
   # targets: all_games.cpp in _roster, shell.cpp in _lib.
   # ⚠ arcade/hud.cpp and arcade/options_screen.cpp are here for the same reason
@@ -202,6 +202,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
   add_subdirectory(games/snake)
   add_subdirectory(games/tetris)
   add_subdirectory(games/sokoban)
+  add_subdirectory(games/solitaire)
 
   set(_game_targets
     ${PROJECT_NAME}_game_minesweeper
@@ -209,6 +210,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
     ${PROJECT_NAME}_game_snake
     ${PROJECT_NAME}_game_tetris
     ${PROJECT_NAME}_game_sokoban
+    ${PROJECT_NAME}_game_solitaire
   )
 
   # ── the roster: the registry table, and nothing else ────────────────────────

@@ -72,8 +72,8 @@ has a keyboard equivalent.
 
 ## Roster matrix
 
-This matrix is the design target. A check mark means the game exists today;
-planned rows describe acceptance for work that has not landed.
+This matrix records the delivered design. A check mark means the game exists
+today.
 
 | Game | Geometry floor | Baseline | Preferred experience | Explicit degradation |
 |---|---:|---|---|---|
@@ -82,7 +82,7 @@ planned rows describe acceptance for work that has not landed.
 | **Snake** ✓ | 58x20 `Drawable` | Distinct ASCII head, body, food and wall glyphs | Styled glyphs/colour and sound | Shape carries identity; silence changes no timing or score |
 | **Tetris** ✓ | 35x24 `Drawable` | ASCII well and legacy-keyboard discrete movement | Styled piece colours and enhanced-keyboard DAS/release | Piece roles remain distinct as glyphs; the HUD and an event name the discrete-input fallback |
 | **Sokoban** ✓ | 34x12 `Playable` | ASCII layered tiles, keyboard and camera | Styled tile glyphs/colour and mouse | Every layer remains distinguishable; the camera preserves the fixed map and rules |
-| **Solitaire** *(planned)* | 43x24 `Drawable` | 5x3 ASCII cards, keyboard selection and counted hidden prefixes | Native card art, raster card art where supported, mouse drag-and-drop | Text cards preserve rank/suit and every selectable face-up card; keyboard replaces drag |
+| **Solitaire** ✓ | 43x24 `Drawable`; table grows to 11x8 cards / 91 columns | 5x3 ASCII cards, keyboard selection and counted hidden prefixes | Aspect-preserved native card art, raster card art where supported, mouse drag-and-drop | Text cards preserve rank/suit and every selectable face-up card; short terminals keep compact cards rather than flattening art; keyboard replaces drag; an `ErrorEvent` names every art fallback |
 
 The matrix is deliberately asymmetric. Not every game needs every profile. A
 pixel path added merely so every row has one would make these small games larger

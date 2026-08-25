@@ -125,9 +125,13 @@ struct Tier {
 // not fit and does NOT try later, shorter ones: a row whose contents reorder
 // themselves as the terminal narrows is harder to read than one that gets
 // shorter. Put the least urgent field last.
+//
+// `x`/`cols` optionally constrain the row to a centred playfield. A negative
+// `cols` keeps the original whole-Screen contract.
 auto draw_status_row(termforge::Screen& screen, int y,
                      std::span<const std::string> fields, std::string_view word,
                      termforge::Rgb field_fg, termforge::Rgb word_fg,
-                     termforge::Rgb bg, std::string_view sep = "   ") -> void;
+                     termforge::Rgb bg, std::string_view sep = "   ", int x = 0,
+                     int cols = -1) -> void;
 
 }  // namespace glyphcade::hud

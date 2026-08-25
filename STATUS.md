@@ -2,9 +2,13 @@
 
 Live state. Update this when something lands; do not let it drift.
 
-**Last updated: 2026-08-25** (#8 adds the first complete art-asset path: a
-manifested PNG, build-time embedding, bounded decode and all three rendering
-tiers. Before it TermForge was repinned from v0.6.0 to v0.57.14; the
+**Last updated: 2026-08-25** (Epic 8 implements the final roster game:
+daily Klondike Solitaire with Draw 1/3, Standard/Vegas scoring, bounded undo,
+safe auto-complete, keyboard and mouse play, five new SFX, and committed Neon
+and Classic card atlases across native, raster and text tiers. Before it #8
+added the first complete art-asset path: manifested PNGs, build-time embedding,
+bounded decode and all three rendering tiers. Before that TermForge was repinned
+from v0.6.0 to v0.57.14; the
 compact `Cell` API is adopted, the ASCII selector mark is now `*`, capability
 replies are parsed as complete records, and Sokoban's #128 hit-test workaround
 is retired. Before it #10 — Solitaire's
@@ -72,22 +76,43 @@ real TermForge drivers headlessly; `asset-manifest` rejects missing, extra or
 changed PNGs. Visual quality on a real terminal remains a human judgement, not
 something the byte-level test claims.
 
-**Solitaire's worst tableau now has a bottom-tier answer before the flagship is
-being written.** #10. A pile can hold six hidden cards and a complete
-thirteen-rank face-up build, but the six hidden identities are not information
-the player may inspect. They render as one counted card-back strip; every
-face-up card keeps its own row, and the last keeps its full 5x3 outline. The
-nineteen-card worst case is therefore 16 tableau rows, and the whole table fits
-exactly at **43x24**.
+**Epic 8 is implemented. There are six games, and the flagship exercises every
+rendering tier.** Solitaire deals one deterministic UTC-daily Klondike board,
+offers Draw 1/3, Standard/Vegas scoring and Neon/Classic decks, and supports the
+complete game through keyboard selection or mouse drag-and-drop. Its model owns
+the rules, scoring, a 50-position undo history and a dry-run auto-complete that
+commits only after proving the position solvable.
+
+The generated source art and two exact 13x5 atlases are committed with prompts,
+provenance, byte counts and SHA-256 hashes. Kitty uses transparent native card
+art, truecolour uses art composited over felt, and Baseline uses complete text
+cards. Every downgrade raises an `ErrorEvent`; the Shell routes game-owned
+events through the same sticky notice used by framework degradation.
+
+The 43-column number is a floor, not the permanent render width. Available rows
+and columns grow cards together from 5x3 to 11x8 and gaps from 1 to 2 up to a
+91-column ceiling, then centre the result. A short-but-wide terminal does not
+flatten portrait art merely because columns are available. Kitty and ANSI are
+given proportionally scaled images at the driver's exact preferred pixel
+extent, making TermForge's `Stretch` placement an identity operation. Remaining
+rows are tableau capacity; the seven piles and the rules state never scale.
+
+A pile can hold six hidden cards and a complete thirteen-rank face-up build, but
+the six hidden identities are not information the player may inspect. They
+render as one counted card-back strip; every face-up card keeps its own row, and
+the last keeps its full 5x3 outline. The nineteen-card worst case is therefore
+16 tableau rows, and the whole table fits exactly at **43x24**.
 
 This is neither a visual cap nor an adaptive option: no playable information is
 removed, and `tableau_card_at()` keeps each visible face-up strip addressable for
-the future mouse path. The covered hidden strip has no hit; once exposed, the
+the mouse path. The covered hidden strip has no hit; once exposed, the
 full card back names the one card that may flip. `test/35solitaire-layout`
 sweeps every valid hidden/face-up count and pins the width, height and hit-test
-boundaries without a `Screen`. The game is deliberately not registered yet —
-Epic 8 still owns its model and renderer. See "Solitaire's nineteen cards fit
-without hiding one" in [docs/history.md](docs/history.md).
+boundaries without a `Screen`; `test/37solitaire` drives the rules without
+TermForge, and `test/38solitaire-ui` covers rendering outcomes, input, timing
+and score recording. Device audio, real Kitty placement and drag feel still
+require the maintainer gate before release. See "The flagship completes the
+roster" in [docs/history.md](docs/history.md).
 
 **The suite's fidelity contract is explicit.** Every roster entry now has a
 documented floor, preferred experience and degradation story in
@@ -178,7 +203,7 @@ adds **"to play well"** to explain why its number is a judgement.
 `term-game#38` — pressing Enter on a
 game used to start it immediately on its first setting, with the options as a
 row of text along the bottom of a game already running, where using one
-*restarted the game you just started*. Four of the five games now show a
+*restarted the game you just started*. Five of the six games now show a
 pre-start screen instead; 2048, which has no settings, goes straight in and is
 byte-for-byte unchanged. See "What the options screen is" below.
 
@@ -380,16 +405,14 @@ latency and cursor responsiveness, Tetris' DAS/ARR/soft-drop trio, Sokoban's
 push feel, and whether any effect in the bank sounds *right*. Do not infer these
 from "it feels fast" — a frame rate is not a feel decision.
 
-**Next move: Epic 8 (Solitaire)**, the flagship and the last of the roster. Both
-prerequisites are now done: #10 gives the bottom-tier table a 43x24 contract,
-and #8 supplies committed sprite input, PNG decode and tested tier routing.
-
-We are now pinned to **v0.57.14**, so both `draw_image(Rect cells, …)` and
-`MapWidget`'s atlas-backed sprite tier are available. Free-floating cards still
-fit the direct `Image`/`draw_image` path better than a tile map; at v0.2.2 that
-hand-written path was not viable because `draw_image` took an image's pixel
-dimensions as a cell count. See "What the v0.6.0 bump brought" below for that
-resolved history.
+**Next gate: review and device verification for Epic 8.** The implementation is
+complete locally and its headless evidence covers rules, exact geometry, text,
+raster and synthetic native rendering, mouse routing, fixed-tick timing, score
+persistence, asset integrity and offline audio fingerprints. Before merge and
+release, the maintainer must still play the drag path in a real terminal, check
+native Kitty placement, and listen to the five new effects on a device. After
+that release, work returns to GitHub triage; custom card packs remain outside
+the asset pipeline by design.
 
 Since Epic 3, two housekeeping issues have landed.
 `term-game#16` moved the pin to
@@ -428,7 +451,7 @@ delegates picking to `MapWidget::tile_at()`.
 | 5 — Snake | **done** | — |
 | 6 — Tetris | **done** | ~~termforge #60~~ — shipped in **v0.1.19…v0.2.2** and taken. `KeyboardMode::Enhanced` gives real `KeyAction::Repeat`/`Release`; DAS is now expressible rather than inferred from OS auto-repeat. `term-game#32` built the seam that reaches it: declare `Enhanced` in `kMeta` and the Shell does the rest. ⚠ Still degradable: a terminal without the kitty protocol never delivers `Release` — and note the notice is **ours**, not upstream's, because `App::setup()` has already run by the time a game entry sets the mode. Tetris must fall back to discrete steps **knowingly** |
 | 7 — Sokoban | **done** | ~~termforge #64 → #63~~ — both shipped and **taken**. `MapWidget` v1 (glyph tier) is now SPENT: Sokoban is its first consumer, and the four pieces of API friction it found are listed in "What Epic 7 built" |
-| 8 — Solitaire | **ready to build** | #10 gives the text table a tested 43x24 contract; #8 supplies manifested PNG storage, embedding and decode. ~~termforge #63~~ shipped and is taken, so `Image` plus `draw_image` is reachable from game code. `MapWidget`'s sprite tier also shipped in v0.14.0, but free-floating cards still fit the direct image path better than a tile widget |
+| 8 — Solitaire | **implemented; device gate pending** | No code or framework blocker. Headless validation is complete; real Kitty placement, drag feel and the new SFX need maintainer verification before merge/release |
 
 **Nothing upstream blocks any epic.** That has been true since term-game#24, and it is what
 [term-game#24](`term-game#24`) bought. termforge

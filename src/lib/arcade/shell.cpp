@@ -159,6 +159,9 @@ Shell::Shell(std::unique_ptr<audio::AudioSink> sink,
     m_scores_notice = m_scores_store.load_error();
   }
   m_ctx.set_scores(&m_scores_store);
+  m_ctx.set_reporter(this, [](void* owner, const termforge::ErrorEvent& error) {
+    static_cast<Shell*>(owner)->on_event(termforge::Event{error});
+  });
 
   m_title.set_align(termforge::Label::Align::Center);
   m_title.set_colors(kAccent, termforge::theme::kBg);
@@ -434,7 +437,10 @@ auto Shell::on_render(termforge::Screen& screen) -> void {
       // and draws the dialog over it, and restore_backdrop undoes the damage
       // after present() — so "the game freezes behind a dimmed pause dialog"
       // costs nothing here.
-      if (m_game) m_game->draw(screen);
+      if (m_game) {
+        m_game->draw(screen);
+        render_pixel_regions(*m_game);
+      }
       break;
   }
   // No `default:`. With -Wswitch and CI's -Werror, a fourth State becomes a

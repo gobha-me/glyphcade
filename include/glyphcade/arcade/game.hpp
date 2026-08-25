@@ -7,6 +7,10 @@
 // or touches Terminal, or reaches another game's headers, is a bug in the
 // architecture rather than a style disagreement.
 //
+// A Game IS a Widget. That inheritance gives the Shell the standard optional
+// pixel-region contract while leaving terminal ownership exactly where it was:
+// draw() is the semantic floor, and draw_pixels() may enhance it.
+//
 // The contracts the Shell actually guarantees are written into each method
 // below, because a game author reads this file and nothing else.
 
@@ -14,6 +18,7 @@
 
 #include <termforge/core/screen.hpp>
 #include <termforge/core/types.hpp>
+#include <termforge/widgets/widget.hpp>
 
 #include <glyphcade/arcade/context.hpp>
 #include <glyphcade/arcade/game_meta.hpp>
@@ -34,7 +39,7 @@ namespace glyphcade {
 // frame and must fully repaint. (The Shell does clear() the Screen first, so a
 // game that only repaints what changed is still correct — but do not build on
 // that; it is the Shell's convenience, not a promise to games.)
-class Game {
+class Game : public termforge::Widget {
  public:
   virtual ~Game() = default;
 

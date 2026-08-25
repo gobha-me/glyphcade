@@ -14,6 +14,61 @@ written as ordinary `#NN` links.
 
 ---
 
+## The flagship completes the roster (#1)
+
+Solitaire lands as a rules model and several presentations of the same state,
+not as a renderer with rules hidden inside event handlers. `board.hpp` names no
+TermForge type. It owns a deterministic UTC-daily deal, Draw 1 and Draw 3 stock
+order, unlimited recycling, legal tableau and foundation moves, automatic
+flips, Standard and Vegas scoring, a fifty-position undo history and win state.
+Auto-complete first plans against a copy, including stock/recycle accessibility,
+and changes the live board only if that plan reaches all 52 foundations.
+
+The 43x24 contract from #10 is now spent by both views and input. Baseline draws
+complete ASCII cards, one counted hidden prefix and a cursor/target glyph path
+whose meaning does not depend on colour. Styled terminals add Unicode suits and
+borders. Truecolour composites the selected deck over felt for raster output;
+Kitty keeps the transparent native pixels below text. ANSI cannot layer an image
+below text, so a selected card or valid target stays in the cell view rather
+than letting raster art cover its essential cue. Keyboard can perform every
+action,
+while mouse press/motion/release selects, previews and commits through the same
+model calls. The dragged card remains semantically present in the cell layer,
+but its one pixel source moves to the pointer, avoiding duplicate image regions.
+The first wide-window review caught that the renderer still treated the
+43-column floor as its final measure. A second visual review caught the opposite
+failure: widening an always-three-row card made Kitty stretch portrait art as
+if it had been crushed flat. The layout now grows width and height together,
+from 5x3 to 11x8, with a 91-column prose ceiling. A short-but-wide terminal
+keeps compact cards. The pixel path proportionally scales the atlas into the
+driver's exact preferred pixel canvas, so `PlacementFit::Stretch` has nothing
+left to distort; covered fans are sliced from that already-scaled card because
+ANSI cannot crop at placement time. Remaining rows are pile capacity and the
+seven-pile rules extent is unchanged.
+
+Three generated source images and the two atlas outputs are committed inputs.
+`tools/build_solitaire_atlas.py` is authoring-only: it uses ImageMagick to place
+exact rank/suit labels and deterministic vector pips into a 13-column by
+5-row atlas. The build never runs it. `assets/manifest.json` records the image
+generation prompts and tool, dimensions, byte sizes and SHA-256 for every PNG.
+Changing the authored source or atlas without updating that record is a test
+failure.
+
+Two host seams were required and kept generic. `Game` now inherits `Widget`, so
+the Shell can render any game's optional pixel regions after its semantic cell
+draw without making the game an `App`. `GameContext::report()` routes a
+game-owned degradation through the Shell's ordinary sticky `ErrorEvent` notice;
+a bare context remains a null reporter. Solitaire emits exactly one event when
+native art falls to raster or text.
+
+Five card effects were appended to the synth bank, preserving every earlier enum
+index. Offline fingerprints pin their frames, peak, RMS and zero crossings. The
+model, UI, exact geometry, registry, asset manifest and score records all have
+headless coverage. Those facts do not prove drag feel, real Kitty placement or
+sound quality: the merge/release gate remains a maintainer play on hardware.
+
+---
+
 ## One ruleset, several presentations (#19)
 
 The arcade had a strong bottom-tier rule and several good individual examples,

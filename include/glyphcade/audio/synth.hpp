@@ -135,6 +135,12 @@ enum class SfxId : std::uint8_t {
   // a wall is holding a direction, so a rejection tone fires as fast as the key
   // repeats — the metronome argument again, for the fourth game running.
   Seat,
+  // Added for Solitaire. Win remains the suite-wide outcome cue.
+  CardDeal,
+  CardFlip,
+  CardPlace,
+  InvalidMove,
+  CardFoundation,
 };
 
 // Every id, in order, so a test can loop the whole bank and a new effect cannot
@@ -148,12 +154,13 @@ enum class SfxId : std::uint8_t {
 // ⚠ ENUM order, not thematic order. Slide and Merge are appended at the end
 // rather than grouped with the other in-game effects, because appending cannot
 // renumber an existing id — and kBank is indexed by that number.
-inline constexpr std::array<SfxId, 15> kSfxIds{
+inline constexpr std::array<SfxId, 20> kSfxIds{
     SfxId::Click,    SfxId::Reveal,     SfxId::Flag,  SfxId::Explode,
     SfxId::Win,      SfxId::Lose,       SfxId::MenuMove, SfxId::MenuSelect,
     SfxId::Slide,    SfxId::Merge,      SfxId::Eat,
     SfxId::Lock,     SfxId::Tetris,     SfxId::LevelUp,
-    SfxId::Seat,
+    SfxId::Seat,     SfxId::CardDeal,   SfxId::CardFlip,
+    SfxId::CardPlace, SfxId::InvalidMove, SfxId::CardFoundation,
 };
 
 // Every id appears exactly once: each entry equals its own index, which is only
